@@ -1,6 +1,8 @@
 import { ActionIcon, Group, Stack, Text, Tooltip, UnstyledButton } from '@mantine/core';
 import { IconAdjustments, IconLayoutSidebarRightCollapse } from '@tabler/icons-react';
 
+import { useT } from '../../i18n';
+
 /**
  * RF-108/RF-109: the right rail's header, and the whole of it when collapsed — the same shape as
  * the filmstrip's own `RailHeader` (RF-68), mirrored for the edge it sits on. Collapsed, the icon
@@ -9,14 +11,15 @@ import { IconAdjustments, IconLayoutSidebarRightCollapse } from '@tabler/icons-r
  * content at the same width.
  */
 export function PropertiesHeader({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+  const t = useT();
   if (collapsed) {
     return (
-      <Tooltip label="expandir o painel" position="left">
-        <UnstyledButton onClick={onToggle} w="100%" h="100%" py={10} aria-label="Expandir o painel">
+      <Tooltip label={t.editor.propertiesHeader.expandTip} position="left">
+        <UnstyledButton onClick={onToggle} w="100%" h="100%" py={10} aria-label={t.editor.propertiesHeader.expandAria}>
           <Stack align="center" justify="center" gap={8} h="100%">
             <IconAdjustments size={15} />
             <Text size="xs" fw={600} style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-              Painel
+              {t.editor.propertiesHeader.panel}
             </Text>
           </Stack>
         </UnstyledButton>
@@ -28,11 +31,11 @@ export function PropertiesHeader({ collapsed, onToggle }: { collapsed: boolean; 
       <Group gap={6} wrap="nowrap">
         <IconAdjustments size={15} />
         <Text size="xs" fw={600}>
-          Painel
+          {t.editor.propertiesHeader.panel}
         </Text>
       </Group>
-      <Tooltip label="recolher">
-        <ActionIcon size="sm" variant="subtle" aria-label="Recolher o painel" onClick={onToggle}>
+      <Tooltip label={t.editor.propertiesHeader.collapseTip}>
+        <ActionIcon size="sm" variant="subtle" aria-label={t.editor.propertiesHeader.collapseAria} onClick={onToggle}>
           <IconLayoutSidebarRightCollapse size={15} />
         </ActionIcon>
       </Tooltip>

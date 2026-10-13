@@ -18,20 +18,7 @@ import { useState } from 'react';
 import type { Binding, CatalogField, DeckMapping, SceneShape } from '../../api/types';
 import { bindingKey } from '../../api/types';
 import { FieldPicker, KIND_LABEL } from '../../pages/FieldCatalog';
-
-const MODE_LABELS: Record<string, string> = {
-  text: 'Texto',
-  number: 'Número formatado',
-  status_text: 'Rótulo do status',
-  bullet_list: 'Lista simples',
-  inline_list: 'Lista em linha',
-  grouped_list: 'Lista agrupada',
-  table_rows: 'Linhas de tabela',
-  grouped_rows: 'Linhas agrupadas',
-  status_fill: 'Cor do status',
-  chart: 'Gráfico',
-  qr_code: 'QR code',
-};
+import { useT } from '../../i18n';
 
 export type ContentOrigin = 'estatico' | 'dados' | 'fixo';
 
@@ -77,6 +64,7 @@ export function ContentSection({
   onBind,
   onText,
 }: Props) {
+  const t = useT();
   const [picking, setPicking] = useState(false);
   const slide = mapping.slides[String(originSlideId)];
   const index = slide?.bindings?.findIndex((b) => b.target.endsWith(`/sh${shape.shape_id}`)) ?? -1;
@@ -119,12 +107,12 @@ export function ContentSection({
     <Stack gap="xs" p="sm">
       <Group gap="xs" justify="space-between">
         <Text size="xs" fw={600}>
-          Conteúdo
+          {t.editor.content.title}
         </Text>
         {binding && (
-          <Tooltip label="a próxima geração reescreve esta caixa">
+          <Tooltip label={t.editor.content.boundTip}>
             <Badge size="xs" color="petrol" variant="filled" leftSection={<IconDatabase size={10} />}>
-              vinculado
+              {t.editor.content.bound}
             </Badge>
           </Tooltip>
         )}
@@ -136,17 +124,17 @@ export function ContentSection({
         value={origin}
         onChange={(value) => setOrigin(value as ContentOrigin)}
         data={[
-          { value: 'estatico', label: 'Do slide' },
-          { value: 'dados', label: 'Campo' },
-          { value: 'fixo', label: 'Variável' },
+          { value: 'estatico', label: t.editor.content.fromSlide },
+          { value: 'dados', label: t.editor.content.field },
+          { value: 'fixo', label: t.editor.content.variable },
         ]}
       />
 
       {origin === 'estatico' && (
         <>
           <Textarea
-            label="Texto"
-            description="uma linha por parágrafo; fica no slide até você mudar"
+            label={t.editor.content.text}
+            description={t.editor.content.textHint}
             size="xs"
             autosize
             minRows={2}
@@ -157,9 +145,9 @@ export function ContentSection({
           {overrideText != null && (
             <Group gap={4}>
               <Badge size="xs" color="orange" variant="light" leftSection={<IconLetterCase size={10} />}>
-                texto editado
+                {t.editor.content.edited}
               </Badge>
-              <ActionIcon size="sm" variant="subtle" aria-label="Voltar ao texto original" onClick={() => onText(null)}>
+              <ActionIcon size="sm" variant="subtle" aria-label={t.editor.content.revertAria} onClick={() => onText(null)}>
                 <IconTrash size={13} />
               </ActionIcon>
             </Group>
@@ -170,9 +158,9 @@ export function ContentSection({
       {origin === 'dados' && binding && (
         <Stack gap="xs">
           <Select
-            label="Como preencher"
+            label={t.editor.content.fillAs}
             size="xs"
-            data={Object.entries(MODE_LABELS).map(([value, label]) => ({ value, label }))}
+            data={Object.entries(t.editor.content.modes).map(([value, label]) => ({ value, label }))}
             value={binding.mode}
             onChange={(value) =>
               value && onBind({ ...binding, mode: value as Binding['mode'], variable: null, field: null })
@@ -193,9 +181,9 @@ export function ContentSection({
                       </Badge>
                     )}
                     {legacyField && (
-                      <Tooltip label="vínculo antigo, direto ao catálogo; continua funcionando">
+                      <Tooltip label={t.editor.content.legacyTip}>
                         <Badge size="xs" color="gray" variant="outline">
-                          campo
+                          {t.editor.content.legacyBadge}
                         </Badge>
                       </Tooltip>
                     )}
@@ -207,7 +195,7 @@ export function ContentSection({
                 <ActionIcon
                   size="sm"
                   variant="subtle"
-                  aria-label="Desvincular"
+                  aria-label={t.editor.content.unbind}
                   onClick={() => onBind({ ...binding, variable: null, field: null })}
                 >
                   <IconTrash size={13} />
@@ -215,7 +203,7 @@ export function ContentSection({
               </Group>
             ) : (
               <Text size="xs" c="red.7">
-                Nada escolhido.
+                {t.editor.content.nothing}
               </Text>
             )}
           </Paper>
@@ -225,7 +213,7 @@ export function ContentSection({
             leftSection={<IconDatabase size={12} />}
             onClick={() => setPicking(true)}
           >
-            {bound ? 'Trocar' : 'Escolher variável'}
+            {bound ? t.editor.content.change : t.editor.content.choose}
           </Button>
           <FieldPicker
             opened={picking}
@@ -236,7 +224,7 @@ export function ContentSection({
             onClose={() => setPicking(false)}
           />
           <Text size="xs" c="dimmed">
-            O conteúdo é recalculado a cada geração. Posição, tamanho e formato continuam seus.
+            {t.editor.content.recalculated}
           </Text>
         </Stack>
       )}
@@ -245,8 +233,8 @@ export function ContentSection({
         <Stack gap="xs">
           <Group align="flex-end" gap={4} wrap="nowrap">
             <Textarea
-              label="Texto com marcadores"
-              description="{{texto.definicao}} vira o valor que alcança este slide"
+              label={t.editor.content.markersLabel}
+              description={t.editor.content.markersHint}
               size="xs"
               autosize
               minRows={2}
@@ -257,13 +245,13 @@ export function ContentSection({
             />
             <Menu width={280} position="bottom-end">
               <Menu.Target>
-                <ActionIcon variant="light" size="lg" aria-label="Inserir marcador de variável">
+                <ActionIcon variant="light" size="lg" aria-label={t.editor.content.insertAria}>
                   <IconBraces size={16} />
                 </ActionIcon>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Label>Variáveis</Menu.Label>
-                {variables.length === 0 && <Menu.Item disabled>Nenhuma variável ainda</Menu.Item>}
+                <Menu.Label>{t.editor.content.variables}</Menu.Label>
+                {variables.length === 0 && <Menu.Item disabled>{t.editor.content.noVariables}</Menu.Item>}
                 {variables.map((item) => (
                   <Menu.Item
                     key={item.name}
@@ -278,7 +266,7 @@ export function ContentSection({
           </Group>
           <Paper withBorder p={6} bg="var(--mantine-color-default-hover)">
             <Text size="xs" c="dimmed">
-              Já resolvido neste slide:
+              {t.editor.content.resolvedHere}
             </Text>
             <Text size="xs" style={{ whiteSpace: 'pre-wrap' }}>
               {shape.text?.paragraphs?.map((p) => p.text).join('\n') || '—'}

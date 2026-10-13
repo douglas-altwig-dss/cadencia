@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { CellStyle, TableEdit } from '../../api/types';
 import type { EffectiveShape } from '../../lib/deckEdits';
 import { cmToEmu, emuToCm } from '../../lib/emu';
+import { useT } from '../../i18n';
 
 const hex = (value: string) => value.replace('#', '').toUpperCase();
 
@@ -23,6 +24,7 @@ export function TablePanel({
   edit?: TableEdit;
   onChange: (patch: { col_widths?: number[] | null; cells?: Record<string, CellStyle | null> }) => void;
 }) {
+  const t = useT();
   const table = shape.table!;
   const [row, setRow] = useState(0);
   const [col, setCol] = useState(0);
@@ -35,15 +37,15 @@ export function TablePanel({
   return (
     <Stack gap="xs" p="sm">
       <Text size="xs" fw={600}>
-        Tabela · {table.rows} × {table.cols}
+        {t.editor.table.title(table.rows, table.cols)}
       </Text>
       {shape.bound && (
         <Text size="xs" c="dimmed">
-          Tabela preenchida pelos dados: larguras e estilos ficam; as linhas mudam a cada geração.
+          {t.editor.table.boundHint}
         </Text>
       )}
       <Text size="xs" c="dimmed">
-        Largura das colunas (cm)
+        {t.editor.table.widths}
       </Text>
       <SimpleGrid cols={Math.min(table.cols, 4)} spacing={4}>
         {table.col_widths.map((width, index) => (
@@ -54,7 +56,7 @@ export function TablePanel({
             step={0.1}
             decimalScale={2}
             value={Number(emuToCm(width).toFixed(2))}
-            aria-label={`Largura da coluna ${index + 1}`}
+            aria-label={t.editor.table.widthAria(index + 1)}
             onChange={(value) => {
               const cm = Number(value);
               if (!cm || cm <= 0) return;
@@ -66,21 +68,21 @@ export function TablePanel({
         ))}
       </SimpleGrid>
       <Button size="compact-xs" variant="subtle" disabled={!edit?.col_widths} onClick={() => onChange({ col_widths: null })}>
-        Voltar às larguras do modelo
+        {t.editor.table.resetWidths}
       </Button>
       <Divider />
       <Group gap="xs" grow>
         <Select
           size="xs"
-          label="Linha"
-          data={Array.from({ length: table.rows }, (_, r) => ({ value: String(r), label: r === 0 ? '1 (cabeçalho)' : String(r + 1) }))}
+          label={t.editor.table.row}
+          data={Array.from({ length: table.rows }, (_, r) => ({ value: String(r), label: r === 0 ? t.editor.table.headerRow : String(r + 1) }))}
           value={String(row)}
           onChange={(v) => v && setRow(Number(v))}
           allowDeselect={false}
         />
         <Select
           size="xs"
-          label="Coluna"
+          label={t.editor.table.column}
           data={Array.from({ length: table.cols }, (_, c) => ({ value: String(c), label: String(c + 1) }))}
           value={String(col)}
           onChange={(v) => v && setCol(Number(v))}
@@ -88,25 +90,25 @@ export function TablePanel({
           disabled={wholeRow}
         />
       </Group>
-      <Checkbox size="xs" label="Aplicar à linha inteira" checked={wholeRow} onChange={(e) => setWholeRow(e.currentTarget.checked)} />
+      <Checkbox size="xs" label={t.editor.table.wholeRow} checked={wholeRow} onChange={(e) => setWholeRow(e.currentTarget.checked)} />
       <Text size="xs" c="dimmed" lineClamp={1}>
-        Texto atual: {table.cells[row]?.[col] || '—'}
+        {t.editor.table.currentText(table.cells[row]?.[col] || '—')}
       </Text>
       <ColorInput
         size="xs"
-        label="Preenchimento"
+        label={t.editor.table.fill}
         format="hex"
         value={current.fill && current.fill !== 'none' ? `#${current.fill}` : ''}
         onChangeEnd={(value) => value && style({ fill: hex(value) })}
       />
-      <ColorInput size="xs" label="Cor do texto" format="hex" value={current.color ? `#${current.color}` : ''} onChangeEnd={(value) => value && style({ color: hex(value) })} />
+      <ColorInput size="xs" label={t.editor.table.textColor} format="hex" value={current.color ? `#${current.color}` : ''} onChangeEnd={(value) => value && style({ color: hex(value) })} />
       <Group gap="xs" align="flex-end">
-        <NumberInput size="xs" label="Tamanho (pt)" min={6} max={96} value={current.size_pt ?? ''} onChange={(v) => v && style({ size_pt: Number(v) })} w={100} />
+        <NumberInput size="xs" label={t.editor.table.size} min={6} max={96} value={current.size_pt ?? ''} onChange={(v) => v && style({ size_pt: Number(v) })} w={100} />
         <Chip size="xs" checked={Boolean(current.bold)} onChange={(on) => style({ bold: on })}>
-          Negrito
+          {t.editor.table.bold}
         </Chip>
         <Chip size="xs" checked={Boolean(current.italic)} onChange={(on) => style({ italic: on })}>
-          Itálico
+          {t.editor.table.italic}
         </Chip>
       </Group>
       <SegmentedControl
@@ -114,9 +116,9 @@ export function TablePanel({
         value={current.align ?? ''}
         onChange={(value) => style({ align: value as CellStyle['align'] })}
         data={[
-          { value: 'left', label: 'Esq.' },
-          { value: 'center', label: 'Centro' },
-          { value: 'right', label: 'Dir.' },
+          { value: 'left', label: t.editor.table.left },
+          { value: 'center', label: t.editor.table.center },
+          { value: 'right', label: t.editor.table.right },
         ]}
       />
       <Group gap="xs">
@@ -127,10 +129,10 @@ export function TablePanel({
             onChange({ cells: Object.fromEntries(Array.from({ length: table.cols }, (_, c) => [`0:${c}`, { fill: '0E5C5B', color: 'FFFFFF', bold: true }])) })
           }
         >
-          Destacar cabeçalho
+          {t.editor.table.highlightHeader}
         </Button>
         <Button size="compact-xs" variant="subtle" color="red" onClick={() => onChange({ cells: Object.fromEntries(targets.map((a) => [a, null])) })}>
-          Limpar estilo
+          {t.editor.table.clearStyle}
         </Button>
       </Group>
     </Stack>

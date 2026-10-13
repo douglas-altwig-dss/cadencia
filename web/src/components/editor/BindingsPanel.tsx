@@ -4,20 +4,7 @@ import { IconEye, IconTrash } from '@tabler/icons-react';
 import type { Binding, CatalogField, SlideMapping } from '../../api/types';
 import { bindingKey } from '../../api/types';
 import { KIND_LABEL } from '../../pages/FieldCatalog';
-
-const MODE_LABELS: Record<string, string> = {
-  text: 'Texto',
-  number: 'Número',
-  status_text: 'Rótulo do status',
-  bullet_list: 'Lista',
-  inline_list: 'Lista em linha',
-  grouped_list: 'Lista agrupada',
-  table_rows: 'Tabela',
-  grouped_rows: 'Tabela agrupada',
-  status_fill: 'Cor do status',
-  chart: 'Gráfico',
-  qr_code: 'QR code',
-};
+import { useT } from '../../i18n';
 
 /**
  * RF-69: every binding on this slide, in one list.
@@ -45,12 +32,13 @@ export function BindingsPanel({
   onSelect: (shapeKey: string) => void;
   onRemove: (index: number) => void;
 }) {
+  const t = useT();
   const bindings = slide?.bindings ?? [];
   if (!bindings.length) {
     return (
       <Text size="xs" c="dimmed" p="sm">
-        Nenhuma área deste slide está ligada a uma variável. Selecione uma forma e use{' '}
-        <b>Conteúdo → Campo</b>.
+        {t.editor.bindings.emptyBefore} <b>{t.editor.bindings.emptyPath}</b>
+        {t.editor.bindings.emptyAfter}
       </Text>
     );
   }
@@ -72,7 +60,7 @@ export function BindingsPanel({
               <Stack gap={0} style={{ minWidth: 0, flex: 1 }}>
                 <Group gap={4} wrap="nowrap">
                   <Badge size="xs" variant="light">
-                    {MODE_LABELS[binding.mode] ?? binding.mode}
+                    {t.editor.bindings.modes[binding.mode] ?? binding.mode}
                   </Badge>
                   {spec && (
                     <Badge size="xs" variant="outline" color="gray">
@@ -81,19 +69,19 @@ export function BindingsPanel({
                   )}
                 </Group>
                 <Text size="xs" lineClamp={1}>
-                  {binding.value != null ? binding.value || '(texto vazio)' : (spec?.label ?? key ?? '—')}
+                  {binding.value != null ? binding.value || t.editor.bindings.emptyText : (spec?.label ?? key ?? '—')}
                 </Text>
                 <Text size="xs" c="dimmed" className="mono" lineClamp={1}>
                   {binding.target}
                 </Text>
               </Stack>
               <Group gap={2} wrap="nowrap">
-                <Tooltip label="selecionar no slide">
+                <Tooltip label={t.editor.bindings.selectTip}>
                   <ActionIcon
                     size="sm"
                     variant="subtle"
                     disabled={!shapeKey}
-                    aria-label={`Selecionar a área ${binding.target}`}
+                    aria-label={t.editor.bindings.selectAria(binding.target)}
                     onClick={() => shapeKey && onSelect(shapeKey)}
                   >
                     <IconEye size={14} />
@@ -103,7 +91,7 @@ export function BindingsPanel({
                   size="sm"
                   variant="subtle"
                   color="red"
-                  aria-label={`Remover o vínculo de ${binding.target}`}
+                  aria-label={t.editor.bindings.removeAria(binding.target)}
                   onClick={() => onRemove(index)}
                 >
                   <IconTrash size={14} />

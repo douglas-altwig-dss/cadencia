@@ -5,6 +5,7 @@ import type { EffectiveShape } from '../../lib/deckEdits';
 import { EMU_PER_PT, emuToPx } from '../../lib/emu';
 import { fontStack } from '../../lib/fonts';
 import { layoutParagraph } from '../../lib/textLayout';
+import { useT } from '../../i18n';
 
 const EMPTY_FRAME: SceneText = {
   paragraphs: [{ text: '', level: 0, align: 'center', line_spacing: null, space_before_pt: null, space_after_pt: null, bullet: { kind: 'none' }, style: { size_pt: 18 }, runs: [] }],
@@ -46,6 +47,7 @@ export function TextOverlay({
   onChange: (text: string) => void;
   onDone: () => void;
 }) {
+  const t = useT();
   const ref = useRef<HTMLTextAreaElement>(null);
   // A shape with no text frame yet still gets a caret: PowerPoint's own defaults for an autoshape,
   // which is what the file will end up with if anything is typed.
@@ -103,7 +105,7 @@ export function TextOverlay({
       ref={ref}
       value={value}
       spellCheck={false}
-      aria-label="Texto do elemento"
+      aria-label={t.editor.stage.textAria}
       onChange={(event) => onChange(event.currentTarget.value)}
       onKeyDown={(event) => {
         event.stopPropagation(); // the canvas shortcuts must not see typing

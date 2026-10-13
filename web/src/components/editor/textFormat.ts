@@ -7,6 +7,7 @@ import {
 
 import type { ParagraphEdit } from '../../api/types';
 import type { EffectiveShape } from '../../lib/deckEdits';
+import { t } from '../../i18n';
 
 /** Shared by the toolbar and the properties panel, so the two never disagree about a control. */
 export const FONTS = [
@@ -22,12 +23,14 @@ export const FONTS = [
 
 export const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 54, 60, 72, 96];
 
-export const ALIGNS = [
-  { value: 'left', icon: IconAlignLeft, label: 'à esquerda' },
-  { value: 'center', icon: IconAlignCenter, label: 'centralizado' },
-  { value: 'right', icon: IconAlignRight, label: 'à direita' },
-  { value: 'justify', icon: IconAlignJustified, label: 'justificado' },
-] as const;
+/** The alignment buttons; a function so the labels follow the current language. */
+export const ALIGNS = () =>
+  [
+    { value: 'left', icon: IconAlignLeft, label: t().editor.textFormat.alignLeft },
+    { value: 'center', icon: IconAlignCenter, label: t().editor.textFormat.alignCenter },
+    { value: 'right', icon: IconAlignRight, label: t().editor.textFormat.alignRight },
+    { value: 'justify', icon: IconAlignJustified, label: t().editor.textFormat.alignJustify },
+  ] as const;
 
 export const hex = (value?: string | null) => (value ? `#${value.replace('#', '')}` : '');
 export const bare = (value: string) => value.replace('#', '').toUpperCase().slice(0, 6);

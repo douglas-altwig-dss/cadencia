@@ -34,6 +34,7 @@ import type { NamedStyle, ParagraphEdit, ShapeEdit } from '../../api/types';
 import type { EffectiveShape } from '../../lib/deckEdits';
 import { cmToEmu, emuToCm } from '../../lib/emu';
 import { ALIGNS, FONTS, bare, hex, paragraphsOf } from './textFormat';
+import { useT } from '../../i18n';
 
 interface Props {
   shape: EffectiveShape | null;
@@ -72,34 +73,35 @@ export function PropertiesPanel({
   styles = [],
   onStyles,
 }: Props) {
+  const t = useT();
   if (count > 1) {
     return (
       <Stack gap="xs" p="sm">
         <Text size="sm" fw={600}>
-          {grouped ? `Grupo de ${count} elementos` : `${count} elementos selecionados`}
+          {grouped ? t.editor.properties.groupOf(count) : t.editor.properties.selectedCount(count)}
         </Text>
         <Text size="xs" c="dimmed">
           {grouped
-            ? 'Selecionar um deles seleciona o grupo inteiro. Desagrupe para editar um só.'
-            : 'Arraste para mover todos juntos. Escolha um só para editar as propriedades.'}
+            ? t.editor.properties.groupHint
+            : t.editor.properties.manyHint}
         </Text>
         <Group gap={4}>
           {grouped
             ? onUngroup && (
                 <Button size="compact-xs" variant="light" leftSection={<IconLayersSubtract size={13} />} onClick={onUngroup}>
-                  Desagrupar
+                  {t.editor.properties.ungroup}
                 </Button>
               )
             : onGroup && (
                 <Button size="compact-xs" variant="light" leftSection={<IconLayersUnion size={13} />} onClick={onGroup}>
-                  Agrupar
+                  {t.editor.properties.group}
                 </Button>
               )}
           <Button size="compact-xs" variant="default" onClick={() => onOrder('front')}>
-            Trazer para a frente
+            {t.editor.properties.bringToFront}
           </Button>
           <Button size="compact-xs" variant="default" onClick={() => onOrder('back')}>
-            Enviar para trás
+            {t.editor.properties.sendToBack}
           </Button>
         </Group>
       </Stack>
@@ -109,10 +111,10 @@ export function PropertiesPanel({
     return (
       <Stack gap={4} p="sm">
         <Text size="sm" fw={600}>
-          Nada selecionado
+          {t.editor.properties.nothing}
         </Text>
         <Text size="xs" c="dimmed">
-          Clique num elemento do slide para editá-lo, ou use a barra acima para inserir um novo.
+          {t.editor.properties.nothingHint}
         </Text>
       </Stack>
     );
@@ -139,29 +141,29 @@ export function PropertiesPanel({
               {shape.kind}
             </Badge>
             {shape.bound && (
-              <Tooltip label={`Preenchido pelos dados (${shape.bound_field}); a próxima geração reescreve o texto.`} multiline w={250}>
+              <Tooltip label={t.editor.properties.boundTip(shape.bound_field ?? '')} multiline w={250}>
                 <Badge size="xs" color="petrol" variant="filled">
-                  dados
+                  {t.editor.properties.boundBadge}
                 </Badge>
               </Tooltip>
             )}
             {shape.dirty && (
               <Badge size="xs" color="orange" variant="light">
-                editado
+                {t.editor.properties.edited}
               </Badge>
             )}
           </Group>
         </Stack>
         <Group gap={2} wrap="nowrap">
           {shape.dirty && (
-            <Tooltip label="desfazer as edições deste elemento">
-              <ActionIcon variant="subtle" aria-label="Reverter o elemento" onClick={onReset}>
+            <Tooltip label={t.editor.properties.resetTip}>
+              <ActionIcon variant="subtle" aria-label={t.editor.properties.resetAria} onClick={onReset}>
                 <IconArrowBackUp size={16} />
               </ActionIcon>
             </Tooltip>
           )}
-          <Tooltip label="remover do slide">
-            <ActionIcon variant="subtle" color="red" aria-label="Remover o elemento" onClick={onDelete}>
+          <Tooltip label={t.editor.properties.removeTip}>
+            <ActionIcon variant="subtle" color="red" aria-label={t.editor.properties.removeAria} onClick={onDelete}>
               <IconTrash size={16} />
             </ActionIcon>
           </Tooltip>
@@ -171,10 +173,10 @@ export function PropertiesPanel({
         <>
           <Group p="sm" pt={0}>
             <Button size="compact-xs" variant="light" leftSection={<IconLayersSubtract size={13} />} onClick={onUngroup}>
-              Desagrupar
+              {t.editor.properties.ungroup}
             </Button>
             <Text size="xs" c="dimmed">
-              Separa as formas deste grupo para editá-las uma a uma.
+              {t.editor.properties.ungroupHint}
             </Text>
           </Group>
         </>
@@ -209,7 +211,7 @@ export function PropertiesPanel({
         <Accordion.Item value="posicao">
           <Accordion.Control>
             <Text size="xs" fw={600}>
-              Posição e tamanho
+              {t.editor.properties.position}
             </Text>
           </Accordion.Control>
           <Accordion.Panel>
@@ -234,7 +236,7 @@ export function PropertiesPanel({
               </Group>
               <Group grow>
                 <NumberInput
-                  label="Largura (cm)"
+                  label={t.editor.properties.width}
                   size="xs"
                   decimalScale={2}
                   step={0.1}
@@ -243,7 +245,7 @@ export function PropertiesPanel({
                   onChange={(v) => setFrame({ cx: cmToEmu(Number(v) || 0.1) })}
                 />
                 <NumberInput
-                  label="Altura (cm)"
+                  label={t.editor.properties.height}
                   size="xs"
                   decimalScale={2}
                   step={0.1}
@@ -253,7 +255,7 @@ export function PropertiesPanel({
                 />
               </Group>
               <NumberInput
-                label="Rotação (graus)"
+                label={t.editor.properties.rotation}
                 size="xs"
                 step={5}
                 min={-360}
@@ -263,16 +265,16 @@ export function PropertiesPanel({
               />
               <Group gap={4}>
                 <Button size="compact-xs" variant="default" onClick={() => onOrder('front')}>
-                  Frente
+                  {t.editor.properties.front}
                 </Button>
                 <Button size="compact-xs" variant="default" onClick={() => onOrder('forward')}>
-                  Avançar
+                  {t.editor.properties.forward}
                 </Button>
                 <Button size="compact-xs" variant="default" onClick={() => onOrder('backward')}>
-                  Recuar
+                  {t.editor.properties.backward}
                 </Button>
                 <Button size="compact-xs" variant="default" onClick={() => onOrder('back')}>
-                  Fundo
+                  {t.editor.properties.back}
                 </Button>
               </Group>
             </Stack>
@@ -283,20 +285,19 @@ export function PropertiesPanel({
           <Accordion.Item value="texto">
             <Accordion.Control>
               <Text size="xs" fw={600}>
-                Texto
+                {t.editor.properties.text}
               </Text>
             </Accordion.Control>
             <Accordion.Panel>
               <Stack gap="xs">
                 {shape.bound && (
                   <Text size="xs" c="petrol.8">
-                    Este elemento é preenchido por {shape.bound_field}. Editar o texto aqui passa a valer por cima
-                    dos dados até você reverter.
+                    {t.editor.properties.boundText(shape.bound_field ?? '')}
                   </Text>
                 )}
                 <Textarea
-                  label="Conteúdo"
-                  description="uma linha por parágrafo"
+                  label={t.editor.properties.content}
+                  description={t.editor.properties.contentHint}
                   size="xs"
                   autosize
                   minRows={2}
@@ -311,7 +312,7 @@ export function PropertiesPanel({
                 />
                 <Group grow>
                   <Select
-                    label="Fonte"
+                    label={t.editor.properties.font}
                     size="xs"
                     data={FONTS}
                     searchable
@@ -319,7 +320,7 @@ export function PropertiesPanel({
                     onChange={(value) => patchAll({ style: { font: value } })}
                   />
                   <NumberInput
-                    label="Corpo (pt)"
+                    label={t.editor.properties.size}
                     size="xs"
                     min={4}
                     max={200}
@@ -332,32 +333,32 @@ export function PropertiesPanel({
                   <ActionIcon.Group>
                     <ActionIcon
                       variant={first?.style?.bold ? 'filled' : 'default'}
-                      aria-label="Negrito"
+                      aria-label={t.editor.properties.bold}
                       onClick={() => patchAll({ style: { bold: !first?.style?.bold } })}
                     >
                       <IconBold size={15} />
                     </ActionIcon>
                     <ActionIcon
                       variant={first?.style?.italic ? 'filled' : 'default'}
-                      aria-label="Itálico"
+                      aria-label={t.editor.properties.italic}
                       onClick={() => patchAll({ style: { italic: !first?.style?.italic } })}
                     >
                       <IconItalic size={15} />
                     </ActionIcon>
                     <ActionIcon
                       variant={first?.style?.underline ? 'filled' : 'default'}
-                      aria-label="Sublinhado"
+                      aria-label={t.editor.properties.underline}
                       onClick={() => patchAll({ style: { underline: !first?.style?.underline } })}
                     >
                       <IconUnderline size={15} />
                     </ActionIcon>
                   </ActionIcon.Group>
                   <ActionIcon.Group>
-                    {ALIGNS.map(({ value, icon: Icon, label }) => (
+                    {ALIGNS().map(({ value, icon: Icon, label }) => (
                       <ActionIcon
                         key={value}
                         variant={first?.align === value ? 'filled' : 'default'}
-                        aria-label={`Alinhar ${label}`}
+                        aria-label={label}
                         onClick={() => patchAll({ align: value })}
                       >
                         <Icon size={15} />
@@ -367,14 +368,14 @@ export function PropertiesPanel({
                   <ActionIcon.Group>
                     <ActionIcon
                       variant={first?.bullet === 'char' ? 'filled' : 'default'}
-                      aria-label="Lista com marcadores"
+                      aria-label={t.editor.properties.bullets}
                       onClick={() => patchAll({ bullet: first?.bullet === 'char' ? 'none' : 'char' })}
                     >
                       <IconList size={15} />
                     </ActionIcon>
                     <ActionIcon
                       variant={first?.bullet === 'number' ? 'filled' : 'default'}
-                      aria-label="Lista numerada"
+                      aria-label={t.editor.properties.numbered}
                       onClick={() => patchAll({ bullet: first?.bullet === 'number' ? 'none' : 'number' })}
                     >
                       <IconListNumbers size={15} />
@@ -382,7 +383,7 @@ export function PropertiesPanel({
                   </ActionIcon.Group>
                 </Group>
                 <ColorInput
-                  label="Cor do texto"
+                  label={t.editor.properties.textColor}
                   size="xs"
                   format="hex"
                   value={hex(first?.style?.color)}
@@ -390,7 +391,7 @@ export function PropertiesPanel({
                 />
                 <Group grow>
                   <NumberInput
-                    label="Entrelinha"
+                    label={t.editor.properties.lineSpacing}
                     size="xs"
                     min={0.5}
                     max={4}
@@ -400,7 +401,7 @@ export function PropertiesPanel({
                     onChange={(v) => patchAll({ line_spacing: Number(v) || 1 })}
                   />
                   <NumberInput
-                    label="Recuo (nível)"
+                    label={t.editor.properties.indent}
                     size="xs"
                     min={0}
                     max={8}
@@ -410,23 +411,23 @@ export function PropertiesPanel({
                 </Group>
                 <Group grow>
                   <Select
-                    label="Alinhamento vertical"
+                    label={t.editor.properties.verticalAlign}
                     size="xs"
                     data={[
-                      { value: 'top', label: 'Em cima' },
-                      { value: 'middle', label: 'No meio' },
-                      { value: 'bottom', label: 'Embaixo' },
+                      { value: 'top', label: t.editor.properties.top },
+                      { value: 'middle', label: t.editor.properties.middle },
+                      { value: 'bottom', label: t.editor.properties.bottom },
                     ]}
                     value={text.anchor}
                     onChange={(value) => value && onPatch({ text: { anchor: value as 'top' | 'middle' | 'bottom' } })}
                   />
                   <Select
-                    label="Ajuste automático"
+                    label={t.editor.properties.autofit}
                     size="xs"
                     data={[
-                      { value: 'none', label: 'Não ajustar' },
-                      { value: 'shrink', label: 'Encolher o texto' },
-                      { value: 'resize', label: 'Crescer a caixa' },
+                      { value: 'none', label: t.editor.properties.autofitNone },
+                      { value: 'shrink', label: t.editor.properties.autofitShrink },
+                      { value: 'resize', label: t.editor.properties.autofitResize },
                     ]}
                     value={text.autofit}
                     onChange={(value) => value && onPatch({ text: { autofit: value as 'none' | 'shrink' | 'resize' } })}
@@ -434,7 +435,7 @@ export function PropertiesPanel({
                 </Group>
                 <Group grow align="flex-end">
                   <NumberInput
-                    label="Colunas"
+                    label={t.editor.properties.columns}
                     size="xs"
                     min={1}
                     max={4}
@@ -442,7 +443,7 @@ export function PropertiesPanel({
                     onChange={(v) => onPatch({ text: { columns: Number(v) || 1 } })}
                   />
                   <Switch
-                    label="Quebrar linha"
+                    label={t.editor.properties.wrap}
                     size="xs"
                     checked={text.word_wrap}
                     onChange={(event) => onPatch({ text: { word_wrap: event.currentTarget.checked } })}
@@ -452,7 +453,7 @@ export function PropertiesPanel({
                   {(['l', 'r', 't', 'b'] as const).map((side) => (
                     <NumberInput
                       key={side}
-                      label={`Margem ${side.toUpperCase()} (pt)`}
+                      label={t.editor.properties.margin(side.toUpperCase())}
                       size="xs"
                       min={0}
                       max={72}
@@ -472,18 +473,18 @@ export function PropertiesPanel({
         <Accordion.Item value="aparencia">
           <Accordion.Control>
             <Text size="xs" fw={600}>
-              Preenchimento e contorno
+              {t.editor.properties.fillAndLine}
             </Text>
           </Accordion.Control>
           <Accordion.Panel>
             <Stack gap="xs">
               <Select
-                label="Preenchimento"
+                label={t.editor.properties.fill}
                 size="xs"
                 data={[
-                  { value: 'inherit', label: 'Como no modelo' },
-                  { value: 'solid', label: 'Cor sólida' },
-                  { value: 'none', label: 'Sem preenchimento' },
+                  { value: 'inherit', label: t.editor.properties.asTemplate },
+                  { value: 'solid', label: t.editor.properties.solidFill },
+                  { value: 'none', label: t.editor.properties.noFill },
                 ]}
                 value={shape.fill.type}
                 onChange={(value) =>
@@ -493,14 +494,14 @@ export function PropertiesPanel({
               {shape.fill.type === 'solid' && (
                 <>
                   <ColorInput
-                    label="Cor"
+                    label={t.editor.properties.color}
                     size="xs"
                     format="hex"
                     value={hex(shape.fill.color)}
                     onChange={(value) => onPatch({ fill: { type: 'solid', color: bare(value), alpha: shape.fill.alpha } })}
                   />
                   <Stack gap={2}>
-                    <Text size="xs">Transparência</Text>
+                    <Text size="xs">{t.editor.properties.transparency}</Text>
                     <Slider
                       size="sm"
                       min={0}
@@ -516,7 +517,7 @@ export function PropertiesPanel({
               )}
               {shape.geometry === 'roundRect' && (
                 <Stack gap={2}>
-                  <Text size="xs">Arredondamento dos cantos</Text>
+                  <Text size="xs">{t.editor.properties.cornerRadius}</Text>
                   <Slider
                     size="sm"
                     min={0}
@@ -529,12 +530,12 @@ export function PropertiesPanel({
               )}
               <Divider my={2} />
               <Select
-                label="Contorno"
+                label={t.editor.properties.outline}
                 size="xs"
                 data={[
-                  { value: 'inherit', label: 'Como no modelo' },
-                  { value: 'solid', label: 'Linha sólida' },
-                  { value: 'none', label: 'Sem contorno' },
+                  { value: 'inherit', label: t.editor.properties.asTemplate },
+                  { value: 'solid', label: t.editor.properties.solidLine },
+                  { value: 'none', label: t.editor.properties.noLine },
                 ]}
                 value={shape.line.type}
                 onChange={(value) => value && onPatch({ line: { ...shape.line, type: value as 'solid' | 'none' } })}
@@ -542,14 +543,14 @@ export function PropertiesPanel({
               {shape.line.type === 'solid' && (
                 <Group grow align="flex-end">
                   <ColorInput
-                    label="Cor"
+                    label={t.editor.properties.color}
                     size="xs"
                     format="hex"
                     value={hex(shape.line.color)}
                     onChange={(value) => onPatch({ line: { ...shape.line, type: 'solid', color: bare(value) } })}
                   />
                   <NumberInput
-                    label="Espessura (pt)"
+                    label={t.editor.properties.lineWidth}
                     size="xs"
                     min={0.25}
                     max={20}
@@ -559,13 +560,13 @@ export function PropertiesPanel({
                     onChange={(v) => onPatch({ line: { ...shape.line, type: 'solid', width_pt: Number(v) || 1 } })}
                   />
                   <Select
-                    label="Traço"
+                    label={t.editor.properties.dash}
                     size="xs"
                     data={[
-                      { value: 'solid', label: 'Contínuo' },
-                      { value: 'dash', label: 'Tracejado' },
-                      { value: 'dot', label: 'Pontilhado' },
-                      { value: 'dashDot', label: 'Traço-ponto' },
+                      { value: 'solid', label: t.editor.properties.dashSolid },
+                      { value: 'dash', label: t.editor.properties.dashDash },
+                      { value: 'dot', label: t.editor.properties.dashDot },
+                      { value: 'dashDot', label: t.editor.properties.dashDashDot },
                     ]}
                     value={shape.line.dash ?? 'solid'}
                     onChange={(value) => onPatch({ line: { ...shape.line, type: 'solid', dash: value } })}
@@ -580,19 +581,19 @@ export function PropertiesPanel({
           <Accordion.Control>
             <Group gap={6}>
               <Text size="xs" fw={600}>
-                Acessibilidade
+                {t.editor.properties.accessibility}
               </Text>
               {(shape.kind === 'image' || shape.kind === 'chart') && !(shape.edit?.alt_text ?? shape.alt) && (
                 <Badge size="xs" color="yellow" variant="light">
-                  sem texto alternativo
+                  {t.editor.properties.noAlt}
                 </Badge>
               )}
             </Group>
           </Accordion.Control>
           <Accordion.Panel>
             <Textarea
-              label="Texto alternativo"
-              description="O que um leitor de tela diz sobre este elemento. Gráficos gerados recebem uma descrição dos dados quando este campo fica vazio."
+              label={t.editor.properties.altText}
+              description={t.editor.properties.altTextHint}
               size="xs"
               autosize
               minRows={2}
@@ -612,19 +613,19 @@ export function PropertiesPanel({
           <Accordion.Item value="imagem">
             <Accordion.Control>
               <Text size="xs" fw={600}>
-                Imagem
+                {t.editor.properties.image}
               </Text>
             </Accordion.Control>
             <Accordion.Panel>
               <Stack gap="xs">
                 <Text size="xs" c="dimmed">
-                  Recorte, em fração de cada lado.
+                  {t.editor.properties.cropHint}
                 </Text>
                 <Group grow>
                   {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
                     <NumberInput
                       key={side}
-                      label={side}
+                      label={t.editor.properties.cropSides[side]}
                       size="xs"
                       min={0}
                       max={0.9}
@@ -670,6 +671,7 @@ function NamedStyles({
   onStyles: (next: NamedStyle[]) => void;
   onApply: (style: NamedStyle) => void;
 }) {
+  const t = useT();
   const [name, setName] = useState('');
   const [adding, setAdding] = useState(false);
   const first = paragraphsOf(shape)[0];
@@ -687,17 +689,17 @@ function NamedStyles({
     <Stack gap={6} p="sm">
       <Group justify="space-between">
         <Text size="xs" fw={600}>
-          Estilos
+          {t.editor.properties.styles}
         </Text>
-        <Tooltip label="Salvar o visual deste elemento como estilo">
-          <ActionIcon size="sm" variant="subtle" onClick={() => setAdding((a) => !a)} aria-label="Novo estilo">
+        <Tooltip label={t.editor.properties.saveStyleTip}>
+          <ActionIcon size="sm" variant="subtle" onClick={() => setAdding((a) => !a)} aria-label={t.editor.properties.newStyleAria}>
             <IconPlus size={14} />
           </ActionIcon>
         </Tooltip>
       </Group>
       {adding && (
         <Group gap={4} wrap="nowrap">
-          <TextInput size="xs" placeholder="nome do estilo" value={name} onChange={(e) => setName(e.currentTarget.value)} style={{ flex: 1 }} />
+          <TextInput size="xs" placeholder={t.editor.properties.styleName} value={name} onChange={(e) => setName(e.currentTarget.value)} style={{ flex: 1 }} />
           <Button
             size="compact-xs"
             disabled={!name.trim()}
@@ -708,7 +710,7 @@ function NamedStyles({
               setAdding(false);
             }}
           >
-            Salvar
+            {t.editor.properties.save}
           </Button>
         </Group>
       )}
@@ -732,7 +734,7 @@ function NamedStyles({
                 size="compact-xs"
                 variant="default"
                 px={4}
-                aria-label={`Apagar o estilo ${style.name}`}
+                aria-label={t.editor.properties.deleteStyleAria(style.name)}
                 onClick={() => onStyles(styles.filter((s) => s.name !== style.name))}
               >
                 ×
@@ -743,7 +745,7 @@ function NamedStyles({
       ) : (
         !adding && (
           <Text size="xs" c="dimmed">
-            Nenhum estilo salvo. Formate um elemento e salve o visual com +.
+            {t.editor.properties.noStyles}
           </Text>
         )
       )}

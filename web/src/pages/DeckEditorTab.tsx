@@ -125,6 +125,7 @@ import {
 } from '../lib/deckEdits';
 import { cmToEmu } from '../lib/emu';
 import { loadDeckFonts, type FontPlan } from '../lib/fonts';
+import { useT } from '../i18n';
 
 const HISTORY_LIMIT = 100;
 /** Default, smallest and largest widths of the two side panels, in pixels. */
@@ -267,6 +268,7 @@ export function DeckEditorTab({
    * "slide editor" two different screens over the same file. They are one screen; what differs is
    * only whether the data has been filled in yet.
    */
+  const t = useT();
   const runScene = useRunScene(runId);
   const templateScene = useTemplateScene(templateId, !runId);
   const scene = runId ? runScene : templateScene;
@@ -359,8 +361,8 @@ export function DeckEditorTab({
           missing?.length &&
           notifications.show({
             color: 'yellow',
-            title: 'Fontes aproximadas',
-            message: `Não há face de métricas compatíveis para ${missing.join(', ')}. Essas caixas podem quebrar linha em lugares diferentes no PowerPoint.`,
+            title: t.editor.page.fontsTitle,
+            message: t.editor.page.fontsMessage(missing.join(', ')),
           }),
       )
       .catch(() => undefined);
@@ -445,7 +447,7 @@ export function DeckEditorTab({
           onSuccess: (result) => {
             revision.current = result.revision;
             setDirty(false);
-            announce('Edições salvas.');
+            announce(t.editor.page.saved);
           },
         },
       ),
@@ -497,13 +499,13 @@ export function DeckEditorTab({
 
   // #21: the editor's panels and tools, reachable from Ctrl+K without hunting the toolbar.
   useRegisterCommands('editor', [
-    { id: 'biblioteca', label: 'Abrir a biblioteca de imagens e blocos', run: () => setLibrary(true) },
-    { id: 'localizar', label: 'Localizar e substituir', shortcut: 'Ctrl+H', run: () => setPanelMode('localizar') },
-    { id: 'comentarios', label: 'Comentários do slide', run: () => setPanelMode('comentarios') },
-    { id: 'propriedades', label: 'Painel de propriedades', run: () => setPanelMode('props') },
-    { id: 'historico', label: 'Histórico deste slide', disabled: !current, run: () => current && setHistoryOf(current.key) },
-    { id: 'grade', label: showGrid ? 'Esconder a grade' : 'Mostrar a grade', run: () => setShowGrid((v) => !v) },
-    { id: 'ajustar', label: 'Ajustar o slide à janela', run: () => setZoom('fit') },
+    { id: 'biblioteca', label: t.editor.commands.library, run: () => setLibrary(true) },
+    { id: 'localizar', label: t.editor.commands.find, shortcut: 'Ctrl+H', run: () => setPanelMode('localizar') },
+    { id: 'comentarios', label: t.editor.commands.comments, run: () => setPanelMode('comentarios') },
+    { id: 'propriedades', label: t.editor.commands.properties, run: () => setPanelMode('props') },
+    { id: 'historico', label: t.editor.commands.history, disabled: !current, run: () => current && setHistoryOf(current.key) },
+    { id: 'grade', label: showGrid ? t.editor.commands.hideGrid : t.editor.commands.showGrid, run: () => setShowGrid((v) => !v) },
+    { id: 'ajustar', label: t.editor.commands.fit, run: () => setZoom('fit') },
   ]);
   /** This slide's mapping, and the one way to change it: both panels below write through here. */
   const slideSpec = (current && mapping.slides[String(current.origin_slide_id)]) || BLANK_SLIDE;
@@ -750,7 +752,7 @@ export function DeckEditorTab({
     change(next);
     setSelected(keys);
     setLibrary(false);
-    announce(`Bloco ${block.name} inserido.`);
+    announce(t.editor.page.blockInserted(block.name));
     recordBlockUse(block.id).catch(() => undefined);
   };
 
@@ -802,7 +804,7 @@ export function DeckEditorTab({
   const toggleLock = () => {
     if (!current || !selected.length) return;
     change(withLocked(edits, editKey, selected, !selectionLocked));
-    announce(selectionLocked ? 'Desbloqueado.' : 'Bloqueado.');
+    announce(selectionLocked ? t.editor.page.unlocked : t.editor.page.locked);
   };
   const hideSelection = () => {
     if (!current || !selected.length) return;
@@ -815,7 +817,7 @@ export function DeckEditorTab({
   const copyStyle = () => {
     if (selectedShapes.length !== 1) return;
     setCopiedStyle(styleOf(selectedShapes[0]));
-    notifications.show({ title: 'Formato copiado', message: 'Selecione outras formas e use Ctrl+Shift+V (vale em outros slides).' });
+    notifications.show({ title: t.editor.page.styleCopiedTitle, message: t.editor.page.styleCopiedMessage });
   };
   const pasteStyle = () => {
     if (!current || !copiedStyle || !selectedShapes.length) return;
@@ -846,13 +848,13 @@ export function DeckEditorTab({
    * nothing here is a new surface, only a new way to reach it.
    */
   useRegisterCommands('editor-menu', [
-    { id: 'desfazer', label: 'Desfazer', shortcut: 'Ctrl+Z', group: 'editar', disabled: !canUndo, run: undo },
-    { id: 'refazer', label: 'Refazer', shortcut: 'Ctrl+Shift+Z', group: 'editar', disabled: !canRedo, run: redo },
-    { id: 'copiar', label: 'Copiar', shortcut: 'Ctrl+C', group: 'editar', divider: true, disabled: !selectedShapes.length, run: copySelection },
-    { id: 'colar', label: 'Colar', shortcut: 'Ctrl+V', group: 'editar', disabled: !hasClipboard, run: paste },
+    { id: 'desfazer', label: t.editor.commands.undo, shortcut: 'Ctrl+Z', group: 'editar', disabled: !canUndo, run: undo },
+    { id: 'refazer', label: t.editor.commands.redo, shortcut: 'Ctrl+Shift+Z', group: 'editar', disabled: !canRedo, run: redo },
+    { id: 'copiar', label: t.editor.commands.copy, shortcut: 'Ctrl+C', group: 'editar', divider: true, disabled: !selectedShapes.length, run: copySelection },
+    { id: 'colar', label: t.editor.commands.paste, shortcut: 'Ctrl+V', group: 'editar', disabled: !hasClipboard, run: paste },
     {
       id: 'duplicar-forma',
-      label: 'Duplicar forma',
+      label: t.editor.commands.duplicateShape,
       shortcut: 'Ctrl+D',
       group: 'editar',
       disabled: !selectedShapes.length,
@@ -861,78 +863,78 @@ export function DeckEditorTab({
         paste();
       },
     },
-    { id: 'excluir-forma', label: 'Excluir forma', shortcut: 'Delete', group: 'editar', disabled: !selectedShapes.length || selectionLocked, run: removeSelection },
+    { id: 'excluir-forma', label: t.editor.commands.deleteShape, shortcut: 'Delete', group: 'editar', disabled: !selectedShapes.length || selectionLocked, run: removeSelection },
     {
       id: 'selecionar-tudo',
-      label: 'Selecionar tudo',
+      label: t.editor.commands.selectAll,
       shortcut: 'Ctrl+A',
       group: 'editar',
       divider: true,
       run: () => setSelected(shapes.filter((s) => !s.container).map((s) => s.key)),
     },
-    { id: 'localizar-menu', label: 'Localizar e substituir…', shortcut: 'Ctrl+H', group: 'editar', run: () => setPanelMode('localizar') },
+    { id: 'localizar-menu', label: t.editor.commands.findMenu, shortcut: 'Ctrl+H', group: 'editar', run: () => setPanelMode('localizar') },
 
-    { id: 'zoom-ajustar', label: 'Ajustar à janela', group: 'ver', run: () => setZoom('fit') },
-    { id: 'grade', label: showGrid ? 'Ocultar grade' : 'Mostrar grade', group: 'ver', run: () => setShowGrid((v) => !v) },
-    { id: 'reguas', label: showRulers ? 'Ocultar réguas' : 'Mostrar réguas', group: 'ver', run: () => setShowRulers((v) => !v) },
-    { id: 'ima', label: snap ? 'Desligar o ímã de alinhamento' : 'Ligar o ímã de alinhamento', group: 'ver', run: () => setSnap((v) => !v) },
-    { id: 'propriedades-menu', label: 'Painel de propriedades', group: 'ver', divider: true, run: () => setPanelMode('props') },
-    { id: 'comentarios-menu', label: 'Comentários do slide', group: 'ver', run: () => setPanelMode('comentarios') },
-    { id: 'biblioteca-menu', label: 'Biblioteca de imagens e blocos', group: 'ver', run: () => setLibrary(true) },
+    { id: 'zoom-ajustar', label: t.editor.commands.fitWindow, group: 'ver', run: () => setZoom('fit') },
+    { id: 'grade', label: showGrid ? t.editor.commands.menuHideGrid : t.editor.commands.menuShowGrid, group: 'ver', run: () => setShowGrid((v) => !v) },
+    { id: 'reguas', label: showRulers ? t.editor.commands.hideRulers : t.editor.commands.showRulers, group: 'ver', run: () => setShowRulers((v) => !v) },
+    { id: 'ima', label: snap ? t.editor.commands.snapOff : t.editor.commands.snapOn, group: 'ver', run: () => setSnap((v) => !v) },
+    { id: 'propriedades-menu', label: t.editor.commands.properties, group: 'ver', divider: true, run: () => setPanelMode('props') },
+    { id: 'comentarios-menu', label: t.editor.commands.comments, group: 'ver', run: () => setPanelMode('comentarios') },
+    { id: 'biblioteca-menu', label: t.editor.commands.libraryMenu, group: 'ver', run: () => setLibrary(true) },
 
-    { id: 'inserir-texto', label: 'Caixa de texto', group: 'inserir', disabled: !current, run: () => insert('textbox') },
-    { id: 'inserir-imagem', label: 'Imagem…', group: 'inserir', disabled: !current, run: () => setLibrary(true) },
+    { id: 'inserir-texto', label: t.editor.commands.textBox, group: 'inserir', disabled: !current, run: () => insert('textbox') },
+    { id: 'inserir-imagem', label: t.editor.commands.image, group: 'inserir', disabled: !current, run: () => setLibrary(true) },
     ...(
       [
-        ['rect', 'Retângulo'],
-        ['roundRect', 'Retângulo arredondado'],
-        ['ellipse', 'Elipse'],
-        ['triangle', 'Triângulo'],
-        ['diamond', 'Losango'],
-        ['line', 'Linha'],
-        ['arrow', 'Seta'],
-        ['star', 'Estrela'],
+        'rect',
+        'roundRect',
+        'ellipse',
+        'triangle',
+        'diamond',
+        'line',
+        'arrow',
+        'star',
       ] as const
-    ).map(([preset, label]) => ({
+    ).map((preset) => ({
       id: `inserir-forma-${preset}`,
-      label: `Forma: ${label}`,
+      label: t.editor.commands.shape(t.editor.commands.shapes[preset]),
       group: 'inserir',
       disabled: !current,
       run: () => insert('shape', preset),
     })),
-    { id: 'inserir-comentario', label: 'Comentário no slide', group: 'inserir', divider: true, run: () => setPanelMode('comentarios') },
+    { id: 'inserir-comentario', label: t.editor.commands.slideComment, group: 'inserir', divider: true, run: () => setPanelMode('comentarios') },
 
-    { id: 'negrito', label: 'Negrito', shortcut: 'Ctrl+B', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ bold: !leadRun?.bold }) },
-    { id: 'italico', label: 'Itálico', shortcut: 'Ctrl+I', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ italic: !leadRun?.italic }) },
-    { id: 'sublinhado', label: 'Sublinhado', shortcut: 'Ctrl+U', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ underline: !leadRun?.underline }) },
-    { id: 'alinhar-esquerda', label: 'Alinhar texto à esquerda', group: 'formatar', divider: true, disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'left' })) },
-    { id: 'alinhar-centro', label: 'Alinhar texto ao centro', group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'center' })) },
-    { id: 'alinhar-direita', label: 'Alinhar texto à direita', group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'right' })) },
-    { id: 'marcadores', label: 'Marcadores', group: 'formatar', divider: true, disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { bullet: 'char' })) },
-    { id: 'numeracao', label: 'Lista numerada', group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { bullet: 'number' })) },
-    { id: 'copiar-formato', label: 'Copiar formatação', shortcut: 'Ctrl+Shift+C', group: 'formatar', divider: true, disabled: selectedShapes.length !== 1, run: copyStyle },
-    { id: 'colar-formato', label: 'Colar formatação', shortcut: 'Ctrl+Shift+V', group: 'formatar', disabled: !copiedStyle || !selectedShapes.length, run: pasteStyle },
-    { id: 'bloquear', label: selectionLocked ? 'Desbloquear forma' : 'Bloquear forma', shortcut: 'Ctrl+L', group: 'formatar', divider: true, disabled: !selectedShapes.length, run: toggleLock },
-    { id: 'ocultar-forma', label: 'Ocultar forma no editor', group: 'formatar', disabled: !selectedShapes.length, run: hideSelection },
-    ...(hiddenKeys.length ? [{ id: 'mostrar-ocultas', label: `Mostrar formas ocultas (${hiddenKeys.length})`, group: 'formatar', run: showHidden }] : []),
+    { id: 'negrito', label: t.editor.commands.bold, shortcut: 'Ctrl+B', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ bold: !leadRun?.bold }) },
+    { id: 'italico', label: t.editor.commands.italic, shortcut: 'Ctrl+I', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ italic: !leadRun?.italic }) },
+    { id: 'sublinhado', label: t.editor.commands.underline, shortcut: 'Ctrl+U', group: 'formatar', disabled: !leadText, run: () => toggleTextStyle({ underline: !leadRun?.underline }) },
+    { id: 'alinhar-esquerda', label: t.editor.commands.alignTextLeft, group: 'formatar', divider: true, disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'left' })) },
+    { id: 'alinhar-centro', label: t.editor.commands.alignTextCenter, group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'center' })) },
+    { id: 'alinhar-direita', label: t.editor.commands.alignTextRight, group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { align: 'right' })) },
+    { id: 'marcadores', label: t.editor.commands.bullets, group: 'formatar', divider: true, disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { bullet: 'char' })) },
+    { id: 'numeracao', label: t.editor.commands.numbered, group: 'formatar', disabled: !leadText, run: () => patchParagraphs((shape) => patchedParagraphs(shape, { bullet: 'number' })) },
+    { id: 'copiar-formato', label: t.editor.commands.copyFormat, shortcut: 'Ctrl+Shift+C', group: 'formatar', divider: true, disabled: selectedShapes.length !== 1, run: copyStyle },
+    { id: 'colar-formato', label: t.editor.commands.pasteFormat, shortcut: 'Ctrl+Shift+V', group: 'formatar', disabled: !copiedStyle || !selectedShapes.length, run: pasteStyle },
+    { id: 'bloquear', label: selectionLocked ? t.editor.commands.unlockShape : t.editor.commands.lockShape, shortcut: 'Ctrl+L', group: 'formatar', divider: true, disabled: !selectedShapes.length, run: toggleLock },
+    { id: 'ocultar-forma', label: t.editor.commands.hideShape, group: 'formatar', disabled: !selectedShapes.length, run: hideSelection },
+    ...(hiddenKeys.length ? [{ id: 'mostrar-ocultas', label: t.editor.commands.showHidden(hiddenKeys.length), group: 'formatar', run: showHidden }] : []),
 
-    { id: 'duplicar-slide', label: 'Duplicar slide', group: 'slide', disabled: !current, run: duplicateCurrentSlide },
-    { id: 'excluir-slide', label: 'Excluir slide', group: 'slide', disabled: !current, run: deleteCurrentSlide },
+    { id: 'duplicar-slide', label: t.editor.commands.duplicateSlide, group: 'slide', disabled: !current, run: duplicateCurrentSlide },
+    { id: 'excluir-slide', label: t.editor.commands.deleteSlide, group: 'slide', disabled: !current, run: deleteCurrentSlide },
     {
       id: 'renomear-slide',
-      label: 'Nomear slide…',
+      label: t.editor.commands.renameSlide,
       group: 'slide',
       disabled: !current,
       run: () => {
         if (!current) return;
         const existing = slideTitle(mapping.slides[String(current.origin_slide_id)], current.layout ?? '', current.index);
-        const name = window.prompt('Nome do slide', existing);
+        const name = window.prompt(t.editor.commands.slideNamePrompt, existing);
         if (name != null) onMapping({ ...mapping, slides: { ...mapping.slides, [String(current.origin_slide_id)]: { ...(mapping.slides[String(current.origin_slide_id)] ?? BLANK_SLIDE), name } } });
       },
     },
     {
       id: 'escopo-slide',
-      label: 'Transição e escopo do slide',
+      label: t.editor.commands.slideScope,
       group: 'slide',
       divider: true,
       disabled: !current,
@@ -941,30 +943,30 @@ export function DeckEditorTab({
         setPanelMode('props');
       },
     },
-    { id: 'historico-slide', label: 'Histórico deste slide', group: 'slide', disabled: !current, run: () => current && setHistoryOf(current.key) },
+    { id: 'historico-slide', label: t.editor.commands.history, group: 'slide', disabled: !current, run: () => current && setHistoryOf(current.key) },
     // M13: the template's slides as a sorter, which replaces the drawer that drew them as PNGs.
     {
       id: 'slides-modelo',
-      label: slideSorter ? 'Voltar à edição dos slides' : 'Slides deste modelo',
+      label: slideSorter ? t.editor.commands.backToSlides : t.editor.commands.templateSlides,
       group: 'slide',
       divider: true,
       run: () => setSlideSorter((v) => !v),
     },
 
-    { id: 'trazer-frente', label: 'Trazer para a frente', group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('front') },
-    { id: 'avancar', label: 'Avançar uma posição', group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('forward') },
-    { id: 'recuar', label: 'Recuar uma posição', group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('backward') },
-    { id: 'enviar-atras', label: 'Enviar para trás', group: 'organizar', divider: true, disabled: !selectedShapes.length, run: () => reorderZ('back') },
-    { id: 'alinhar-esquerda-forma', label: 'Alinhar à esquerda', group: 'organizar', divider: true, disabled: selectedShapes.length < 2, run: () => align('left') },
-    { id: 'alinhar-centro-forma', label: 'Centralizar horizontalmente', group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('hcenter') },
-    { id: 'alinhar-direita-forma', label: 'Alinhar à direita', group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('right') },
-    { id: 'alinhar-topo-forma', label: 'Alinhar ao topo', group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('top') },
-    { id: 'alinhar-meio-forma', label: 'Centralizar verticalmente', group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('vcenter') },
-    { id: 'alinhar-base-forma', label: 'Alinhar à base', group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('bottom') },
-    { id: 'distribuir-h', label: 'Distribuir horizontalmente', group: 'organizar', divider: true, disabled: selectedShapes.length < 3, run: () => distribute('h') },
-    { id: 'distribuir-v', label: 'Distribuir verticalmente', group: 'organizar', disabled: selectedShapes.length < 3, run: () => distribute('v') },
-    { id: 'agrupar', label: 'Agrupar', shortcut: 'Ctrl+G', group: 'organizar', divider: true, disabled: !canGroup, run: groupSelection },
-    { id: 'desagrupar', label: 'Desagrupar', shortcut: 'Ctrl+Shift+G', group: 'organizar', disabled: !canUngroup, run: ungroupSelection },
+    { id: 'trazer-frente', label: t.editor.commands.bringToFront, group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('front') },
+    { id: 'avancar', label: t.editor.commands.forward, group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('forward') },
+    { id: 'recuar', label: t.editor.commands.backward, group: 'organizar', disabled: !selectedShapes.length, run: () => reorderZ('backward') },
+    { id: 'enviar-atras', label: t.editor.commands.sendToBack, group: 'organizar', divider: true, disabled: !selectedShapes.length, run: () => reorderZ('back') },
+    { id: 'alinhar-esquerda-forma', label: t.editor.commands.alignLeft, group: 'organizar', divider: true, disabled: selectedShapes.length < 2, run: () => align('left') },
+    { id: 'alinhar-centro-forma', label: t.editor.commands.centerH, group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('hcenter') },
+    { id: 'alinhar-direita-forma', label: t.editor.commands.alignRight, group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('right') },
+    { id: 'alinhar-topo-forma', label: t.editor.commands.alignTop, group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('top') },
+    { id: 'alinhar-meio-forma', label: t.editor.commands.centerV, group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('vcenter') },
+    { id: 'alinhar-base-forma', label: t.editor.commands.alignBottom, group: 'organizar', disabled: selectedShapes.length < 2, run: () => align('bottom') },
+    { id: 'distribuir-h', label: t.editor.commands.distributeH, group: 'organizar', divider: true, disabled: selectedShapes.length < 3, run: () => distribute('h') },
+    { id: 'distribuir-v', label: t.editor.commands.distributeV, group: 'organizar', disabled: selectedShapes.length < 3, run: () => distribute('v') },
+    { id: 'agrupar', label: t.editor.commands.group, shortcut: 'Ctrl+G', group: 'organizar', divider: true, disabled: !canGroup, run: groupSelection },
+    { id: 'desagrupar', label: t.editor.commands.ungroup, shortcut: 'Ctrl+Shift+G', group: 'organizar', disabled: !canUngroup, run: ungroupSelection },
   ]);
 
   /** Open a slide (by key or template slide id) and select one of its shapes (by key or shape id). */
@@ -1113,13 +1115,13 @@ export function DeckEditorTab({
   }, [edits, current, selected, shapes, change, undo, redo, dirty, copiedStyle, mappingDirty, onSaveMapping]);
 
   if (scene.isLoading || stored.isLoading) return <Loading rows={6} />;
-  if (scene.error) return <ErrorState error={scene.error} title="Não foi possível abrir a apresentação" />;
-  if (!scene.data || !current) return <Alert variant="light">Esta geração não tem slides.</Alert>;
+  if (scene.error) return <ErrorState error={scene.error} title={t.editor.page.openError} />;
+  if (!scene.data || !current) return <Alert variant="light">{t.editor.page.noSlides}</Alert>;
   // RF-86: on a phone the deck can be generated, downloaded and presented, but not laid out.
   if (phone) {
     return (
-      <Alert variant="light" color="petrol" title="O editor precisa de uma tela maior">
-        Num celular dá para gerar, baixar e apresentar: use os botões acima. Para mover e formatar formas, abra num computador ou tablet na horizontal.
+      <Alert variant="light" color="petrol" title={t.editor.page.phoneTitle}>
+        {t.editor.page.phoneBody}
       </Alert>
     );
   }
@@ -1175,7 +1177,7 @@ export function DeckEditorTab({
     'pagina-inicial': {
       prepend: [
         {
-          caption: 'Pincel',
+          caption: t.editor.groups.painter,
           content: (
             <FormatPainterControl
               copiedStyle={copiedStyle}
@@ -1191,15 +1193,15 @@ export function DeckEditorTab({
     },
     formatar: {
       prepend: [
-        { caption: 'Fonte', content: <FontControls selection={selectedShapes} onParagraphs={patchParagraphs} /> },
-        { caption: 'Parágrafo', content: <ParagraphControls selection={selectedShapes} onParagraphs={patchParagraphs} /> },
-        { caption: 'Preenchimento e Contorno', content: <ShapeStyleControls selection={selectedShapes} onPatchEach={patchEach} /> },
+        { caption: t.editor.groups.font, content: <FontControls selection={selectedShapes} onParagraphs={patchParagraphs} /> },
+        { caption: t.editor.groups.paragraph, content: <ParagraphControls selection={selectedShapes} onParagraphs={patchParagraphs} /> },
+        { caption: t.editor.groups.fillAndLine, content: <ShapeStyleControls selection={selectedShapes} onPatchEach={patchEach} /> },
       ],
     },
     slide: {
       prepend: [
         {
-          caption: 'Plano de Fundo',
+          caption: t.editor.groups.background,
           content: (
             <Group gap={4} wrap="nowrap">
               <BackgroundControl fill={current ? effectiveBackground : null} disabled={!current} onChange={(fill) => change(withBackground(edits, editKey, fill))} />
@@ -1210,13 +1212,13 @@ export function DeckEditorTab({
       ],
     },
     organizar: {
-      prepend: [{ caption: 'Girar', content: <RotateFlipControls disabled={!selectedShapes.length} onRotate={rotateSelection} onFlip={flipSelection} /> }],
-      append: [{ caption: 'Bloqueio', content: <LockControl locked={selectionLocked} disabled={!selectedShapes.length} onToggle={toggleLock} /> }],
+      prepend: [{ caption: t.editor.groups.rotate, content: <RotateFlipControls disabled={!selectedShapes.length} onRotate={rotateSelection} onFlip={flipSelection} /> }],
+      append: [{ caption: t.editor.groups.lock, content: <LockControl locked={selectionLocked} disabled={!selectedShapes.length} onToggle={toggleLock} /> }],
     },
     exibir: {
       prepend: [
         {
-          caption: 'Modo de exibição',
+          caption: t.editor.groups.viewMode,
           content: (
             <Button
               size="compact-sm"
@@ -1224,15 +1226,15 @@ export function DeckEditorTab({
               leftSection={<IconLayoutGrid size={14} />}
               onClick={() => setSlideSorter((v) => !v)}
             >
-              {slideSorter ? 'Normal' : 'Classificação de slides'}
+              {slideSorter ? t.editor.groups.normal : t.editor.groups.sorter}
             </Button>
           ),
         },
       ],
       append: [
-        { caption: 'Cor', content: <PreviewModeControl mode={previewMode} onChange={setPreviewMode} /> },
+        { caption: t.editor.groups.color, content: <PreviewModeControl mode={previewMode} onChange={setPreviewMode} /> },
         {
-          caption: 'Guias',
+          caption: t.editor.groups.guides,
           content: (
             <GuidesControls
               showGrid={showGrid}
@@ -1248,22 +1250,22 @@ export function DeckEditorTab({
             />
           ),
         },
-        { caption: 'Zoom', content: <ZoomControl zoom={effectiveZoom} fitting={zoom === 'fit'} onZoom={setZoomValue} onFit={() => setZoom('fit')} /> },
-        { caption: 'Exibição de dados', content: <DisplayToggle display={display} onDisplay={setDisplay} /> },
-        ...(authors.length ? [{ caption: 'Colaboração', content: <PresenceAvatars authors={authors} /> }] : []),
+        { caption: t.editor.groups.zoom, content: <ZoomControl zoom={effectiveZoom} fitting={zoom === 'fit'} onZoom={setZoomValue} onFit={() => setZoom('fit')} /> },
+        { caption: t.editor.groups.dataDisplay, content: <DisplayToggle display={display} onDisplay={setDisplay} /> },
+        ...(authors.length ? [{ caption: t.editor.groups.collaboration, content: <PresenceAvatars authors={authors} /> }] : []),
       ],
     },
     inserir: {
       prepend: [
         {
-          caption: 'Enviar arquivo',
+          caption: t.editor.groups.upload,
           content: (
             <ImageUploadButton
               uploading={upload.isPending}
               onImage={(file) =>
                 upload.mutate(file, {
                   onSuccess: (asset) => insert('image', undefined, asset.id),
-                  onError: (error) => notifications.show({ color: 'red', title: 'Imagem recusada', message: error.message }),
+                  onError: (error) => notifications.show({ color: 'red', title: t.editor.page.imageRefused, message: error.message }),
                 })
               }
             />
@@ -1272,7 +1274,7 @@ export function DeckEditorTab({
       ],
       append: [
         {
-          caption: 'Símbolos',
+          caption: t.editor.groups.symbols,
           content: <SymbolPickerControl disabled={!editing && !(selectedShapes.length === 1 && canHoldText(selectedShapes[0]))} onInsert={insertSymbol} />,
         },
       ],
@@ -1286,9 +1288,9 @@ export function DeckEditorTab({
       {editingTemplate && (
         <Alert variant="light" color="petrol" py={6}>
           <Text size="xs">
-            Você está editando o <b>modelo</b>, desenhado do próprio arquivo — é assim que os
-            slides vão sair. O que mudar aqui vale para <b>todos os boards</b>; o que for ajustado
-            depois sobre uma geração vale só para aquela cópia.
+            {t.editor.page.templateBefore} <b>{t.editor.page.templateWord}</b>
+            {t.editor.page.templateMiddle} <b>{t.editor.page.templateAll}</b>
+            {t.editor.page.templateAfter}
           </Text>
         </Alert>
       )}
@@ -1301,14 +1303,14 @@ export function DeckEditorTab({
           trailing={
             <Group gap={6} wrap="nowrap">
               <Button size="compact-sm" leftSection={<IconPlayerPlay size={15} />} onClick={onGenerate}>
-                Gerar
+                {t.editor.page.generate}
               </Button>
               {onToggleMenu && (
-                <Tooltip label={menuVisible ? 'Esconder a faixa de opções' : 'Mostrar a faixa de opções'}>
+                <Tooltip label={menuVisible ? t.editor.page.hideRibbon : t.editor.page.showRibbon}>
                   <ActionIcon
                     variant="subtle"
                     onClick={onToggleMenu}
-                    aria-label={menuVisible ? 'Esconder a faixa de opções' : 'Mostrar a faixa de opções'}
+                    aria-label={menuVisible ? t.editor.page.hideRibbon : t.editor.page.showRibbon}
                   >
                     {menuVisible ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
                   </ActionIcon>
@@ -1344,7 +1346,7 @@ export function DeckEditorTab({
         }}
         onInsertBlock={insertBlock}
       />
-      {save.error && <ErrorState error={save.error} title="Edições não salvas" />}
+      {save.error && <ErrorState error={save.error} title={t.editor.page.notSaved} />}
 
       {slideSorter ? (
         <Paper withBorder h="calc(100vh - 250px)" mih={520}>
@@ -1419,7 +1421,7 @@ export function DeckEditorTab({
             min={RAIL.min}
             max={railMax}
             fallback={RAIL.start}
-            label="Largura da lista de slides"
+            label={t.editor.page.railWidth}
             onResize={railPane.onResize}
             onCommit={railPane.onCommit}
           />
@@ -1530,7 +1532,7 @@ export function DeckEditorTab({
             min={PANEL.min}
             max={panelMax}
             fallback={PANEL.start}
-            label="Largura do painel de propriedades"
+            label={t.editor.page.panelWidth}
             onResize={panelPane.onResize}
             onCommit={panelPane.onCommit}
           />
@@ -1549,9 +1551,9 @@ export function DeckEditorTab({
             value={panelMode}
             onChange={(value) => setPanelMode(value as typeof panelMode)}
             data={[
-              { value: 'props', label: 'Propriedades' },
-              { value: 'comentarios', label: `Comentários${openComments[current.origin_slide_id] ? ` (${openComments[current.origin_slide_id]})` : ''}` },
-              { value: 'localizar', label: 'Localizar' },
+              { value: 'props', label: t.editor.page.tabProps },
+              { value: 'comentarios', label: t.editor.page.tabComments(openComments[current.origin_slide_id] ?? 0) },
+              { value: 'localizar', label: t.editor.page.tabFind },
             ]}
           />
           <ScrollArea h="calc(100% - 60px)" type="auto">
@@ -1559,10 +1561,10 @@ export function DeckEditorTab({
               <CommentsPanel
                 templateId={templateId}
                 originSlideId={current.origin_slide_id}
-                slideLabel={`o slide ${current.index}`}
+                slideLabel={t.editor.page.commentSlideLabel(current.index)}
                 shapeKey={selectedShapes.length === 1 ? selectedShapes[0].key : null}
                 shapeName={selectedShapes.length === 1 ? selectedShapes[0].name : null}
-                labelFor={(origin) => `slide ${slides.find((s) => s.origin_slide_id === origin)?.index ?? origin}`}
+                labelFor={(origin) => t.editor.page.commentSlideBadge(slides.find((s) => s.origin_slide_id === origin)?.index ?? origin)}
                 onGo={(origin, shape) => goTo(String(origin), shape)}
               />
             )}
@@ -1585,7 +1587,7 @@ export function DeckEditorTab({
               <>
                 <Stack gap="xs" p="sm">
                   <Text size="xs" fw={600}>
-                    Escopo deste slide
+                    {t.editor.page.slideScope}
                   </Text>
                   <SlideScope
                     mapping={slideSpec}
@@ -1598,7 +1600,7 @@ export function DeckEditorTab({
                 {/* RF-69: what survived the advanced mapping screen — every binding on this slide
                     at once, which is the one thing clicking shapes cannot give you. */}
                 <Text size="xs" fw={600} px="sm" pt="sm">
-                  Todos os vínculos
+                  {t.editor.page.allBindings}
                 </Text>
                 <BindingsPanel
                   slide={slideSpec}
@@ -1665,7 +1667,7 @@ export function DeckEditorTab({
             />
             {selectedShapes.length === 1 && selectedShapes[0].locked && (
               <Alert variant="light" color="gray" mx="sm" mb="sm" icon={<IconLock size={14} />} p="xs">
-                <Text size="xs">Bloqueada: não se move, não muda de tamanho e não é removida. Ctrl+L desbloqueia.</Text>
+                <Text size="xs">{t.editor.page.lockedHint}</Text>
               </Alert>
             )}
             {selectedShapes.length === 1 && selectedShapes[0].table && (
@@ -1697,19 +1699,19 @@ export function DeckEditorTab({
           >
             <Group gap={4}>
               <IconNotes size={13} />
-              <span>Notas do apresentador</span>
+              <span>{t.editor.page.speakerNotes}</span>
             </Group>
           </Button>
           <Text size="xs" c="dimmed">
-            Duplo clique escreve no slide · Ctrl+D duplica · Ctrl+G agrupa · Ctrl+scroll amplia
+            {t.editor.page.hints}
           </Text>
         </Group>
         <Group gap={6}>
           <SaveState dirty={dirty || mappingDirty} saving={save.isPending || mappingSaving} pending={pending} />
-          <Tooltip label="salvar agora (Ctrl+S)">
+          <Tooltip label={t.editor.page.saveNowTip}>
             <ActionIcon
               variant="default"
-              aria-label="Salvar edições"
+              aria-label={t.editor.page.saveAria}
               loading={save.isPending || mappingSaving}
               disabled={!dirty && !mappingDirty}
               onClick={() => {
@@ -1728,15 +1730,15 @@ export function DeckEditorTab({
             disabled={pending === 0}
             onClick={() => change(EMPTY_EDITS)}
           >
-            Descartar tudo
+            {t.editor.page.discardAll}
           </Button>
         </Group>
       </Group>
 
       <Collapse expanded={openNotes}>
         <Textarea
-          label="Notas do apresentador"
-          description="Vão para o .pptx e aparecem no modo de apresentação. Marcadores são preenchidos por board: {{board.nome}}, {{riscos.itens|contagem}} itens em risco — {{riscos.itens|chaves}}. Modificadores: |contagem, |chaves, |lista."
+          label={t.editor.page.speakerNotes}
+          description={t.editor.page.notesHint}
           size="xs"
           autosize
           minRows={2}
@@ -1751,23 +1753,24 @@ export function DeckEditorTab({
 
 /** The quiet status line both products have instead of a save button people must remember. */
 function SaveState({ dirty, saving, pending }: { dirty: boolean; saving: boolean; pending: number }) {
+  const t = useT();
   if (saving) {
     return (
       <Badge variant="light" color="gray">
-        salvando…
+        {t.editor.page.saving}
       </Badge>
     );
   }
   if (dirty) {
     return (
       <Badge variant="light" color="orange">
-        alterações não salvas
+        {t.editor.page.unsaved}
       </Badge>
     );
   }
   return (
     <Badge variant="light" color="teal">
-      {pending > 0 ? (pending === 1 ? '1 edição salva' : `${pending} edições salvas`) : 'tudo salvo'}
+      {pending > 0 ? t.editor.page.savedEdits(pending) : t.editor.page.allSaved}
     </Badge>
   );
 }

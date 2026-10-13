@@ -3,12 +3,12 @@ import { useElementSize } from '@mantine/hooks';
 import { IconAlertTriangle, IconCopy, IconDotsVertical, IconFilter, IconHistory, IconMessage, IconPlus, IconTrash } from '@tabler/icons-react';
 import { memo, useMemo, useState } from 'react';
 
-import { plural } from '../../lib/format';
 import type { DeckBoard, DeckEdits, DeckMapping, DeckScene, SceneSlide, SlideMapping } from '../../api/types';
 import { isConditional, slideTitle } from '../../api/types';
 import { effectiveShapes, slideEdits, type EffectiveShape } from '../../lib/deckEdits';
 import { displayShapes, type VariableDisplay } from '../../lib/variableDisplay';
 import { SlideStage } from './SlideStage';
+import { t, useT } from '../../i18n';
 
 /** Only the fallback for the one render before `useElementSize` reports anything. */
 const THUMB_WIDTH = 150;
@@ -22,9 +22,10 @@ function scopeLabel(slide: SlideMapping | undefined, spaceNames: Record<string, 
   const spaces = (slide?.only_spaces ?? []).map((key) => spaceNames[key] ?? key);
   const boards = slide?.only_boards ?? [];
   const parts: string[] = [];
-  if (spaces.length) parts.push(`espaços: ${spaces.join(', ')}`);
-  if (boards.length) parts.push(plural(boards.length, 'board', 'boards'));
-  return parts.length ? `Só para ${parts.join(' · ')}` : 'Em todos os espaços e boards';
+  const text = t().editor.rail;
+  if (spaces.length) parts.push(text.scopeSpaces(spaces.join(', ')));
+  if (boards.length) parts.push(text.scopeBoards(boards.length));
+  return parts.length ? text.scopeOnly(parts.join(' · ')) : text.scopeEverywhere;
 }
 const BAR = '2px solid var(--mantine-primary-color-filled)';
 
@@ -142,6 +143,7 @@ export function SlideRail({
   /** #20: open the saved versions of one slide. */
   onHistory?: (key: string) => void;
 }) {
+  const t = useT();
   const [renaming, setRenaming] = useState<string | null>(null);
   /** The name somebody gave the slide, else the layout it came from, else its number. */
   const slideLabel = (slide: SceneSlide) =>
@@ -270,7 +272,7 @@ export function SlideRail({
                     size="xs"
                     lineClamp={1}
                     style={{ flex: 1, cursor: 'text' }}
-                    title="duplo clique para renomear"
+                    title={t.editor.rail.renameTitle}
                     onDoubleClick={() => setRenaming(slide.key)}
                     c={mapping.slides[String(slide.origin_slide_id)]?.name ? undefined : 'dimmed'}
                   >
@@ -281,7 +283,7 @@ export function SlideRail({
               <Box style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, marginTop: 2, minHeight: 18 }}>
                 {slide.duplicate_of && (
                   <Badge size="xs" variant="outline" color="gray">
-                    cópia
+                    {t.editor.rail.copy}
                   </Badge>
                 )}
                 {/* RF-55: a slide that is not simply everywhere says so on the thumbnail, so the
@@ -289,7 +291,7 @@ export function SlideRail({
                 {isConditional(mapping.slides[String(slide.origin_slide_id)]) && (
                   <Tooltip label={scopeLabel(mapping.slides[String(slide.origin_slide_id)], spaceNames)}>
                     <Badge size="xs" color="grape" variant="light" leftSection={<IconFilter size={9} />}>
-                      escopo
+                      {t.editor.rail.scope}
                     </Badge>
                   </Tooltip>
                 )}
@@ -303,14 +305,14 @@ export function SlideRail({
                   </Tooltip>
                 ) : null}
                 {comments?.[slide.origin_slide_id] ? (
-                  <Tooltip label={`${plural(comments[slide.origin_slide_id], 'comentário', 'comentários')} em aberto`}>
+                  <Tooltip label={t.editor.rail.openComments(comments[slide.origin_slide_id])}>
                     <Badge size="xs" color="blue" variant="light" leftSection={<IconMessage size={9} />}>
                       {comments[slide.origin_slide_id]}
                     </Badge>
                   </Tooltip>
                 ) : null}
                 {presence?.[slide.key]?.length ? (
-                  <Tooltip label={`Aberto agora por ${presence[slide.key].join(', ')}`}>
+                  <Tooltip label={t.editor.rail.openBy(presence[slide.key].join(', '))}>
                     <Avatar.Group spacing={6}>
                       {presence[slide.key].slice(0, 3).map((name) => (
                         <Avatar key={name} size={18} radius="xl" color="initials" name={name} />
@@ -320,28 +322,28 @@ export function SlideRail({
                 ) : null}
                 {edited && (
                   <Badge size="xs" color="orange" variant="light">
-                    editado
+                    {t.editor.rail.edited}
                   </Badge>
                 )}
                 <Menu position="right-start" withinPortal>
                   <Menu.Target>
-                    <ActionIcon size="xs" variant="subtle" aria-label={`Opções do slide ${position + 1}`}>
+                    <ActionIcon size="xs" variant="subtle" aria-label={t.editor.rail.optionsAria(position + 1)}>
                       <IconDotsVertical size={12} />
                     </ActionIcon>
                   </Menu.Target>
                   <Menu.Dropdown>
                     <Menu.Item leftSection={<IconCopy size={14} />} onClick={() => onDuplicate(slide.key)}>
-                      Duplicar
+                      {t.editor.rail.duplicate}
                     </Menu.Item>
                     <Menu.Item disabled={position === 0} onClick={() => nudge(slide.key, -1)}>
-                      Mover para cima
+                      {t.editor.rail.moveUp}
                     </Menu.Item>
                     <Menu.Item disabled={position === slides.length - 1} onClick={() => nudge(slide.key, 1)}>
-                      Mover para baixo
+                      {t.editor.rail.moveDown}
                     </Menu.Item>
                     {onHistory && (
                       <Menu.Item leftSection={<IconHistory size={14} />} onClick={() => onHistory(slide.key)}>
-                        Histórico deste slide
+                        {t.editor.rail.history}
                       </Menu.Item>
                     )}
                     <Menu.Divider />
@@ -351,7 +353,7 @@ export function SlideRail({
                       disabled={slides.length <= 1}
                       onClick={() => onDelete(slide.key)}
                     >
-                      Remover
+                      {t.editor.rail.remove}
                     </Menu.Item>
                   </Menu.Dropdown>
                 </Menu>
@@ -359,11 +361,11 @@ export function SlideRail({
             </Box>
           );
         })}
-        <Tooltip label="duplica o slide aberto" position="right">
+        <Tooltip label={t.editor.rail.newTip} position="right">
           <ActionIcon
             variant="default"
             w="100%"
-            aria-label="Novo slide"
+            aria-label={t.editor.rail.newAria}
             onClick={() => onDuplicate(currentKey)}
           >
             <IconPlus size={15} />

@@ -3,6 +3,7 @@ import { Badge, Button, Group, Loader, Modal, Stack, Table, Text } from '@mantin
 import { useRestoreSlide, useSlideHistory } from '../../api/deckHooks';
 import { fmtDateTime } from '../../lib/format';
 import { ErrorState } from '../common';
+import { useT } from '../../i18n';
 
 /**
  * #20: the versions of the edits in which *this* slide changed, and a way back to one of them
@@ -22,30 +23,30 @@ export function SlideHistoryModal({
   onClose: () => void;
   onRestored: () => void;
 }) {
+  const t = useT();
   const history = useSlideHistory(templateId, slideKey ?? undefined);
   const restore = useRestoreSlide(templateId);
   return (
-    <Modal opened={slideKey !== null} onClose={onClose} title={`Histórico — ${title}`} size="lg">
+    <Modal opened={slideKey !== null} onClose={onClose} title={t.editor.slideHistory.title(title)} size="lg">
       <Stack gap="sm">
         <Text size="xs" c="dimmed">
-          Restaurar troca só as edições deste slide pelas daquela versão; os outros slides ficam como estão.
-          A versão atual é guardada antes, então a troca também pode ser desfeita daqui.
+          {t.editor.slideHistory.hint}
         </Text>
         {history.isLoading && <Loader size="sm" />}
         {history.error && <ErrorState error={history.error} />}
-        {restore.error && <ErrorState error={restore.error} title="Não restaurado" />}
+        {restore.error && <ErrorState error={restore.error} title={t.editor.slideHistory.notRestored} />}
         {history.data && !history.data.items.length && (
           <Text size="sm" c="dimmed">
-            Nenhuma versão guardada mudou este slide ainda. As versões automáticas saem a cada 10 minutos de edição.
+            {t.editor.slideHistory.empty}
           </Text>
         )}
         {history.data && history.data.items.length > 0 && (
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Quando</Table.Th>
-                <Table.Th>Versão</Table.Th>
-                <Table.Th>Autor</Table.Th>
+                <Table.Th>{t.editor.slideHistory.when}</Table.Th>
+                <Table.Th>{t.editor.slideHistory.version}</Table.Th>
+                <Table.Th>{t.editor.slideHistory.author}</Table.Th>
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
@@ -55,10 +56,10 @@ export function SlideHistoryModal({
                   <Table.Td>{fmtDateTime(entry.at)}</Table.Td>
                   <Table.Td>
                     <Group gap={4}>
-                      <Text size="sm">{entry.label || (entry.auto ? 'automática' : 'sem nome')}</Text>
+                      <Text size="sm">{entry.label || (entry.auto ? t.editor.slideHistory.automatic : t.editor.slideHistory.unnamed)}</Text>
                       {entry.removed && (
                         <Badge size="xs" color="gray" variant="light">
-                          sem edições
+                          {t.editor.slideHistory.noEdits}
                         </Badge>
                       )}
                     </Group>
@@ -82,7 +83,7 @@ export function SlideHistoryModal({
                         )
                       }
                     >
-                      Restaurar
+                      {t.editor.slideHistory.restore}
                     </Button>
                   </Table.Td>
                 </Table.Tr>

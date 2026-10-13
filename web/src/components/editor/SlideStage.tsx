@@ -8,6 +8,7 @@ import type { EffectiveShape } from '../../lib/deckEdits';
 import { EMU_PER_INCH, emuToCm, emuToPx, pxToEmu } from '../../lib/emu';
 import type { DisplayShape } from '../../lib/variableDisplay';
 import { ShapeNode, hex } from './ShapeNode';
+import { useT } from '../../i18n';
 
 /** How close, in screen pixels, an edge has to be before it snaps. */
 const SNAP_PX = 6;
@@ -86,6 +87,7 @@ export function SlideStage({
   onEditText,
   onContextMenu,
 }: Props) {
+  const t = useT();
   const scale = (width * zoom) / scene.slide_width;
   /**
    * RF-61: where this scene's embedded pictures live. The scene says which file it was read from,
@@ -458,8 +460,11 @@ export function SlideStage({
       </Box>
       {!chromeless && (
         <MText className="sr-only">
-          Slide com {shapes.length} elementos, {emuToCm(scene.slide_width).toFixed(1)} por{' '}
-          {emuToCm(scene.slide_height).toFixed(1)} cm.
+          {t.editor.stage.summary(
+            shapes.length,
+            emuToCm(scene.slide_width).toFixed(1),
+            emuToCm(scene.slide_height).toFixed(1),
+          )}
         </MText>
       )}
     </Box>

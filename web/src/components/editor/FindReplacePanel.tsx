@@ -2,12 +2,12 @@ import { Badge, Button, Checkbox, Group, ScrollArea, SegmentedControl, Stack, Ta
 import { notifications } from '@mantine/notifications';
 import { useMemo, useState } from 'react';
 
-import { plural } from '../../lib/format';
 import { useReplaceInVariables } from '../../api/featureHooks';
 import type { DeckEdits, SceneSlide } from '../../api/types';
 import { effectiveShapes, withShapeEdit } from '../../lib/deckEdits';
 import { findMatches, replacedParagraphs, type Match } from '../../lib/findReplace';
 import { ErrorState } from '../common';
+import { useT } from '../../i18n';
 
 /**
  * RF-88: find and replace, over this slide or the whole deck, and over the variables' values.
@@ -34,6 +34,7 @@ export function FindReplacePanel({
   onChange: (next: DeckEdits) => void;
   onGo: (slideKey: string, shapeKey: string) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
   const [matchCase, setMatchCase] = useState(false);
@@ -59,20 +60,20 @@ export function FindReplacePanel({
     }
     if (next !== edits) {
       onChange(next);
-      notifications.show({ title: 'Substituído', message: `${done.size === 1 ? '1 forma alterada' : `${done.size} formas alteradas`}. Ctrl+Z desfaz.` });
+      notifications.show({ title: t.editor.findReplace.replacedTitle, message: t.editor.findReplace.replacedMessage(done.size) });
     }
   };
 
   return (
     <Tabs defaultValue="slides" keepMounted={false}>
       <Tabs.List grow>
-        <Tabs.Tab value="slides">Nos slides</Tabs.Tab>
-        <Tabs.Tab value="variaveis">Nas variáveis</Tabs.Tab>
+        <Tabs.Tab value="slides">{t.editor.findReplace.onSlides}</Tabs.Tab>
+        <Tabs.Tab value="variaveis">{t.editor.findReplace.inVariables}</Tabs.Tab>
       </Tabs.List>
       <Stack gap="xs" p="sm">
-        <TextInput size="xs" label="Localizar" value={query} onChange={(e) => setQuery(e.currentTarget.value)} data-autofocus />
-        <TextInput size="xs" label="Substituir por" value={replacement} onChange={(e) => setReplacement(e.currentTarget.value)} />
-        <Checkbox size="xs" label="Diferenciar maiúsculas" checked={matchCase} onChange={(e) => setMatchCase(e.currentTarget.checked)} />
+        <TextInput size="xs" label={t.editor.findReplace.find} value={query} onChange={(e) => setQuery(e.currentTarget.value)} data-autofocus />
+        <TextInput size="xs" label={t.editor.findReplace.replaceWith} value={replacement} onChange={(e) => setReplacement(e.currentTarget.value)} />
+        <Checkbox size="xs" label={t.editor.findReplace.matchCase} checked={matchCase} onChange={(e) => setMatchCase(e.currentTarget.checked)} />
       </Stack>
       <Tabs.Panel value="slides">
         <Stack gap="xs" px="sm" pb="sm">
@@ -81,16 +82,16 @@ export function FindReplacePanel({
             value={scope}
             onChange={(value) => setScope(value as 'slide' | 'deck')}
             data={[
-              { value: 'deck', label: 'Apresentação inteira' },
-              { value: 'slide', label: 'Este slide' },
+              { value: 'deck', label: t.editor.findReplace.wholeDeck },
+              { value: 'slide', label: t.editor.findReplace.thisSlide },
             ]}
           />
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
-              {query ? `${plural(matches.length, 'ocorrência', 'ocorrências')} em parágrafos` : 'Digite o texto a localizar.'}
+              {query ? t.editor.findReplace.matches(matches.length) : t.editor.findReplace.typeToFind}
             </Text>
             <Button size="compact-xs" disabled={!editable.length} onClick={() => replace(editable)}>
-              Substituir todas ({editable.length})
+              {t.editor.findReplace.replaceAll(editable.length)}
             </Button>
           </Group>
           <ScrollArea.Autosize mah={320}>
@@ -99,19 +100,19 @@ export function FindReplacePanel({
                 <Group key={`${match.slideKey}-${match.shapeKey}-${match.paragraph}-${index}`} gap={4} wrap="nowrap" justify="space-between">
                   <UnstyledButton onClick={() => onGo(match.slideKey, match.shapeKey)} style={{ flex: 1, minWidth: 0 }} p={4}>
                     <Text size="xs" c="dimmed">
-                      Slide {match.slideIndex + 1} · {match.shapeName}
+                      {t.editor.findReplace.slideShape(match.slideIndex + 1, match.shapeName)}
                     </Text>
                     <Text size="xs" lineClamp={2}>
                       {match.text}
                     </Text>
                   </UnstyledButton>
                   {match.bound ? (
-                    <Badge size="xs" variant="outline" color="gray" title="Vinculada a dados: mude a variável ou o campo">
-                      dados
+                    <Badge size="xs" variant="outline" color="gray" title={t.editor.findReplace.boundTitle}>
+                      {t.editor.findReplace.boundBadge}
                     </Badge>
                   ) : (
                     <Button size="compact-xs" variant="subtle" onClick={() => replace([match])}>
-                      Substituir
+                      {t.editor.findReplace.replace}
                     </Button>
                   )}
                 </Group>
@@ -123,7 +124,7 @@ export function FindReplacePanel({
       <Tabs.Panel value="variaveis">
         <Stack gap="xs" px="sm" pb="sm">
           <Text size="xs" c="dimmed">
-            Procura nos valores de todas as variáveis que este modelo usa, em todos os níveis, e nos padrões do registro.
+            {t.editor.findReplace.variablesHint}
           </Text>
           <Group gap="xs">
             <Button
@@ -133,7 +134,7 @@ export function FindReplacePanel({
               loading={variables.isPending && !variables.variables?.apply}
               onClick={() => variables.mutate({ find: query, replace: replacement, match_case: matchCase, template_id: templateId, apply: false })}
             >
-              Pré-visualizar
+              {t.editor.findReplace.preview}
             </Button>
             <Button
               size="compact-xs"
@@ -141,7 +142,7 @@ export function FindReplacePanel({
               loading={variables.isPending && variables.variables?.apply}
               onClick={() => variables.mutate({ find: query, replace: replacement, match_case: matchCase, template_id: templateId, apply: true })}
             >
-              Substituir nas variáveis
+              {t.editor.findReplace.replaceInVariables}
             </Button>
           </Group>
           {variables.error && <ErrorState error={variables.error} />}
@@ -149,12 +150,8 @@ export function FindReplacePanel({
             <Stack gap={4}>
               <Text size="xs" fw={500}>
                 {variables.data.applied
-                  ? variables.data.count === 1
-                    ? '1 valor substituído.'
-                    : `${variables.data.count} valores substituídos.`
-                  : variables.data.count === 1
-                    ? '1 valor seria alterado:'
-                    : `${variables.data.count} valores seriam alterados:`}
+                  ? t.editor.findReplace.applied(variables.data.count)
+                  : t.editor.findReplace.wouldChange(variables.data.count)}
               </Text>
               {variables.data.matches.map((m, i) => (
                 <Text key={i} size="xs">

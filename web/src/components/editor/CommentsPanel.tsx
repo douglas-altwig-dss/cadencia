@@ -7,6 +7,7 @@ import { useAddComment, useComments, useDeleteComment, useResolveComment } from 
 import type { DeckComment } from '../../api/types';
 import { fromNow } from '../../lib/format';
 import { ErrorState, Loading } from '../common';
+import { useT } from '../../i18n';
 
 /** The name comments are signed with when the server does not know who signed in. */
 export function useAuthorName() {
@@ -36,6 +37,7 @@ export function CommentsPanel({
   labelFor: (originSlideId: number) => string;
   onGo: (originSlideId: number, shapeKey: string | null) => void;
 }) {
+  const t = useT();
   const comments = useComments(templateId);
   const add = useAddComment(templateId);
   const resolve = useResolveComment(templateId);
@@ -67,12 +69,12 @@ export function CommentsPanel({
     <Stack gap={2} pl={child ? 'sm' : 0} style={child ? { borderLeft: '2px solid var(--mantine-color-default-border)' } : undefined}>
       <Group gap={6} justify="space-between" wrap="nowrap">
         <Text size="xs" fw={600} lineClamp={1}>
-          {comment.author || 'anônimo'}{' '}
+          {comment.author || t.editor.comments.anonymous}{' '}
           <Text span size="xs" c="dimmed" fw={400}>
             {fromNow(comment.created_at)}
           </Text>
         </Text>
-        <ActionIcon size="xs" variant="subtle" color="red" aria-label="Excluir comentário" onClick={() => remove.mutate(comment.id)}>
+        <ActionIcon size="xs" variant="subtle" color="red" aria-label={t.editor.comments.deleteAria} onClick={() => remove.mutate(comment.id)}>
           <IconTrash size={12} />
         </ActionIcon>
       </Group>
@@ -90,11 +92,11 @@ export function CommentsPanel({
           value={scope}
           onChange={(v) => setScope(v as 'slide' | 'all')}
           data={[
-            { value: 'slide', label: 'Este slide' },
-            { value: 'all', label: `Todos (${comments.data?.open ?? 0} abertos)` },
+            { value: 'slide', label: t.editor.comments.thisSlide },
+            { value: 'all', label: t.editor.comments.all(comments.data?.open ?? 0) },
           ]}
         />
-        <Switch size="xs" label="resolvidos" checked={showResolved} onChange={(e) => setShowResolved(e.currentTarget.checked)} />
+        <Switch size="xs" label={t.editor.comments.resolvedSwitch} checked={showResolved} onChange={(e) => setShowResolved(e.currentTarget.checked)} />
       </Group>
 
       <Paper withBorder p="xs">
@@ -103,16 +105,16 @@ export function CommentsPanel({
             size="xs"
             autosize
             minRows={2}
-            placeholder={`Comentário sobre ${aboutShape && shapeName ? `“${shapeName}”` : slideLabel}…`}
+            placeholder={t.editor.comments.placeholder(aboutShape && shapeName ? t.editor.comments.quoted(shapeName) : slideLabel)}
             value={body}
             onChange={(e) => setBody(e.currentTarget.value)}
-            aria-label="Novo comentário"
+            aria-label={t.editor.comments.newAria}
           />
           <Group justify="space-between" wrap="nowrap" gap="xs">
-            <TextInput size="xs" placeholder="seu nome" value={author} onChange={(e) => setAuthor(e.currentTarget.value)} aria-label="Seu nome" w={120} />
-            {shapeKey && <Switch size="xs" label="sobre a forma" checked={aboutShape} onChange={(e) => setAboutShape(e.currentTarget.checked)} />}
+            <TextInput size="xs" placeholder={t.editor.comments.namePlaceholder} value={author} onChange={(e) => setAuthor(e.currentTarget.value)} aria-label={t.editor.comments.nameAria} w={120} />
+            {shapeKey && <Switch size="xs" label={t.editor.comments.aboutShape} checked={aboutShape} onChange={(e) => setAboutShape(e.currentTarget.checked)} />}
             <Button size="compact-xs" disabled={!body.trim()} loading={add.isPending} onClick={submit}>
-              Comentar
+              {t.editor.comments.submit}
             </Button>
           </Group>
         </Stack>
@@ -120,8 +122,13 @@ export function CommentsPanel({
 
       {roots.length === 0 && (
         <Text size="xs" c="dimmed">
-          Nenhum comentário {showResolved ? '' : 'aberto '}
-          {scope === 'slide' ? 'neste slide' : 'neste modelo'}.
+          {showResolved
+            ? scope === 'slide'
+              ? t.editor.comments.emptySlide
+              : t.editor.comments.emptyTemplate
+            : scope === 'slide'
+              ? t.editor.comments.emptyOpenSlide
+              : t.editor.comments.emptyOpenTemplate}
         </Text>
       )}
       {roots.map((comment) => (
@@ -135,12 +142,12 @@ export function CommentsPanel({
               )}
               {comment.shape_key && (
                 <Badge size="xs" variant="outline" color="gray" style={{ cursor: 'pointer' }} onClick={() => onGo(comment.origin_slide_id, comment.shape_key)}>
-                  forma {comment.shape_key}
+                  {t.editor.comments.shapeBadge(comment.shape_key)}
                 </Badge>
               )}
               {comment.resolved_at && (
                 <Badge size="xs" color="teal" variant="light">
-                  resolvido
+                  {t.editor.comments.resolvedBadge}
                 </Badge>
               )}
             </Group>
@@ -150,28 +157,28 @@ export function CommentsPanel({
             ))}
             {replyTo === comment.id ? (
               <Group gap={4} wrap="nowrap" align="flex-end">
-                <Textarea size="xs" autosize minRows={1} value={reply} onChange={(e) => setReply(e.currentTarget.value)} style={{ flex: 1 }} aria-label="Resposta" data-autofocus />
+                <Textarea size="xs" autosize minRows={1} value={reply} onChange={(e) => setReply(e.currentTarget.value)} style={{ flex: 1 }} aria-label={t.editor.comments.replyAria} data-autofocus />
                 <Button
                   size="compact-xs"
                   disabled={!reply.trim()}
                   onClick={() => add.mutate({ parent_id: comment.id, body: reply, author: author || undefined }, { onSuccess: () => (setReply(''), setReplyTo(null)) })}
                 >
-                  Responder
+                  {t.editor.comments.reply}
                 </Button>
               </Group>
             ) : (
               <Group gap={4}>
                 <Button size="compact-xs" variant="subtle" onClick={() => setReplyTo(comment.id)}>
-                  Responder
+                  {t.editor.comments.reply}
                 </Button>
-                <Tooltip label={comment.resolved_at ? 'Reabrir' : 'Marcar como resolvido'}>
+                <Tooltip label={comment.resolved_at ? t.editor.comments.reopen : t.editor.comments.markResolved}>
                   <Button
                     size="compact-xs"
                     variant="subtle"
                     leftSection={comment.resolved_at ? <IconArrowBackUp size={12} /> : <IconCheck size={12} />}
                     onClick={() => resolve.mutate({ id: comment.id, resolved: !comment.resolved_at })}
                   >
-                    {comment.resolved_at ? 'Reabrir' : 'Resolver'}
+                    {comment.resolved_at ? t.editor.comments.reopen : t.editor.comments.resolve}
                   </Button>
                 </Tooltip>
               </Group>

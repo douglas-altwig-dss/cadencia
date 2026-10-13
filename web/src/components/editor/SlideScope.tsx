@@ -2,6 +2,8 @@ import { Badge, Chip, Divider, Group, MultiSelect, NumberInput, Select, Stack, S
 
 import type { DeckBoard, SlideMapping } from '../../api/types';
 
+import { collator, useT } from '../../i18n';
+
 /**
  * RF-55: which spaces and boards a slide belongs to.
  *
@@ -23,6 +25,7 @@ export function SlideScope({
   audiences?: string[];
   onChange: (next: SlideMapping) => void;
 }) {
+  const t = useT();
   const onlySpaces = mapping.only_spaces ?? [];
   const onlyBoards = mapping.only_boards ?? [];
   const onlyAudiences = mapping.only_audiences ?? [];
@@ -32,7 +35,7 @@ export function SlideScope({
     ...new Map(boards.filter((b) => b.space_key).map((b) => [b.space_key!, b.space_name || b.space_key!])),
   ]
     .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    .sort((a, b) => collator().compare(a.label, b.label));
   // The board list follows the chosen spaces: a board outside them could never match anyway.
   const boardOptions = (onlySpaces.length ? boards.filter((b) => b.space_key && onlySpaces.includes(b.space_key)) : boards)
     .map((b) => ({ value: String(b.id), label: b.space_name ? `${b.name} · ${b.space_name}` : b.name }));
@@ -42,7 +45,7 @@ export function SlideScope({
       <Group gap="xs" justify="space-between">
         <Switch
           size="xs"
-          label="Em todos os espaços e boards"
+          label={t.editor.scope.everywhere}
           checked={everywhere}
           onChange={(event) =>
             onChange(
@@ -54,20 +57,20 @@ export function SlideScope({
         />
         {!everywhere && (
           <Badge size="xs" color="grape" variant="light">
-            condicional
+            {t.editor.scope.conditional}
           </Badge>
         )}
       </Group>
       {everywhere ? (
         <Text size="xs" c="dimmed">
-          Este slide sai para todos. Desligue para escolher quem o recebe.
+          {t.editor.scope.everywhereHint}
         </Text>
       ) : (
         <>
           <MultiSelect
             size="xs"
-            label="Só nestes espaços"
-            placeholder="qualquer espaço"
+            label={t.editor.scope.onlySpaces}
+            placeholder={t.editor.scope.anySpace}
             data={spaceOptions}
             value={onlySpaces}
             onChange={(value) =>
@@ -85,8 +88,8 @@ export function SlideScope({
           />
           <MultiSelect
             size="xs"
-            label="Só nestes boards"
-            placeholder="qualquer board do espaço"
+            label={t.editor.scope.onlyBoards}
+            placeholder={t.editor.scope.anyBoard}
             data={boardOptions}
             value={onlyBoards.map(String)}
             onChange={(value) => onChange({ ...mapping, only_boards: value.map(Number) })}
@@ -94,8 +97,7 @@ export function SlideScope({
             clearable
           />
           <Text size="xs" c="dimmed">
-            Os dois filtros somam-se: com espaço e board preenchidos, o slide só sai para os boards
-            escolhidos <b>dentro</b> desses espaços. Vazio quer dizer "qualquer".
+            {t.editor.scope.combineBefore} <b>{t.editor.scope.combineInside}</b> {t.editor.scope.combineAfter}
           </Text>
         </>
       )}
@@ -104,11 +106,11 @@ export function SlideScope({
           <Divider />
           <Group gap="xs" justify="space-between">
             <Text size="xs" fw={500}>
-              Públicos
+              {t.editor.scope.audiences}
             </Text>
             {onlyAudiences.length > 0 && (
               <Badge size="xs" color="grape" variant="light">
-                só {onlyAudiences.join(', ')}
+                {t.editor.scope.onlyAudiences(onlyAudiences.join(', '))}
               </Badge>
             )}
           </Group>
@@ -122,17 +124,16 @@ export function SlideScope({
             </Group>
           </Chip.Group>
           <Text size="xs" c="dimmed">
-            Nenhum marcado: o slide sai para todos os públicos. Uma geração sem público escolhido
-            inclui todos os slides.
+            {t.editor.scope.audiencesHint}
           </Text>
         </>
       )}
       <Divider />
       <NumberInput
         size="xs"
-        label="Minutos previstos na reunião"
-        description="O cronômetro do modo apresentação avisa quando o slide passa disso."
-        placeholder="sem limite"
+        label={t.editor.scope.minutes}
+        description={t.editor.scope.minutesHint}
+        placeholder={t.editor.scope.noLimit}
         min={0}
         max={120}
         step={0.5}
@@ -143,12 +144,12 @@ export function SlideScope({
       />
       <Select
         size="xs"
-        label="Transição ao entrar neste slide"
-        description="Só no modo apresentação da Cadência; um arquivo baixado abre sem ela."
+        label={t.editor.scope.transition}
+        description={t.editor.scope.transitionHint}
         data={[
-          { value: 'nenhuma', label: 'Nenhuma' },
-          { value: 'fade', label: 'Esmaecer' },
-          { value: 'deslizar', label: 'Deslizar' },
+          { value: 'nenhuma', label: t.editor.scope.transitionNone },
+          { value: 'fade', label: t.editor.scope.transitionFade },
+          { value: 'deslizar', label: t.editor.scope.transitionSlide },
         ]}
         value={mapping.transition ?? 'nenhuma'}
         onChange={(value) => value && onChange({ ...mapping, transition: value as SlideMapping['transition'] })}

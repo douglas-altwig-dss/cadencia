@@ -15,6 +15,8 @@ import {
   IconTrash,
 } from '@tabler/icons-react';
 
+import { useT } from '../../i18n';
+
 const Key = ({ children }: { children: string }) => (
   <Text size="xs" c="dimmed" className="mono">
     {children}
@@ -80,23 +82,24 @@ export function CanvasMenuItems({
   /** RF-93 */
   onComment?: () => void;
 }) {
+  const t = useT();
   if (!hasSelection) {
     return (
       <>
         <Menu.Item leftSection={<IconClipboard size={14} />} rightSection={<Key>Ctrl+V</Key>} disabled={!canPaste} onClick={onPaste}>
-          Colar
+          {t.editor.canvasMenu.paste}
         </Menu.Item>
         <Menu.Item rightSection={<Key>Ctrl+A</Key>} onClick={onSelectAll}>
-          Selecionar tudo
+          {t.editor.canvasMenu.selectAll}
         </Menu.Item>
         {hiddenCount > 0 && onShowHidden && (
           <Menu.Item leftSection={<IconEye size={14} />} onClick={onShowHidden}>
-            Mostrar formas ocultas ({hiddenCount})
+            {t.editor.canvasMenu.showHidden(hiddenCount)}
           </Menu.Item>
         )}
         {onComment && (
           <Menu.Item leftSection={<IconMessage size={14} />} onClick={onComment}>
-            Comentar este slide
+            {t.editor.canvasMenu.commentSlide}
           </Menu.Item>
         )}
       </>
@@ -105,29 +108,29 @@ export function CanvasMenuItems({
   return (
     <>
       <Menu.Item leftSection={<IconCopy size={14} />} rightSection={<Key>Ctrl+C</Key>} onClick={onCopy}>
-        Copiar
+        {t.editor.canvasMenu.copy}
       </Menu.Item>
       <Menu.Item leftSection={<IconClipboard size={14} />} rightSection={<Key>Ctrl+V</Key>} disabled={!canPaste} onClick={onPaste}>
-        Colar
+        {t.editor.canvasMenu.paste}
       </Menu.Item>
       <Menu.Item leftSection={<IconCopy size={14} />} rightSection={<Key>Ctrl+D</Key>} onClick={onDuplicate}>
-        Duplicar
+        {t.editor.canvasMenu.duplicate}
       </Menu.Item>
       <Menu.Divider />
       <Menu.Sub>
         <Menu.Sub.Target>
-          <Menu.Sub.Item leftSection={<IconStack2 size={14} />}>Ordem</Menu.Sub.Item>
+          <Menu.Sub.Item leftSection={<IconStack2 size={14} />}>{t.editor.canvasMenu.order}</Menu.Sub.Item>
         </Menu.Sub.Target>
         <Menu.Sub.Dropdown>
-          <Menu.Item onClick={() => onOrder('front')}>Trazer para a frente</Menu.Item>
-          <Menu.Item onClick={() => onOrder('forward')}>Avançar uma</Menu.Item>
-          <Menu.Item onClick={() => onOrder('backward')}>Recuar uma</Menu.Item>
-          <Menu.Item onClick={() => onOrder('back')}>Enviar para trás</Menu.Item>
+          <Menu.Item onClick={() => onOrder('front')}>{t.editor.canvasMenu.bringToFront}</Menu.Item>
+          <Menu.Item onClick={() => onOrder('forward')}>{t.editor.canvasMenu.bringForward}</Menu.Item>
+          <Menu.Item onClick={() => onOrder('backward')}>{t.editor.canvasMenu.sendBackward}</Menu.Item>
+          <Menu.Item onClick={() => onOrder('back')}>{t.editor.canvasMenu.sendToBack}</Menu.Item>
         </Menu.Sub.Dropdown>
       </Menu.Sub>
       {canGroup && (
         <Menu.Item leftSection={<IconLayersUnion size={14} />} rightSection={<Key>Ctrl+G</Key>} onClick={onGroup}>
-          Agrupar
+          {t.editor.canvasMenu.group}
         </Menu.Item>
       )}
       {canUngroup && (
@@ -136,42 +139,42 @@ export function CanvasMenuItems({
           rightSection={<Key>Ctrl+Shift+G</Key>}
           onClick={onUngroup}
         >
-          Desagrupar
+          {t.editor.canvasMenu.ungroup}
         </Menu.Item>
       )}
       {onCopyStyle && (
         <Menu.Item leftSection={<IconBrush size={14} />} rightSection={<Key>Ctrl+Shift+C</Key>} onClick={onCopyStyle}>
-          Copiar formato
+          {t.editor.canvasMenu.copyStyle}
         </Menu.Item>
       )}
       {onPasteStyle && (
         <Menu.Item leftSection={<IconBrush size={14} />} rightSection={<Key>Ctrl+Shift+V</Key>} disabled={!canPasteStyle} onClick={onPasteStyle}>
-          Colar formato
+          {t.editor.canvasMenu.pasteStyle}
         </Menu.Item>
       )}
       {onLock && (
         <Menu.Item leftSection={locked ? <IconLockOpen size={14} /> : <IconLock size={14} />} rightSection={<Key>Ctrl+L</Key>} onClick={onLock}>
-          {locked ? 'Desbloquear' : 'Bloquear posição e tamanho'}
+          {locked ? t.editor.canvasMenu.unlock : t.editor.canvasMenu.lock}
         </Menu.Item>
       )}
       {onHide && (
         <Menu.Item leftSection={<IconEyeOff size={14} />} onClick={onHide}>
-          Ocultar no editor
+          {t.editor.canvasMenu.hide}
         </Menu.Item>
       )}
       {onComment && (
         <Menu.Item leftSection={<IconMessage size={14} />} onClick={onComment}>
-          Comentar
+          {t.editor.canvasMenu.comment}
         </Menu.Item>
       )}
       {canReset && (
         <Menu.Item leftSection={<IconArrowBackUp size={14} />} onClick={onReset}>
-          Reverter para os dados
+          {t.editor.canvasMenu.reset}
         </Menu.Item>
       )}
       <Menu.Divider />
       <Menu.Item color="red" leftSection={<IconTrash size={14} />} rightSection={<Key>Del</Key>} onClick={onDelete} disabled={locked}>
-        Remover
+        {t.editor.canvasMenu.remove}
       </Menu.Item>
     </>
   );

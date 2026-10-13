@@ -20,11 +20,11 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { IconPencil, IconSearch, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import { plural } from '../../lib/format';
 import { useAssetLibrary, useBlocks, useDeleteBlock, useSaveBlock, useUpdateAsset } from '../../api/deckHooks';
 import type { DeckBlock, LibraryAsset, ShapeEdit } from '../../api/types';
 import { emuToCm } from '../../lib/emu';
 import { ErrorState } from '../common';
+import { useT } from '../../i18n';
 
 /**
  * #16, #17: what can be dropped onto a slide — the pictures uploaded before (searchable by name,
@@ -44,12 +44,13 @@ export function LibraryDrawer({
   onInsertImage: (asset: LibraryAsset) => void;
   onInsertBlock: (block: DeckBlock) => void;
 }) {
+  const t = useT();
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size="lg" title="Biblioteca">
+    <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={t.editor.library.title}>
       <Tabs defaultValue="imagens" keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="imagens">Imagens</Tabs.Tab>
-          <Tabs.Tab value="blocos">Blocos</Tabs.Tab>
+          <Tabs.Tab value="imagens">{t.editor.library.images}</Tabs.Tab>
+          <Tabs.Tab value="blocos">{t.editor.library.blocks}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="imagens">
           <Images onInsert={onInsertImage} />
@@ -63,6 +64,7 @@ export function LibraryDrawer({
 }
 
 function Images({ onInsert }: { onInsert: (asset: LibraryAsset) => void }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [debounced] = useDebouncedValue(query, 250);
@@ -72,18 +74,18 @@ function Images({ onInsert }: { onInsert: (asset: LibraryAsset) => void }) {
     <Stack gap="sm">
       <Group grow>
         <TextInput
-          placeholder="buscar por nome ou rótulo"
+          placeholder={t.editor.library.searchPlaceholder}
           leftSection={<IconSearch size={14} />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
         />
-        <Select placeholder="etiqueta" data={assets.data?.tags ?? []} value={tag} onChange={setTag} clearable />
+        <Select placeholder={t.editor.library.tagPlaceholder} data={assets.data?.tags ?? []} value={tag} onChange={setTag} clearable />
       </Group>
       {assets.isLoading && <Loader size="sm" />}
       {assets.error && <ErrorState error={assets.error} />}
       {assets.data && !assets.data.items.length && (
         <Text size="sm" c="dimmed">
-          Nenhuma imagem{query || tag ? ' com esse filtro' : ''}. Envie uma pela barra do editor e ela aparece aqui.
+          {query || tag ? t.editor.library.noImagesFiltered : t.editor.library.noImages}
         </Text>
       )}
       <SimpleGrid cols={2} spacing="sm">
@@ -100,21 +102,21 @@ function Images({ onInsert }: { onInsert: (asset: LibraryAsset) => void }) {
                   <Text size="xs" fw={500} lineClamp={1}>
                     {asset.label || asset.filename}
                   </Text>
-                  <Tooltip label="Rótulo e etiquetas">
-                    <ActionIcon size="xs" variant="subtle" onClick={() => setEditing(asset.id)} aria-label="Editar rótulo">
+                  <Tooltip label={t.editor.library.labelAndTags}>
+                    <ActionIcon size="xs" variant="subtle" onClick={() => setEditing(asset.id)} aria-label={t.editor.library.editLabelAria}>
                       <IconPencil size={12} />
                     </ActionIcon>
                   </Tooltip>
                 </Group>
                 <Group gap={2}>
-                  {asset.tags.map((t) => (
-                    <Badge key={t} size="xs" variant="light">
-                      {t}
+                  {asset.tags.map((tag) => (
+                    <Badge key={tag} size="xs" variant="light">
+                      {tag}
                     </Badge>
                   ))}
                 </Group>
                 <Button size="compact-xs" variant="light" onClick={() => onInsert(asset)}>
-                  Inserir no slide
+                  {t.editor.library.insertOnSlide}
                 </Button>
               </Stack>
             </Card>
@@ -126,21 +128,22 @@ function Images({ onInsert }: { onInsert: (asset: LibraryAsset) => void }) {
 }
 
 function AssetEditor({ asset, tags, onDone }: { asset: LibraryAsset; tags: string[]; onDone: () => void }) {
+  const t = useT();
   const update = useUpdateAsset();
   const [label, setLabel] = useState(asset.label);
   const [chosen, setChosen] = useState(asset.tags);
   return (
     <Card withBorder padding="xs">
       <Stack gap={6}>
-        <TextInput size="xs" label="Rótulo" value={label} onChange={(e) => setLabel(e.currentTarget.value)} />
-        <TagsInput size="xs" label="Etiquetas" data={tags} value={chosen} onChange={setChosen} />
+        <TextInput size="xs" label={t.editor.library.label} value={label} onChange={(e) => setLabel(e.currentTarget.value)} />
+        <TagsInput size="xs" label={t.editor.library.tags} data={tags} value={chosen} onChange={setChosen} />
         {update.error && <ErrorState error={update.error} />}
         <Group gap={4} justify="flex-end">
           <Button size="compact-xs" variant="default" onClick={onDone}>
-            Cancelar
+            {t.editor.library.cancel}
           </Button>
           <Button size="compact-xs" loading={update.isPending} onClick={() => update.mutate({ id: asset.id, label, tags: chosen }, { onSuccess: onDone })}>
-            Salvar
+            {t.editor.library.save}
           </Button>
         </Group>
       </Stack>
@@ -149,6 +152,7 @@ function AssetEditor({ asset, tags, onDone }: { asset: LibraryAsset; tags: strin
 }
 
 function Blocks({ selection, onInsert }: { selection: Record<string, ShapeEdit>; onInsert: (block: DeckBlock) => void }) {
+  const t = useT();
   const blocks = useBlocks();
   const save = useSaveBlock();
   const remove = useDeleteBlock();
@@ -159,31 +163,29 @@ function Blocks({ selection, onInsert }: { selection: Record<string, ShapeEdit>;
       <Card withBorder padding="sm">
         <Stack gap={6}>
           <Text size="sm" fw={500}>
-            Salvar a seleção como bloco
+            {t.editor.library.saveSelection}
           </Text>
           <Text size="xs" c="dimmed">
-            {count
-              ? `${count === 1 ? '1 elemento selecionado' : `${count} elementos selecionados`}. O bloco guarda posição relativa, texto e formato; vínculos a dados não viajam.`
-              : 'Selecione um ou mais elementos no slide para guardá-los como bloco.'}
+            {count ? t.editor.library.selected(count) : t.editor.library.selectFirst}
           </Text>
           <Group gap={4} wrap="nowrap">
-            <TextInput size="xs" placeholder="nome do bloco" value={name} onChange={(e) => setName(e.currentTarget.value)} style={{ flex: 1 }} />
+            <TextInput size="xs" placeholder={t.editor.library.namePlaceholder} value={name} onChange={(e) => setName(e.currentTarget.value)} style={{ flex: 1 }} />
             <Button
               size="xs"
               disabled={!count || !name.trim()}
               loading={save.isPending}
               onClick={() => save.mutate({ name, shapes: selection }, { onSuccess: () => setName('') })}
             >
-              Salvar
+              {t.editor.library.save}
             </Button>
           </Group>
-          {save.error && <ErrorState error={save.error} title="Bloco não salvo" />}
+          {save.error && <ErrorState error={save.error} title={t.editor.library.notSaved} />}
         </Stack>
       </Card>
       {blocks.isLoading && <Loader size="sm" />}
       {blocks.data && !blocks.data.items.length && (
         <Text size="sm" c="dimmed">
-          Nenhum bloco salvo ainda.
+          {t.editor.library.noBlocks}
         </Text>
       )}
       {blocks.data?.items.map((block) => (
@@ -194,16 +196,16 @@ function Blocks({ selection, onInsert }: { selection: Record<string, ShapeEdit>;
                 {block.name}
               </Text>
               <Text size="xs" c="dimmed">
-                {plural(Object.keys(block.shapes).length, 'elemento', 'elementos')} · {emuToCm(block.width).toFixed(1)} × {emuToCm(block.height).toFixed(1)} cm
+                {t.editor.library.elements(Object.keys(block.shapes).length)} · {emuToCm(block.width).toFixed(1)} × {emuToCm(block.height).toFixed(1)} cm
                 {block.author ? ` · ${block.author}` : ''}
-                {block.usage_count > 0 ? ` · ${plural(block.usage_count, 'uso', 'usos')}` : ''}
+                {block.usage_count > 0 ? ` · ${t.editor.library.uses(block.usage_count)}` : ''}
               </Text>
             </Stack>
             <Group gap={4} wrap="nowrap">
               <Button size="compact-xs" variant="light" onClick={() => onInsert(block)}>
-                Inserir
+                {t.editor.library.insert}
               </Button>
-              <ActionIcon size="sm" variant="subtle" color="red" onClick={() => remove.mutate(block.id)} aria-label={`Apagar o bloco ${block.name}`}>
+              <ActionIcon size="sm" variant="subtle" color="red" onClick={() => remove.mutate(block.id)} aria-label={t.editor.library.deleteAria(block.name)}>
                 <IconTrash size={14} />
               </ActionIcon>
             </Group>

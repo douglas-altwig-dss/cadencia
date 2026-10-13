@@ -11,6 +11,7 @@
  * so a token can never be committed as a manual override.
  */
 import type { DeckMapping, SceneParagraph } from '../api/types';
+import { t } from '../i18n';
 
 import type { EffectiveShape } from './deckEdits';
 
@@ -89,7 +90,7 @@ export function displayShapes(
       return {
         ...shape,
         flag: 'empty',
-        text: { ...shape.text, paragraphs: tokenParagraphs(shape, token ? `${token} — sem valor` : 'sem valor') },
+        text: { ...shape.text, paragraphs: tokenParagraphs(shape, token ? t().editor.display.tokenNoValue(token) : t().editor.display.noValue) },
       };
     }
     return shape;
