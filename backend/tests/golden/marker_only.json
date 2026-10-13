@@ -1,0 +1,224 @@
+{
+  "deck": {
+    "slide_count": 4,
+    "slides": [
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 1,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Acompanhamento semanal"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SEMANA",
+              "04/09/2026"
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 2,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "PROJETO",
+              "Nome do espaço"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SPRINT"
+            ]
+          },
+          {
+            "id": 4,
+            "name": "TextBox 3",
+            "text": [
+              "SEMANA",
+              "00/00/0000"
+            ]
+          },
+          {
+            "id": 5,
+            "name": "TextBox 4",
+            "text": [
+              "Status geral"
+            ]
+          },
+          {
+            "fill": "808080",
+            "id": 6,
+            "name": "Rounded Rectangle 5"
+          },
+          {
+            "id": 7,
+            "name": "TextBox 6",
+            "text": [
+              "Entregas da semana"
+            ]
+          },
+          {
+            "id": 8,
+            "name": "Table 7",
+            "table": [
+              [
+                "Épico:\nItem entregue"
+              ]
+            ]
+          },
+          {
+            "id": 9,
+            "name": "TextBox 8",
+            "text": [
+              "Bloqueios"
+            ]
+          },
+          {
+            "id": 10,
+            "name": "Table 9",
+            "table": [
+              [
+                "Item",
+                "Ação",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          },
+          {
+            "fill": "EEEEEE",
+            "id": 12,
+            "name": "Área gráfico riscos"
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 3,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Riscos"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "Table 2",
+            "table": [
+              [
+                "Situação:",
+                "Concluído",
+                "Em risco",
+                "Atrasado"
+              ]
+            ]
+          },
+          {
+            "id": 4,
+            "name": "Table 3",
+            "table": [
+              [
+                "Sprint",
+                "Chave",
+                "Descrição",
+                "Responsável",
+                "Ação",
+                "Prazo",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                "Épico",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "Concluído"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 4,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Gerado pela Cadência em 10/09/2026"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "produced": [
+    {
+      "board_id": null,
+      "index": 1,
+      "origin_slide_id": 256,
+      "page": 1
+    },
+    {
+      "board_id": null,
+      "index": 2,
+      "origin_slide_id": 257,
+      "page": 1
+    },
+    {
+      "board_id": null,
+      "index": 3,
+      "origin_slide_id": 258,
+      "page": 1
+    },
+    {
+      "board_id": null,
+      "index": 4,
+      "origin_slide_id": 259,
+      "page": 1
+    }
+  ],
+  "validation": {
+    "errors": [],
+    "ok": true,
+    "package_ok": true,
+    "warnings": [
+      "acessibilidade_sem_texto_alternativo",
+      "sem_mapeamento",
+      "vazio"
+    ]
+  }
+}

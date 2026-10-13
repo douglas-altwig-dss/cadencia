@@ -1,0 +1,78 @@
+# Execution: PostgreSQL + API + scheduled collector + web (nginx). `make up` creates the secret files;
+# `make auth LOGIN=<nome>` turns on sign-in (see README, "Access").
+name: cadencia
+
+x-backend: &backend
+  build:
+    context: ./backend
+    args:
+      WITH_LIBREOFFICE: ${WITH_LIBREOFFICE:-false}
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    CADENCIA_DATABASE_URL: postgresql+psycopg://cadencia:${POSTGRES_PASSWORD:-cadencia}@db:5432/cadencia
+    CADENCIA_DATA_DIR: /data
+  volumes:
+    - data:/data
+  secrets:
+    - cadencia_jira_api_token
+    - cadencia_api_token
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cadencia
+      POSTGRES_USER: cadencia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cadencia}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cadencia -d cadencia"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    command: ["cadencia", "serve", "--port", "8000"]
+    # This machine only: from the network, the API is reached through the web app's sign-in.
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  collector:
+    <<: *backend
+    command: ["cadencia", "scheduler"]
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy  # the API applies migrations first
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    secrets:
+      - cadencia_api_token
+      - cadencia_web_htpasswd
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata: {}
+  data: {}
+
+secrets:
+  cadencia_jira_api_token:
+    file: ./secrets/jira_api_token
+  cadencia_api_token:
+    file: ./secrets/api_token
+  cadencia_web_htpasswd:
+    file: ./secrets/web_htpasswd

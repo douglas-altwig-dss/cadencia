@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cadencia"
+version = "0.1.0"
+description = "Cadência — acompanhamento semanal de entregas no Jira"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.27",
+  "tenacity>=8.2",
+  "pydantic>=2.7",
+  "pydantic-settings>=2.3",
+  "fastapi>=0.111",
+  "uvicorn[standard]>=0.30",
+  "python-multipart>=0.0.9",
+  "sqlalchemy>=2.0.30",
+  "psycopg[binary]>=3.1",
+  "alembic>=1.13",
+  "apscheduler>=3.10,<4",
+  "python-pptx>=1.0",
+  "matplotlib>=3.8",
+  "segno>=1.6",
+  "tzdata",
+  "ortools>=9.10",
+  "anthropic>=1.9,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.5"]
+
+[project.scripts]
+cadencia = "cadencia.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["cadencia*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["ignore::DeprecationWarning:pptx.*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+# pt-BR strings legitimately contain en dashes and accented characters.
+ignore = ["RUF001", "RUF002", "RUF003", "RUF012", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

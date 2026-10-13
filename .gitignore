@@ -1,0 +1,20 @@
+# secrets and local configuration
+.env
+secrets/
+
+# local data (SQLite database, uploaded templates, generated decks)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Python
+backend/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# web
+web/node_modules/
+web/dist/

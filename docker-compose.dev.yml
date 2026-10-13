@@ -1,0 +1,97 @@
+# Development: the same services as execution (db, api, collector, web) running from the mounted
+# source with reload, plus `workspace`, the container VS Code attaches to (.devcontainer).
+# Dependencies live in named volumes so rebuilding the image never reinstalls them.
+name: cadencia-dev
+
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: .devcontainer/Dockerfile
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    CADENCIA_DATABASE_URL: postgresql+psycopg://cadencia:cadencia@db:5432/cadencia
+    CADENCIA_DATA_DIR: /workspace/data
+    CADENCIA_API_URL: http://api:8000
+    CADENCIA_LOG_JSON: "false"
+  volumes:
+    - .:/workspace:cached
+    - venv:/workspace/backend/.venv
+    - node_modules:/workspace/web/node_modules
+    - pip-cache:/home/vscode/.cache/pip
+    - npm-cache:/home/vscode/.npm
+  working_dir: /workspace
+  user: vscode
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cadencia
+      POSTGRES_USER: cadencia
+      POSTGRES_PASSWORD: cadencia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cadencia -d cadencia"]
+      interval: 5s
+      retries: 20
+
+  workspace:
+    <<: *dev
+    command: sleep infinity
+    volumes:
+      - .:/workspace:cached
+      - venv:/workspace/backend/.venv
+      - node_modules:/workspace/web/node_modules
+      - pip-cache:/home/vscode/.cache/pip
+      - npm-cache:/home/vscode/.npm
+      # Personal configuration and credentials shared with other projects' dev containers.
+      - devcontainer-config:/home/vscode/.config
+      - devcontainer-claude:/home/vscode/.claude
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *dev
+    command: >
+      sh -c "until [ -x backend/.venv/bin/cadencia ]; do echo 'aguardando make setup…'; sleep 3; done;
+             exec backend/.venv/bin/cadencia serve --reload --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  collector:
+    <<: *dev
+    command: >
+      sh -c "until [ -x backend/.venv/bin/cadencia ]; do sleep 3; done; sleep 10;
+             exec backend/.venv/bin/cadencia scheduler"
+    depends_on:
+      - api
+
+  web:
+    <<: *dev
+    command: >
+      sh -c "until [ -x web/node_modules/.bin/vite ]; do echo 'aguardando make setup…'; sleep 3; done;
+             cd web && exec npm run dev"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  pgdata-dev: {}
+  venv: {}
+  node_modules: {}
+  pip-cache: {}
+  npm-cache: {}
+  devcontainer-config:
+    name: devcontainer-user-config
+  devcontainer-claude:
+    name: devcontainer-claude-config

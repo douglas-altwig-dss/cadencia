@@ -1,0 +1,1393 @@
+/* ---- Design tokens. Surfaces come in layers — the page is tinted, cards sit on it in white (or
+   the dark scheme's lifted grey) — so structure reads without a border around everything. */
+:root {
+  --app-bg: #f3f6f5;
+  --surface: #ffffff;
+  --surface-sunken: #f6f8f8;
+  --border-soft: #e2e8e6;
+  --text-muted: #5b6b67;
+  --nav-active-bg: #e3f1ef;
+  --page-max: 1440px;
+}
+
+[data-mantine-color-scheme='dark'] {
+  --app-bg: #101514;
+  --surface: #1a2120;
+  --surface-sunken: #141a19;
+  --border-soft: #2a3432;
+  --text-muted: #9aa8a4;
+  --nav-active-bg: #16302d;
+}
+
+body {
+  font-variant-numeric: tabular-nums lining-nums;
+  background: var(--app-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Cards: every bordered Paper becomes a card on the tinted page. */
+.mantine-Paper-root[data-with-border] {
+  background: var(--surface);
+  border-color: var(--border-soft);
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-Paper-root[data-with-border] {
+  box-shadow: none;
+}
+
+/* Badges say words, not SHOUTED WORDS: sentence case, no tracking. */
+.mantine-Badge-root {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+
+/* Tables: quiet column heads, a hairline between rows, the head row on a sunken band. */
+.mantine-Table-thead .mantine-Table-th {
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  white-space: nowrap;
+}
+
+.mantine-Table-table {
+  --table-border-color: var(--border-soft);
+}
+
+/* Tabs: the underline reads as navigation, and the active tab is the only emphatic one. */
+.mantine-Tabs-list[data-variant='default'] {
+  --tabs-list-border-size: 1px;
+  --tab-border-color: var(--border-soft);
+}
+
+.mantine-Tabs-tab[data-variant='default'] {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.mantine-Tabs-tab[data-variant='default'][data-active] {
+  color: var(--mantine-color-text);
+  font-weight: 600;
+}
+
+.mantine-Title-root {
+  letter-spacing: -0.01em;
+}
+
+/* The content column: a readable width on big screens; the deck editor opts out (it needs room). */
+.page {
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding-block: var(--mantine-spacing-xs) var(--mantine-spacing-xl);
+}
+
+.page.is-wide {
+  max-width: none;
+}
+
+/* Header and navigation. */
+.app-header,
+.app-nav {
+  background: var(--surface);
+  border-color: var(--border-soft) !important;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--mantine-color-petrol-6), var(--mantine-color-petrol-9));
+}
+
+.nav-section {
+  padding: var(--mantine-spacing-md) var(--mantine-spacing-sm) 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.app-nav .mantine-NavLink-root {
+  border-radius: var(--mantine-radius-md);
+  margin-block: 1px;
+  color: var(--mantine-color-text);
+  font-weight: 500;
+}
+
+.app-nav .mantine-NavLink-root[data-active] {
+  background: var(--nav-active-bg);
+  color: var(--mantine-primary-color-filled);
+  box-shadow: inset 3px 0 0 var(--mantine-primary-color-filled);
+}
+
+.search-trigger {
+  min-width: 320px;
+  justify-content: space-between;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-color: var(--border-soft);
+}
+
+/* KPI tiles. */
+.kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.kpi-value {
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+/* Explanatory notes: a quiet aside, not a coloured slab competing with the data. */
+.note {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--mantine-primary-color-filled);
+}
+
+.note .mantine-Alert-title {
+  color: var(--mantine-color-text);
+}
+
+.note .mantine-Alert-icon {
+  color: var(--mantine-primary-color-filled);
+}
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0.5rem;
+  z-index: 1000;
+  padding: 0.5rem 1rem;
+  background: var(--mantine-color-body);
+  border: 2px solid var(--mantine-primary-color-filled);
+}
+
+.skip-link:focus {
+  left: 1rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.mono {
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.86em;
+}
+
+.tree-toggle {
+  width: 1.5rem;
+  display: inline-flex;
+  justify-content: center;
+}
+
+/* Clickable shapes drawn over the rendered slide, in the deck mapping screen. A bound area is
+   marked by a solid outline *and* a numbered badge, never by colour alone. */
+.slide-area {
+  position: absolute;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 1px dashed transparent;
+  border-radius: 2px;
+}
+
+.slide-area.is-visible,
+.slide-area:hover,
+.slide-area:focus-visible {
+  border-color: var(--mantine-color-dimmed);
+  background: color-mix(in srgb, var(--mantine-color-body) 45%, transparent);
+}
+
+.slide-area.is-bound {
+  border: 2px solid var(--mantine-primary-color-filled);
+  background: color-mix(in srgb, var(--mantine-primary-color-filled) 12%, transparent);
+}
+
+.slide-area.is-bound.is-active,
+.slide-area.is-bound:hover,
+.slide-area.is-bound:focus-visible {
+  background: color-mix(in srgb, var(--mantine-primary-color-filled) 28%, transparent);
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* Inside the corner, not outside it: areas touching the slide edge would clip their own badge. */
+.slide-area-badges {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  flex-wrap: nowrap;
+}
+
+.binding-row.is-active {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: inset 3px 0 0 var(--mantine-primary-color-filled);
+}
+
+/* The panel splitters (RF-54). Invisible until it matters, then a line under the pointer — the
+   hit area stays 6px wide so it is grabbable without drawing a 6px bar across the screen. */
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  border-radius: 1px;
+  background: transparent;
+  transition: background 120ms ease;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer:focus-visible::after,
+.panel-resizer:active::after {
+  background: var(--mantine-primary-color-filled);
+}
+
+.panel-resizer:focus-visible {
+  outline: none;
+}
+
+/* While a splitter is being dragged the whole page keeps the resize cursor, so it does not flicker
+   back to a text caret every time the pointer crosses the canvas. */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+/* RF-106: the ribbon — a tab strip over a panel of grouped commands, PowerPoint's own shape. */
+.ribbon-tabstrip {
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-soft);
+}
+.ribbon-tab {
+  padding: 6px 12px;
+  color: var(--mantine-color-text);
+  border-bottom: 2px solid transparent;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.ribbon-tab:hover,
+.ribbon-tab:focus-visible {
+  background-color: var(--mantine-color-default-hover);
+}
+.ribbon-tab.is-active {
+  border-bottom-color: var(--mantine-primary-color-filled);
+  background-color: var(--surface);
+}
+.ribbon-panel {
+  background: var(--surface);
+  overflow-x: auto;
+  min-height: 74px;
+}
+.ribbon-group {
+  padding: 4px 10px;
+  flex: 0 0 auto;
+}
+.ribbon-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  color: var(--mantine-color-text);
+  transition: background-color 120ms ease;
+}
+.ribbon-entry:hover:not(:disabled) {
+  background-color: var(--mantine-color-default-hover);
+}
+.ribbon-entry:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* RF-98: compact density. `!important` because Mantine writes the spacing variables inline. */
+[data-density='compacta'] .mantine-Table-table {
+  --table-vertical-spacing: 0.2rem !important;
+  --table-horizontal-spacing: 0.5rem !important;
+  font-size: 0.8125rem;
+}
+
+[data-density='compacta'] .mantine-Paper-root {
+  --paper-padding: 0.5rem;
+}
+
+/* RF-95: less motion, when asked for here or by the operating system. */
+[data-motion='reduzido'] *,
+[data-motion='reduzido'] *::before,
+[data-motion='reduzido'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The slide-to-slide transitions offered in the editor's "Transição" setting (PresentMode only —
+   a downloaded file carries none of this). RF-95's rule above already collapses their duration to
+   near-zero under reduced motion, so they need no separate opt-out here. */
+@keyframes cadencia-slide-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes cadencia-slide-deslizar {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+.cadencia-transition-fade {
+  animation: cadencia-slide-fade 220ms ease-out;
+}
+.cadencia-transition-deslizar {
+  animation: cadencia-slide-deslizar 220ms ease-out;
+}
+
+/* RF-95: a visible focus ring everywhere, not only where a component remembered one. */
+:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+/* RF-86: on a phone, wide tables scroll inside their card instead of widening the page. */
+@media (max-width: 48em) {
+  .mantine-AppShell-main {
+    padding-inline: 0.5rem;
+  }
+  .mobile-stack {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+}
+
+/* Epic plan: the weekly schedule. The label column stays put while the timeline scrolls. */
+.gantt {
+  --gantt-day-line: var(--mantine-color-default-border);
+  --gantt-hour-line: color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent);
+  overflow-x: auto;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.gantt-row {
+  display: flex;
+  min-height: 34px;
+}
+
+.gantt-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 220px;
+  width: 220px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  background: var(--mantine-color-body);
+  border-right: 1px solid var(--mantine-color-default-border);
+}
+
+.gantt-lane-label {
+  padding-left: 24px;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.gantt-head {
+  min-height: 22px;
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.gantt-week,
+.gantt-day,
+.gantt-hour {
+  flex: 0 0 auto;
+  text-align: center;
+  border-left: 1px solid var(--mantine-color-default-border);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.gantt-week {
+  font-weight: 600;
+  color: var(--mantine-color-text);
+}
+
+.gantt-week.is-planning {
+  background: var(--mantine-color-default-hover);
+}
+
+.gantt-hour {
+  border-left-color: color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent);
+  font-size: 10px;
+}
+
+.gantt-group {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.gantt-track {
+  position: relative;
+  flex: 1 0 auto;
+  min-height: 40px;
+}
+
+.gantt-track.is-group {
+  min-height: 30px;
+  background-color: var(--mantine-color-default-hover);
+}
+
+.gantt-bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 4px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, #000 25%, transparent);
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gantt-bar-title {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.gantt-bar-detail {
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+/* Epic plan: the dependency pipeline, nodes as buttons over an SVG of arrows. */
+.pipeline {
+  position: relative;
+  overflow: auto;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-default-hover);
+}
+
+.pipeline-node {
+  position: absolute;
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-sm);
+  cursor: pointer;
+}
+
+.pipeline-node:hover {
+  border-color: var(--mantine-primary-color-filled);
+}
+
+.plan-index {
+  position: sticky;
+  top: 76px;
+}
+
+/* Below lg the index becomes a jump list, kept in reach while the plan is read. */
+.plan-jump {
+  position: sticky;
+  top: 60px;
+  z-index: 5;
+  background: var(--app-bg);
+  padding-block: var(--mantine-spacing-xs);
+}
+
+/* People: a card per person; its name is the link, and the link's ::after covers the whole card. */
+.person-card {
+  position: relative;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+/* The "i"s are buttons over the stretched link, so they still get the click and the focus. */
+.person-card .info-tip {
+  position: relative;
+  z-index: 1;
+}
+
+/* A link whose hit area is its whole positioned ancestor (the card). */
+.stretched-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.person-card:hover {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: var(--mantine-shadow-sm);
+}
+
+/* The People card: equal heights in a row, small-caps stat labels, a lift on hover (not for those who ask for none). */
+.pk-card {
+  display: block;
+  height: 100%;
+  padding: var(--mantine-spacing-sm);
+}
+
+.pk-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mantine-color-dimmed);
+  margin-bottom: 4px;
+}
+
+.pk-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mantine-spacing-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pk-card {
+    transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .pk-card:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* Epic plan: sections breathe; the index is a list of places, the current one marked. */
+.plan-section {
+  scroll-margin-top: 76px;
+  margin-bottom: 56px;
+}
+
+.plan-index-link {
+  border-radius: var(--mantine-radius-sm);
+  padding-block: 5px;
+  font-size: var(--mantine-font-size-sm);
+  color: var(--text-muted);
+}
+
+.plan-index-link[data-active] {
+  background: var(--nav-active-bg);
+  color: var(--mantine-primary-color-filled);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--mantine-primary-color-filled);
+}
+
+.algo-card {
+  border-color: var(--border-soft);
+  background: var(--surface);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.algo-card[data-checked] {
+  border-color: var(--mantine-primary-color-filled);
+  background: var(--nav-active-bg);
+}
+
+/* A table that is not already inside a card becomes one, so rows never float on the tinted page. */
+.page .mantine-Table-table:not(.mantine-Paper-root .mantine-Table-table) {
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--border-soft), var(--mantine-shadow-xs);
+}
+
+/* Filter chips: an unselected chip is still a visible control on the tinted page. */
+.page .mantine-Chip-label:not([data-checked]) {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+
+/* A badge carries a word that states something (a risk, a status); it grows rather than clips. */
+.mantine-Badge-root {
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.mantine-Badge-label {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Issue keys are identifiers: never split "SUP-8" across lines. */
+.mono {
+  white-space: nowrap;
+}
+
+/* Person timeline: rows of a label and a track; bars are placed in percent of the period. */
+.tl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tl-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 240px) 1fr;
+  gap: var(--mantine-spacing-sm);
+  align-items: center;
+  min-height: 26px;
+}
+
+.tl-row > a {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tl-track {
+  position: relative;
+  height: 18px;
+  background: var(--surface-sunken);
+  border-radius: 4px;
+}
+
+.tl-head .tl-track,
+.tl-foot .tl-track {
+  background: none;
+  height: 16px;
+}
+
+.tl-tick,
+.tl-today {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.6875rem;
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+}
+
+.tl-today {
+  transform: translateX(-100%);
+}
+
+.tl-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-soft);
+}
+
+.tl-bar {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 3px;
+  min-width: 4px;
+}
+
+.tl-bar.is-clipped {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.tl-bar.is-striped,
+.tl-swatch.is-striped {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0 3px, transparent 3px 6px);
+}
+
+.tl-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* On a phone the label is the key alone and only the ends of the axis are dated: 8 weeks of labels do not fit 250 px. */
+@media (max-width: 48em) {
+  .tl-row {
+    grid-template-columns: 74px 1fr;
+    gap: var(--mantine-spacing-xs);
+  }
+  .tl-summary {
+    display: none;
+  }
+  .tl-head .tl-tick:not(:first-child):not(:last-child) {
+    display: none;
+  }
+}
+
+/* The Home mosaic: 12 columns; a tile's span is set inline from its size and the screen width. */
+.mosaic {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--mantine-spacing-sm);
+  align-items: stretch;
+}
+
+.mosaic-item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: var(--mantine-radius-md);
+}
+
+.mosaic-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mosaic-body > * {
+  flex: 1;
+}
+
+.mosaic-item.is-editing {
+  padding: 6px;
+  background: var(--surface-sunken);
+  outline: 1px dashed var(--border-soft);
+  cursor: grab;
+}
+
+.mosaic-item.is-dragging {
+  opacity: 0.4;
+}
+
+.mosaic-item.drop-before {
+  box-shadow: -4px 0 0 0 var(--mantine-primary-color-filled);
+}
+
+.mosaic-item.drop-after {
+  box-shadow: 4px 0 0 0 var(--mantine-primary-color-filled);
+}
+
+.mosaic-grip {
+  color: var(--mantine-color-dimmed);
+  flex: 0 0 auto;
+}
+
+.mosaic-item.is-editing .mosaic-body {
+  opacity: 0.85;
+}
+
+/* The sprint timeline: a tree on the sprint's days. Label, then a track with weekends, days, today, a bar and a due date. */
+.tl-sprint .tl-row {
+  grid-template-columns: minmax(220px, 38%) 1fr;
+  --tl-indent: 16px;
+}
+
+.tl-sprint .tl-head {
+  position: sticky;
+  top: 60px;
+  z-index: 3;
+  background: var(--mantine-color-body);
+}
+
+/* A day's label sits at the left edge of its column: it names the day that starts there. */
+.tl-sprint .tl-head .tl-tick {
+  transform: none;
+  padding-left: 3px;
+}
+
+.tl-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding-left: calc(var(--depth, 0) * var(--tl-indent, 16px));
+}
+
+.tl-label .tl-key {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-caret {
+  display: inline-block;
+  width: 18px;
+  flex: 0 0 auto;
+}
+
+.tl-weekend {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--border-soft);
+  opacity: 0.55;
+}
+
+.tl-todayline {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 0;
+  border-left: 1.5px solid var(--mantine-color-red-6);
+  z-index: 1;
+}
+
+.tl-bar.is-summary {
+  top: 6px;
+  bottom: 6px;
+  border-radius: 1px;
+  opacity: 0.85;
+}
+
+.tl-note {
+  position: absolute;
+  left: 6px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  font-size: 0.6875rem;
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+}
+
+.tl-due {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  transform: rotate(45deg);
+  background: var(--mantine-color-text);
+  z-index: 2;
+}
+
+.tl-due.is-late {
+  background: var(--mantine-color-red-7);
+}
+
+@media (max-width: 48em) {
+  .tl-sprint .tl-row {
+    grid-template-columns: 132px 1fr;
+    --tl-indent: 8px;
+  }
+  .tl-sprint .tl-head {
+    top: 56px;
+  }
+}
+
+/* The "i" that says how a number is calculated: a button (keyboard, touch), quiet until it is looked at. */
+.info-tip {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -2px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mantine-color-dimmed);
+  cursor: help;
+  border-radius: 50%;
+  line-height: 1;
+}
+
+.info-tip:hover {
+  color: var(--mantine-color-text);
+}
+
+.info-tip:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* Tab bars: on a phone one row that scrolls sideways, never three rows of wrapped tabs. */
+@media (max-width: 48em) {
+  .mantine-Tabs-list {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mantine-Tabs-list::-webkit-scrollbar {
+    display: none;
+  }
+  .mantine-Tabs-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+/* A table wider than its card says so: a soft shade over the edge that still has more to scroll to.
+   `useScrollHints` marks the container (data-more-left / data-more-right); the shade is drawn over the
+   rows, not behind them, because the rows have backgrounds of their own. */
+.mantine-TableScrollContainer-scrollContainer {
+  position: relative;
+}
+
+.mantine-TableScrollContainer-scrollContainer::before,
+.mantine-TableScrollContainer-scrollContainer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.mantine-TableScrollContainer-scrollContainer::before {
+  left: 0;
+  background: linear-gradient(to right, rgb(16 32 30 / 0.16), transparent);
+}
+
+.mantine-TableScrollContainer-scrollContainer::after {
+  right: 0;
+  background: linear-gradient(to left, rgb(16 32 30 / 0.16), transparent);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-TableScrollContainer-scrollContainer::before {
+  background: linear-gradient(to right, rgb(0 0 0 / 0.5), transparent);
+}
+
+[data-mantine-color-scheme='dark'] .mantine-TableScrollContainer-scrollContainer::after {
+  background: linear-gradient(to left, rgb(0 0 0 / 0.5), transparent);
+}
+
+.mantine-TableScrollContainer-scrollContainer[data-more-left]::before,
+.mantine-TableScrollContainer-scrollContainer[data-more-right]::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mantine-TableScrollContainer-scrollContainer::before,
+  .mantine-TableScrollContainer-scrollContainer::after {
+    transition: opacity 150ms ease;
+  }
+}
+
+/* Form labels: the same weight as the rest of the text, so a filter row does not out-shout the numbers. */
+.mantine-InputWrapper-label {
+  font-weight: 500;
+}
+
+/* A tile with nothing to say says so in the middle of its space, not in the corner of a blank card. */
+.tile-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  padding-block: var(--mantine-spacing-md);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* The loading bar: fixed at the very top, above the header. Static under reduced motion. */
+.fetch-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 2px;
+  z-index: 1000;
+  background: var(--mantine-primary-color-filled);
+  opacity: 0.75;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fetch-bar {
+    background: linear-gradient(90deg, transparent, var(--mantine-primary-color-filled), transparent);
+    background-size: 40% 100%;
+    background-repeat: no-repeat;
+    animation: fetch-bar 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes fetch-bar {
+  from {
+    background-position: -40% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+/* Sprint timeline (RF-111 follow-up): the summary, the by-person lanes, zoom and the sprint's end. */
+.tl-scroll {
+  overflow-x: auto;
+}
+
+.tl-scroll.is-wide .tl-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--mantine-color-body);
+}
+
+.tl-sprint-end {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed var(--mantine-color-dimmed);
+  pointer-events: none;
+}
+
+.tl-end-mark {
+  display: inline-block;
+  width: 0;
+  height: 10px;
+  border-left: 1px dashed var(--mantine-color-dimmed);
+  vertical-align: -1px;
+}
+
+.tl-beyond {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: repeating-linear-gradient(45deg, transparent 0 5px, var(--border-soft) 5px 6px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.tl-bar-days {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.tl-lane {
+  margin-top: 8px;
+}
+
+.tl-lane:first-child {
+  margin-top: 0;
+}
+
+.tl-lane-head {
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 4px;
+  margin-bottom: 2px;
+}
+
+.tl-lane-head .tl-label {
+  gap: 8px;
+}
+
+.tl-track-quiet {
+  background: none;
+}
+
+/* Interactive timeline: a cursor over the axis, focusable and clickable rows, and the detail panel's
+   open row. The cursor is one line drawn in every track from the --cursor the component sets. */
+.tl-sprint .tl-track::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--cursor, -10px);
+  width: 1px;
+  background: var(--mantine-color-blue-6);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tl-cursor-label {
+  position: absolute;
+  top: -2px;
+  z-index: 4;
+  transform: translateX(6px);
+  padding: 0 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  background: var(--mantine-color-body);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tl-cursor-label.is-left {
+  transform: translateX(calc(-100% - 6px));
+}
+
+.tl-row.is-interactive:hover .tl-label,
+.tl-row.is-open .tl-label {
+  background: var(--surface-sunken);
+  border-radius: 4px;
+}
+
+.tl-row.is-interactive .tl-label {
+  cursor: pointer;
+}
+
+.tl-row.is-interactive:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.tl-bar.is-clickable {
+  cursor: pointer;
+}
+
+.tl-bar.is-clickable:hover {
+  filter: brightness(1.08);
+}
+
+
+/* Timeline de foco (the team's focus log): one lane per person, one column per day, week or month.
+   Its own classes, not the sprint timeline's: the two are different surfaces that happen to share an axis. */
+.tf-viewport {
+  --tf-lane-w: 210px;
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--mantine-radius-md);
+  background: var(--surface);
+}
+
+.tf-grid {
+  display: grid;
+  min-width: max-content;
+}
+
+.tf-corner,
+.tf-col-head,
+.tf-lane-label {
+  position: sticky;
+  background: var(--surface);
+  z-index: 2;
+}
+
+.tf-corner {
+  top: 0;
+  left: 0;
+  z-index: 4;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tf-col-head {
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 1px solid var(--border-soft);
+}
+
+.tf-col-head.is-weekend {
+  background: var(--surface-sunken);
+}
+
+.tf-col-head.is-today .tf-col-title {
+  color: var(--mantine-color-blue-6);
+}
+
+.tf-col-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tf-col-sub {
+  font-size: 11px;
+  color: var(--mantine-color-dimmed);
+}
+
+.tf-lane-label {
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 3px solid var(--lane-c, var(--border-soft));
+}
+
+.tf-cell {
+  min-height: 56px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-left: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.tf-cell.is-weekend {
+  background: var(--surface-sunken);
+}
+
+.tf-cell.is-today {
+  box-shadow: inset 2px 0 0 var(--mantine-color-blue-6);
+}
+
+.tf-cell.is-drop {
+  background: var(--mantine-color-blue-light);
+  outline: 2px dashed var(--mantine-color-blue-6);
+  outline-offset: -4px;
+}
+
+.tf-compact .tf-cell {
+  min-height: 40px;
+}
+
+.tf-card {
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--lane-c, var(--mantine-color-gray-5));
+  border-radius: var(--mantine-radius-sm);
+  background: var(--surface);
+  cursor: grab;
+}
+
+.tf-card:active {
+  cursor: grabbing;
+}
+
+.tf-card-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.tf-shift {
+  border-left: 3px solid var(--shift-c);
+  background: color-mix(in srgb, var(--shift-c) 8%, var(--surface));
+}
+
+.tf-shift.borda-tracejada {
+  border: 1px dashed var(--shift-c);
+  border-left-width: 3px;
+}
+
+.tf-shift.borda-dupla {
+  border: 3px double var(--shift-c);
+}
+
+.tf-shift.borda-solida {
+  border: 2px solid var(--shift-c);
+  background: var(--surface);
+}
+
+.tf-shift.borda-gradiente {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(120deg, var(--shift-c), var(--mantine-color-violet-6)) border-box;
+  border-left: 3px solid var(--shift-c);
+}
+
+.tf-shift-route {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.tf-shift-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.tf-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-right: 6px;
+  flex: 0 0 auto;
+  vertical-align: middle;
+  background: var(--mantine-color-gray-5);
+}
+
+.tf-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tf-count {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.tf-form-box {
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--surface-sunken);
+}
+
+.tf-person-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft);
+}

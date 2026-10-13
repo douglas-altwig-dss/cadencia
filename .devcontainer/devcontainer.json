@@ -1,0 +1,26 @@
+{
+  "name": "Cadência",
+  "dockerComposeFile": ["../docker-compose.dev.yml"],
+  "service": "workspace",
+  "runServices": ["db", "workspace", "api", "collector", "web"],
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "remoteUser": "vscode",
+  "postCreateCommand": "make setup",
+  "forwardPorts": [5173, 8000, 5432],
+  "portsAttributes": {
+    "5173": { "label": "web (Vite)", "onAutoForward": "openBrowser" },
+    "8000": { "label": "api (FastAPI)" },
+    "5432": { "label": "PostgreSQL" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff", "dbaeumer.vscode-eslint"],
+      "settings": {
+        "python.defaultInterpreterPath": "/workspace/backend/.venv/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.cwd": "/workspace/backend"
+      }
+    }
+  }
+}

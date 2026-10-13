@@ -1,0 +1,646 @@
+{
+  "deck": {
+    "slide_count": 8,
+    "slides": [
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 1,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Acompanhamento semanal"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SEMANA",
+              "04/09/2026"
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 2,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "PROJETO",
+              "Inteligência de Dados"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SPRINT",
+              "Dados 4.1"
+            ]
+          },
+          {
+            "id": 4,
+            "name": "TextBox 3",
+            "text": [
+              "SEMANA",
+              "04/09/2026"
+            ]
+          },
+          {
+            "id": 5,
+            "name": "TextBox 4",
+            "text": [
+              "Status geral"
+            ]
+          },
+          {
+            "fill": "FFC000",
+            "id": 6,
+            "name": "Rounded Rectangle 5"
+          },
+          {
+            "id": 7,
+            "name": "TextBox 6",
+            "text": [
+              "Entregas da semana"
+            ]
+          },
+          {
+            "id": 8,
+            "name": "Table 7",
+            "table": [
+              [
+                "Lago de dados unificado:\nTabela de clientes deduplicada"
+              ]
+            ]
+          },
+          {
+            "id": 9,
+            "name": "TextBox 8",
+            "text": [
+              "Bloqueios"
+            ]
+          },
+          {
+            "id": 10,
+            "name": "Table 9",
+            "table": [
+              [
+                "Item",
+                "Ação",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          },
+          {
+            "fill": "EEEEEE",
+            "id": 12,
+            "name": "Área gráfico riscos"
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 3,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Riscos"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "Table 2",
+            "table": [
+              [
+                "Situação:",
+                "Concluído",
+                "Em risco",
+                "Atrasado"
+              ]
+            ]
+          },
+          {
+            "id": 4,
+            "name": "Table 3",
+            "table": [
+              [
+                "Sprint",
+                "Chave",
+                "Descrição",
+                "Responsável",
+                "Ação",
+                "Prazo",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                "Lago de dados unificado",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "Dados 4.1",
+                "DAD-2",
+                "Tabela de clientes deduplicada",
+                "Elisa Prado",
+                "",
+                "",
+                "Concluído"
+              ],
+              [
+                "Dados 4.1",
+                "DAD-3",
+                "Ingestão incremental do ERP",
+                "Diego Rocha",
+                "parado há 8 dias em Em andamento",
+                "",
+                "Em risco"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 4,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "PROJETO",
+              "Produto Digital"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SPRINT",
+              "Plataforma 3.5"
+            ]
+          },
+          {
+            "id": 4,
+            "name": "TextBox 3",
+            "text": [
+              "SEMANA",
+              "04/09/2026"
+            ]
+          },
+          {
+            "id": 5,
+            "name": "TextBox 4",
+            "text": [
+              "Status geral"
+            ]
+          },
+          {
+            "fill": "FF0000",
+            "id": 6,
+            "name": "Rounded Rectangle 5"
+          },
+          {
+            "id": 7,
+            "name": "TextBox 6",
+            "text": [
+              "Entregas da semana"
+            ]
+          },
+          {
+            "id": 8,
+            "name": "Table 7",
+            "table": [
+              [
+                "Checkout novo:\nCupom de desconto\n\nObservabilidade:\nPainel de latência por endpoint\n\nSem épico:\nTimeout no login social"
+              ]
+            ]
+          },
+          {
+            "id": 9,
+            "name": "TextBox 8",
+            "text": [
+              "Bloqueios"
+            ]
+          },
+          {
+            "id": 10,
+            "name": "Table 9",
+            "table": [
+              [
+                "Item",
+                "Ação",
+                "Situação"
+              ],
+              [
+                "Erro de arredondamento no total",
+                "sinalizado como impedimento no Jira",
+                "Em risco"
+              ],
+              [
+                "Atualizar SDK de pagamentos",
+                "aguardando CAD-11",
+                "Em risco"
+              ]
+            ]
+          },
+          {
+            "fill": "EEEEEE",
+            "id": 12,
+            "name": "Área gráfico riscos"
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 5,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Riscos"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "Table 2",
+            "table": [
+              [
+                "Situação:",
+                "Concluído",
+                "Em risco",
+                "Atrasado"
+              ]
+            ]
+          },
+          {
+            "id": 4,
+            "name": "Table 3",
+            "table": [
+              [
+                "Sprint",
+                "Chave",
+                "Descrição",
+                "Responsável",
+                "Ação",
+                "Prazo",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                "Checkout novo",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-11",
+                "Integração com gateway de pagamento",
+                "Carla Mendes",
+                "passou por 1 sprint encerrada sem conclusão (Plataforma 3.4)",
+                "",
+                "Atrasado"
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-13",
+                "Erro de arredondamento no total",
+                "Diego Rocha",
+                "sinalizado como impedimento no Jira",
+                "",
+                "Em risco"
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-10",
+                "Tela de pagamento",
+                "Ana Souza",
+                "em andamento há 3.3 dias; P85 histórico de Story: 3 dias",
+                "",
+                "Em risco"
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-22",
+                "Cupom de desconto",
+                "Bruno Lima",
+                "",
+                "",
+                "Concluído"
+              ],
+              [
+                "",
+                "",
+                "Observabilidade",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-14",
+                "Configurar alertas de latência",
+                "Elisa Prado",
+                "",
+                "06/09",
+                "Em dia"
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-15",
+                "Painel de latência por endpoint",
+                "Ana Souza",
+                "",
+                "",
+                "Concluído"
+              ],
+              [
+                "",
+                "",
+                "Sem épico",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-18",
+                "Atualizar SDK de pagamentos",
+                "Diego Rocha",
+                "aguardando CAD-11",
+                "",
+                "Em risco"
+              ],
+              [
+                "Plataforma 3.5",
+                "CAD-21",
+                "Timeout no login social",
+                "Carla Mendes",
+                "",
+                "",
+                "Concluído"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 6,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "PROJETO",
+              "Produto Digital"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "TextBox 2",
+            "text": [
+              "SPRINT"
+            ]
+          },
+          {
+            "id": 4,
+            "name": "TextBox 3",
+            "text": [
+              "SEMANA",
+              "04/09/2026"
+            ]
+          },
+          {
+            "id": 5,
+            "name": "TextBox 4",
+            "text": [
+              "Status geral"
+            ]
+          },
+          {
+            "fill": "FF0000",
+            "id": 6,
+            "name": "Rounded Rectangle 5"
+          },
+          {
+            "id": 7,
+            "name": "TextBox 6",
+            "text": [
+              "Entregas da semana"
+            ]
+          },
+          {
+            "id": 8,
+            "name": "Table 7",
+            "table": [
+              [
+                "—"
+              ]
+            ]
+          },
+          {
+            "id": 9,
+            "name": "TextBox 8",
+            "text": [
+              "Bloqueios"
+            ]
+          },
+          {
+            "id": 10,
+            "name": "Table 9",
+            "table": [
+              [
+                "Item",
+                "Ação",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          },
+          {
+            "fill": "EEEEEE",
+            "id": 12,
+            "name": "Área gráfico riscos"
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 7,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Riscos"
+            ]
+          },
+          {
+            "id": 3,
+            "name": "Table 2",
+            "table": [
+              [
+                "Situação:",
+                "Concluído",
+                "Em risco",
+                "Atrasado"
+              ]
+            ]
+          },
+          {
+            "id": 4,
+            "name": "Table 3",
+            "table": [
+              [
+                "Sprint",
+                "Chave",
+                "Descrição",
+                "Responsável",
+                "Ação",
+                "Prazo",
+                "Situação"
+              ],
+              [
+                "",
+                "",
+                "Sem épico",
+                "",
+                "",
+                "",
+                ""
+              ],
+              [
+                "",
+                "SUP-6",
+                "Falha na impressão de notas",
+                "Bruno Lima",
+                "parado há 16 dias em Em andamento (2 checkpoints sem transição)",
+                "",
+                "Em risco"
+              ],
+              [
+                "",
+                "SUP-8",
+                "Relatório fiscal com totais errados",
+                "Carla Mendes",
+                "data limite 02/09 vencida há 2 dias",
+                "02/09",
+                "Atrasado"
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "layout": "Blank",
+        "name": "",
+        "number": 8,
+        "shapes": [
+          {
+            "id": 2,
+            "name": "TextBox 1",
+            "text": [
+              "Gerado pela Cadência em 10/09/2026"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "produced": [
+    {
+      "board_id": null,
+      "index": 1,
+      "origin_slide_id": 256,
+      "page": 1
+    },
+    {
+      "board_id": 2,
+      "index": 2,
+      "origin_slide_id": 257,
+      "page": 1
+    },
+    {
+      "board_id": 2,
+      "index": 3,
+      "origin_slide_id": 258,
+      "page": 1
+    },
+    {
+      "board_id": 1,
+      "index": 4,
+      "origin_slide_id": 257,
+      "page": 1
+    },
+    {
+      "board_id": 1,
+      "index": 5,
+      "origin_slide_id": 258,
+      "page": 1
+    },
+    {
+      "board_id": 3,
+      "index": 6,
+      "origin_slide_id": 257,
+      "page": 1
+    },
+    {
+      "board_id": 3,
+      "index": 7,
+      "origin_slide_id": 258,
+      "page": 1
+    },
+    {
+      "board_id": null,
+      "index": 8,
+      "origin_slide_id": 259,
+      "page": 1
+    }
+  ],
+  "validation": {
+    "errors": [],
+    "ok": true,
+    "package_ok": true,
+    "warnings": [
+      "acessibilidade_sem_texto_alternativo",
+      "vazio",
+      "vazio",
+      "vazio",
+      "vazio"
+    ]
+  }
+}
