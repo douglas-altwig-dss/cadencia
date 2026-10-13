@@ -7,14 +7,18 @@ import { useHealthCheck } from '../../api/featureHooks';
 import { useDashboard, usePeopleOverview } from '../../api/hooks';
 import { usePulse } from '../../api/homeHooks';
 import type { DashboardRow, PulseEvent } from '../../api/types';
+import { type Messages, useT } from '../../i18n';
 import { useFilters } from '../../lib/filters';
-import { fmtPct, fromNow, plural } from '../../lib/format';
+import { fmtPct, fromNow } from '../../lib/format';
 import { tileHelp } from '../../lib/indicatorHelp';
 import type { TileState } from '../../lib/mosaic';
 import { ErrorState, KpiCard, Tipped } from '../common';
 import { LoadGauge, SeverityBadge, StateBadge } from '../people/indicators';
 import { BoardsTile, type BoardsConfig } from './BoardsTile';
 import { alignedSums, Delta, Sparkline } from './parts';
+
+type HomeText = Messages['tracking']['home'];
+type TitleKey = keyof HomeText['titles'];
 
 export interface TileProps {
   tile: TileState;
@@ -58,61 +62,63 @@ function summary(rows: DashboardRow[]) {
   return { healthy, atRisk, current, previous, progress, adherence, delivered: alignedSums(healthy, (t) => t.delivered), added };
 }
 
-function withDashboard(type: string, label: string, render: (s: ReturnType<typeof summary>) => ReactNode): ComponentType<TileProps> {
+function withDashboard(type: string, title: TitleKey, render: (s: ReturnType<typeof summary>, m: HomeText) => ReactNode): ComponentType<TileProps> {
   return function DashboardTile() {
     const { data, isLoading, error } = useDashboard();
+    const m = useT().tracking.home;
+    const label = m.titles[title];
     if (isLoading) return <Waiting label={label} help={tileHelp(type)} />;
     if (error) return <ErrorState error={error} />;
     const s = summary(data?.rows ?? []);
-    return s.healthy.length ? <>{render(s)}</> : <KpiCard label={label} value="—" help={tileHelp(type)}>sem boards com dados</KpiCard>;
+    return s.healthy.length ? <>{render(s, m)}</> : <KpiCard label={label} value="—" help={tileHelp(type)}>{m.noBoardsWithData}</KpiCard>;
   };
 }
 
-const RiskTile = withDashboard('kpi:risk', 'Itens em risco agora', (s) => (
-  <KpiCard label="Itens em risco agora" value={s.atRisk} help={tileHelp('kpi:risk')}>
-    em {plural(s.healthy.length, 'board', 'boards')}
+const RiskTile = withDashboard('kpi:risk', 'risk', (s, m) => (
+  <KpiCard label={m.titles.risk} value={s.atRisk} help={tileHelp('kpi:risk')}>
+    {m.acrossBoards(s.healthy.length)}
   </KpiCard>
 ));
 
-const ThroughputTile = withDashboard('kpi:throughput', 'Vazão da janela atual', (s) => (
+const ThroughputTile = withDashboard('kpi:throughput', 'throughput', (s, m) => (
   <KpiCard
-    label="Vazão da janela atual"
+    label={m.titles.throughput}
     help={tileHelp('kpi:throughput')}
     value={s.current}
-    aside={<Sparkline values={s.delivered} label={`Entregues por sprint: ${s.delivered.join(', ')}`} />}
+    aside={<Sparkline values={s.delivered} label={m.deliveredPerSprint(s.delivered.join(', '))} />}
   >
     <Delta value={s.previous == null ? null : s.current - s.previous} better="up" />
     {/* M26: the line is per sprint, not per window, so it says so beside the number it sits next to. */}
     <Text size="xs" c="dimmed" component="div">
-      Linha: entregues em cada sprint
+      {m.lineIsPerSprint}
     </Text>
   </KpiCard>
 ));
 
-const ProgressTile = withDashboard('kpi:progress', 'Progresso médio das sprints', (s) => (
-  <KpiCard label="Progresso médio das sprints" value={fmtPct(s.progress)} help={tileHelp('kpi:progress')}>
-    itens concluídos ÷ itens da sprint
+const ProgressTile = withDashboard('kpi:progress', 'progress', (s, m) => (
+  <KpiCard label={m.titles.progress} value={fmtPct(s.progress)} help={tileHelp('kpi:progress')}>
+    {m.progressHint}
   </KpiCard>
 ));
 
-const AdherenceTile = withDashboard('kpi:adherence', 'Aderência ao compromisso', (s) => {
+const AdherenceTile = withDashboard('kpi:adherence', 'adherence', (s, m) => {
   const last = s.adherence.at(-1) ?? null;
   const prior = s.adherence.length > 1 ? s.adherence.at(-2)! : null;
   return (
     <KpiCard
-      label="Aderência ao compromisso"
+      label={m.titles.adherence}
       help={tileHelp('kpi:adherence')}
       value={fmtPct(last)}
-      aside={<Sparkline values={s.adherence.map((a) => Math.round(a * 100))} label={`Aderência por sprint: ${s.adherence.map((a) => fmtPct(a)).join(', ')}`} />}
+      aside={<Sparkline values={s.adherence.map((a) => Math.round(a * 100))} label={m.adherencePerSprint(s.adherence.map((a) => fmtPct(a)).join(', '))} />}
     >
-      <Delta value={last != null && prior != null ? Math.round((last - prior) * 100) : null} better="up" unit=" p.p." />
+      <Delta value={last != null && prior != null ? Math.round((last - prior) * 100) : null} better="up" unit={m.pointsUnit} />
     </KpiCard>
   );
 });
 
-const ScopeTile = withDashboard('sprint:scope', 'Escopo adicionado', (s) => (
-  <KpiCard label="Escopo adicionado" value={s.added} help={tileHelp('sprint:scope')}>
-    itens entraram nas sprints em curso depois do início
+const ScopeTile = withDashboard('sprint:scope', 'scope', (s, m) => (
+  <KpiCard label={m.titles.scope} value={s.added} help={tileHelp('sprint:scope')}>
+    {m.scopeHint}
   </KpiCard>
 ));
 
@@ -120,7 +126,8 @@ const ScopeTile = withDashboard('sprint:scope', 'Escopo adicionado', (s) => (
 function ElapsedTile() {
   const { data, isLoading, error } = useDashboard();
   const { carry } = useFilters();
-  if (isLoading) return <Waiting label="Sprint em curso" help={tileHelp('sprint:elapsed')} />;
+  const m = useT().tracking.home;
+  if (isLoading) return <Waiting label={m.titles.elapsed} help={tileHelp('sprint:elapsed')} />;
   if (error) return <ErrorState error={error} />;
   const now = data ? new Date(data.generated_at).getTime() : Date.now();
   const running = (data?.rows ?? []).filter((r) => !r.error && r.sprint?.state === 'active' && r.sprint.start && r.sprint.end);
@@ -128,9 +135,9 @@ function ElapsedTile() {
     <Paper withBorder p="md" h="100%">
       <Stack gap="sm">
         <Text className="kpi-label">
-          <Tipped help={tileHelp('sprint:elapsed')}>Sprint em curso</Tipped>
+          <Tipped help={tileHelp('sprint:elapsed')}>{m.titles.elapsed}</Tipped>
         </Text>
-        {running.length === 0 && <TileEmpty icon={<IconCalendarOff size={22} aria-hidden />}>Nenhum board com sprint ativa.</TileEmpty>}
+        {running.length === 0 && <TileEmpty icon={<IconCalendarOff size={22} aria-hidden />}>{m.noActiveSprint}</TileEmpty>}
         {running.map((row) => {
           const start = new Date(row.sprint!.start!).getTime();
           const end = new Date(row.sprint!.end!).getTime();
@@ -145,14 +152,14 @@ function ElapsedTile() {
                 </Anchor>
                 {behind && (
                   <Badge color="yellow" variant="light" size="xs" leftSection={<IconAlertTriangle size={10} />}>
-                    atrás do tempo
+                    {m.behind}
                   </Badge>
                 )}
               </Group>
-              <Progress value={elapsed} size="xs" color="gray" aria-label={`${elapsed}% do tempo da sprint passou`} />
-              <Progress value={done} size="xs" aria-label={`${done}% dos itens concluídos`} />
+              <Progress value={elapsed} size="xs" color="gray" aria-label={m.elapsedAria(elapsed)} />
+              <Progress value={done} size="xs" aria-label={m.doneAria(done)} />
               <Text size="xs" c="dimmed">
-                {row.sprint!.name}: {elapsed}% do tempo · {done}% dos itens concluídos
+                {m.elapsedLine(row.sprint!.name, elapsed, done)}
               </Text>
             </Stack>
           );
@@ -166,16 +173,17 @@ function ElapsedTile() {
 function KanbanTile() {
   const { data, isLoading, error } = useDashboard();
   const { carry } = useFilters();
-  if (isLoading) return <Waiting label="Boards kanban" help={tileHelp('kanban:boards')} />;
+  const m = useT().tracking.home;
+  if (isLoading) return <Waiting label={m.titles.kanban} help={tileHelp('kanban:boards')} />;
   if (error) return <ErrorState error={error} />;
   const rows = (data?.rows ?? []).filter((r) => !r.error && r.board.type === 'kanban');
   return (
     <Paper withBorder p="md" h="100%">
       <Stack gap="sm">
         <Text className="kpi-label">
-          <Tipped help={tileHelp('kanban:boards')}>Boards kanban</Tipped>
+          <Tipped help={tileHelp('kanban:boards')}>{m.titles.kanban}</Tipped>
         </Text>
-        {rows.length === 0 && <TileEmpty icon={<IconLayoutKanban size={22} aria-hidden />}>Nenhum board kanban acompanhado.</TileEmpty>}
+        {rows.length === 0 && <TileEmpty icon={<IconLayoutKanban size={22} aria-hidden />}>{m.noKanban}</TileEmpty>}
         {rows.map((row) => {
           const atRisk = Object.entries(row.risk_counts ?? {}).reduce((s, [k, n]) => (k === 'em_dia' ? s : s + (n ?? 0)), 0);
           const delivered = row.trend.map((t) => t.delivered);
@@ -189,14 +197,14 @@ function KanbanTile() {
                 </Anchor>
                 {atRisk > 0 && (
                   <Badge color="yellow" variant="light" size="xs" leftSection={<IconAlertTriangle size={10} />}>
-                    {atRisk} em risco
+                    {m.atRisk(atRisk)}
                   </Badge>
                 )}
               </Group>
               <Group justify="space-between" wrap="nowrap">
-                <Sparkline values={delivered} label={`Entregues por semana: ${delivered.join(', ')}`} />
+                <Sparkline values={delivered} label={m.deliveredPerWeek(delivered.join(', '))} />
                 <Text size="xs" c="dimmed">
-                  {last?.delivered ?? 0} na semana
+                  {m.thisWeek(last?.delivered ?? 0)}
                 </Text>
               </Group>
               <Delta value={last && prior ? last.delivered - prior.delivered : null} better="up" />
@@ -210,17 +218,22 @@ function KanbanTile() {
 
 // ---- people
 
-function withTeam(type: string, label: string, render: (s: NonNullable<ReturnType<typeof usePeopleOverview>['data']>['summary']) => ReactNode): ComponentType<TileProps> {
+function withTeam(
+  type: string,
+  title: TitleKey,
+  render: (s: NonNullable<ReturnType<typeof usePeopleOverview>['data']>['summary'], m: HomeText) => ReactNode,
+): ComponentType<TileProps> {
   return function TeamTile() {
     const { data, isLoading, error } = usePeopleOverview();
-    if (isLoading) return <Waiting label={label} help={tileHelp(type)} />;
+    const m = useT().tracking.home;
+    if (isLoading) return <Waiting label={m.titles[title]} help={tileHelp(type)} />;
     if (error) return <ErrorState error={error} />;
-    return data ? <>{render(data.summary)}</> : null;
+    return data ? <>{render(data.summary, m)}</> : null;
   };
 }
 
-const LoadTile = withTeam('team:load', 'Carga do time', (s) => (
-  <KpiCard label="Carga do time" help={tileHelp('team:load')}>
+const LoadTile = withTeam('team:load', 'load', (s, m) => (
+  <KpiCard label={m.titles.load} help={tileHelp('team:load')}>
     <LoadGauge workload={{ ratio: s.ratio, state: s.state, hours: s.hours, capacity_hours: s.capacity_hours }} compact />
     <Group justify="center" mt={2}>
       <StateBadge state={s.state} />
@@ -242,51 +255,57 @@ function PeopleLinks({ people }: { people: { account_id: string; name: string }[
   );
 }
 
-const OverloadedTile = withTeam('team:overloaded', 'Pessoas acima da capacidade', (s) => (
-  <KpiCard label="Pessoas acima da capacidade" value={s.above.length} help={tileHelp('team:overloaded')}>
-    {s.above.length ? <PeopleLinks people={s.above} /> : 'Ninguém com mais horas abertas que capacidade.'}
+const OverloadedTile = withTeam('team:overloaded', 'overloaded', (s, m) => (
+  <KpiCard label={m.titles.overloaded} value={s.above.length} help={tileHelp('team:overloaded')}>
+    {s.above.length ? <PeopleLinks people={s.above} /> : m.nobodyOver}
   </KpiCard>
 ));
 
-const BlocksTile = withTeam('team:blocks', 'Bloqueios ativos', (s) => (
-  <KpiCard label="Bloqueios ativos" value={s.blocks.count} help={tileHelp('team:blocks')}>
+const BlocksTile = withTeam('team:blocks', 'blocks', (s, m) => (
+  <KpiCard label={m.titles.blocks} value={s.blocks.count} help={tileHelp('team:blocks')}>
     {s.blocks.count ? (
       <Stack gap={4}>
         <Group gap={4}>
-          {s.blocks.alta > 0 && <SeverityBadge level="alta">{s.blocks.alta} alta</SeverityBadge>}
-          {s.blocks.media > 0 && <SeverityBadge level="media">{s.blocks.media} média</SeverityBadge>}
-          {s.blocks.baixa > 0 && <SeverityBadge level="baixa">{s.blocks.baixa} baixa</SeverityBadge>}
+          {s.blocks.alta > 0 && <SeverityBadge level="alta">{m.severityHigh(s.blocks.alta)}</SeverityBadge>}
+          {s.blocks.media > 0 && <SeverityBadge level="media">{m.severityMedium(s.blocks.media)}</SeverityBadge>}
+          {s.blocks.baixa > 0 && <SeverityBadge level="baixa">{m.severityLow(s.blocks.baixa)}</SeverityBadge>}
         </Group>
         <Text size="xs" c="dimmed">
-          em {s.blocks.people} {s.blocks.people === 1 ? 'pessoa' : 'pessoas'} · o mais antigo, {s.blocks.oldest_days} d
+          {m.blocksLine(s.blocks.people, s.blocks.oldest_days)}
         </Text>
       </Stack>
     ) : (
-      'Nenhum item bloqueado.'
+      m.noBlocks
     )}
   </KpiCard>
 ));
 
-const DeliveredTile = withTeam('team:delivered', 'Entregas na sprint', (s) => (
-  <KpiCard label="Entregas na sprint" value={s.delivered} help={tileHelp('team:delivered')}>
-    {s.committed ? `de ${s.committed} comprometidas` : 'até agora'}
+const DeliveredTile = withTeam('team:delivered', 'delivered', (s, m) => (
+  <KpiCard label={m.titles.delivered} value={s.delivered} help={tileHelp('team:delivered')}>
+    {s.committed ? m.ofCommitted(s.committed) : m.soFar}
   </KpiCard>
 ));
 
 // ---- what is happening
 
-function withPulse(type: string, label: string, render: (p: NonNullable<ReturnType<typeof usePulse>['data']>) => ReactNode): ComponentType<TileProps> {
+function withPulse(
+  type: string,
+  title: TitleKey,
+  render: (p: NonNullable<ReturnType<typeof usePulse>['data']>, m: HomeText) => ReactNode,
+): ComponentType<TileProps> {
   return function PulseTile() {
     const { data, isLoading, error } = usePulse();
-    if (isLoading) return <Waiting label={label} help={tileHelp(type)} />;
+    const m = useT().tracking.home;
+    if (isLoading) return <Waiting label={m.titles[title]} help={tileHelp(type)} />;
     if (error) return <ErrorState error={error} />;
-    return data ? <>{render(data)}</> : null;
+    return data ? <>{render(data, m)}</> : null;
   };
 }
 
 function DayBars({ days }: { days: { date: string; delivered: number }[] }) {
+  const m = useT().tracking.home;
   const max = Math.max(1, ...days.map((d) => d.delivered));
-  const label = `Entregas por dia nos últimos 7 dias: ${days.map((d) => `${d.date.slice(8)}/${d.date.slice(5, 7)} ${d.delivered}`).join('; ')}`;
+  const label = m.perDay(days.map((d) => m.dayLabel(d.date.slice(8), d.date.slice(5, 7), d.delivered)).join('; '));
   return (
     <svg width={days.length * 10} height={30} role="img" aria-label={label}>
       <title>{label}</title>
@@ -298,37 +317,38 @@ function DayBars({ days }: { days: { date: string; delivered: number }[] }) {
   );
 }
 
-const RecentTile = withPulse('pulse:recent', 'Entregas nos últimos 7 dias', (p) => (
-  <KpiCard label="Entregas nos últimos 7 dias" value={p.recent.total} aside={<DayBars days={p.recent.days} />} help={tileHelp('pulse:recent')}>
+const RecentTile = withPulse('pulse:recent', 'recent', (p, m) => (
+  <KpiCard label={m.titles.recent} value={p.recent.total} aside={<DayBars days={p.recent.days} />} help={tileHelp('pulse:recent')}>
     <Delta value={p.recent.total - p.recent.previous_total} better="up" />
   </KpiCard>
 ));
 
-const DueTile = withPulse('pulse:due', 'Vencendo em 7 dias', (p) => (
-  <KpiCard label="Vencendo em 7 dias" value={p.due.soon} help={tileHelp('pulse:due')}>
-    {p.due.overdue > 0 ? `${p.due.overdue} com prazo já vencido` : 'nenhum prazo vencido'}
+const DueTile = withPulse('pulse:due', 'due', (p, m) => (
+  <KpiCard label={m.titles.due} value={p.due.soon} help={tileHelp('pulse:due')}>
+    {p.due.overdue > 0 ? m.overdue(p.due.overdue) : m.noneOverdue}
   </KpiCard>
 ));
 
-const EVENT: Record<PulseEvent['kind'], { icon: ReactNode; verb: (e: PulseEvent) => string }> = {
-  entregue: { icon: <IconCheck size={14} color="var(--mantine-color-teal-7)" aria-hidden />, verb: (e) => `${e.who ?? 'Alguém'} entregou` },
-  bloqueado: { icon: <IconAlertTriangle size={14} color="var(--mantine-color-red-7)" aria-hidden />, verb: (e) => `${e.who ? `${e.who}: ` : ''}bloqueado` },
-  escopo: { icon: <IconPlus size={14} color="var(--mantine-color-blue-7)" aria-hidden />, verb: () => 'Entrou na sprint' },
+/** Each event's icon and the words before its key; the words are read at render time. */
+const EVENT: Record<PulseEvent['kind'], { icon: ReactNode; verb: (e: PulseEvent, m: HomeText) => string }> = {
+  entregue: { icon: <IconCheck size={14} color="var(--mantine-color-teal-7)" aria-hidden />, verb: (e, m) => m.someoneDelivered(e.who ?? null) },
+  bloqueado: { icon: <IconAlertTriangle size={14} color="var(--mantine-color-red-7)" aria-hidden />, verb: (e, m) => m.eventBlocked(e.who ?? null) },
+  escopo: { icon: <IconPlus size={14} color="var(--mantine-color-blue-7)" aria-hidden />, verb: (_e, m) => m.eventScope },
 };
 
-const FeedTile = withPulse('pulse:feed', 'Acontecendo agora', (p) => (
+const FeedTile = withPulse('pulse:feed', 'feed', (p, m) => (
   <Paper withBorder p="md" h="100%">
     <Stack gap="xs">
       <Group justify="space-between">
         <Text className="kpi-label">
-          <Tipped help={tileHelp('pulse:feed')}>Acontecendo agora</Tipped>
+          <Tipped help={tileHelp('pulse:feed')}>{m.titles.feed}</Tipped>
         </Text>
         <Text size="xs" c="dimmed">
-          últimas 48 horas
+          {m.last48h}
         </Text>
       </Group>
       {p.feed.length === 0 ? (
-        <TileEmpty icon={<IconHistory size={22} aria-hidden />}>Nada foi entregue, bloqueado nem entrou nas sprints nas últimas 48 horas.</TileEmpty>
+        <TileEmpty icon={<IconHistory size={22} aria-hidden />}>{m.feedEmpty}</TileEmpty>
       ) : (
         <ScrollArea.Autosize mah={260} type="auto" offsetScrollbars>
           <Stack gap={8} component="ul" m={0} p={0} style={{ listStyle: 'none' }}>
@@ -337,7 +357,7 @@ const FeedTile = withPulse('pulse:feed', 'Acontecendo agora', (p) => (
                 <span style={{ marginTop: 3 }}>{EVENT[e.kind].icon}</span>
                 <Text size="sm" style={{ minWidth: 0 }}>
                   <Text span c="dimmed">
-                    {EVENT[e.kind].verb(e)}{' '}
+                    {EVENT[e.kind].verb(e, m)}{' '}
                   </Text>
                   <Anchor component={Link} to={`/issues/${e.key}`} className="mono" size="sm">
                     {e.key}
@@ -361,14 +381,15 @@ const FeedTile = withPulse('pulse:feed', 'Acontecendo agora', (p) => (
 /** How healthy the boards' own Jira hygiene is (RF-78): the same count `/status → Saúde dos dados` leads with. */
 function HealthTile() {
   const { data, isLoading, error } = useHealthCheck();
-  if (isLoading) return <Waiting label="Saúde dos dados" help={tileHelp('saude:pontos')} />;
+  const m = useT().tracking.home;
+  if (isLoading) return <Waiting label={m.titles.health} help={tileHelp('saude:pontos')} />;
   if (error) return <ErrorState error={error} />;
   if (!data) return null;
   const troubled = data.items.filter((i) => !i.ok).length;
   return (
-    <KpiCard label="Saúde dos dados" value={data.problems} help={tileHelp('saude:pontos')}>
+    <KpiCard label={m.titles.health} value={data.problems} help={tileHelp('saude:pontos')}>
       <Anchor component={Link} to="/status?tab=saude" size="xs">
-        {data.ok ? 'nada que distorça os números' : plural(troubled, 'board com ponto de atenção', 'boards com pontos de atenção')}
+        {data.ok ? m.healthOk : m.healthTroubled(troubled)}
       </Anchor>
     </KpiCard>
   );
@@ -383,10 +404,11 @@ function BoardsView({ tile, onConfig }: TileProps) {
 
 /** A tile from a newer version of Cadência: kept, so nothing is lost, and easy to remove. */
 export function UnknownTile({ tile }: TileProps) {
+  const m = useT().tracking.home;
   return (
     <Paper withBorder p="md" h="100%">
       <Text size="sm" c="dimmed">
-        O tile “{tile.type}” não existe nesta versão. Remova-o em Personalizar.
+        {m.unknownTile(tile.type)}
       </Text>
     </Paper>
   );

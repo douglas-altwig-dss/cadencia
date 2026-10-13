@@ -41,62 +41,63 @@ import type { BoardSettings, FieldMap } from '../api/types';
 import { ErrorState, Loading, Note, PageHeader, useConfirm } from '../components/common';
 import { NotificationsSettings } from '../components/NotificationsSettings';
 import { PlanParametersSettings } from '../components/PlanParametersSettings';
+import { currentLocale, useT, type Messages } from '../i18n';
 import { useFilters } from '../lib/filters';
-import { TIMEZONES, fromNow, plural, weekdays } from '../lib/format';
+import { TIMEZONES, fromNow, weekdays } from '../lib/format';
 
 function ConnectionTab() {
   const health = useHealth();
   const test = useConnectionTest();
   const discovery = useDiscovery();
+  const m = useT().tracking.settings.connection;
   return (
     <Stack gap="md" maw={760}>
       <Note>
-        A credencial (e-mail + token de API) fica fora do repositório: variáveis <code>CADENCIA_JIRA_*</code> ou o arquivo
-        <code> secrets/jira_api_token</code> montado no contêiner. A Cadência é somente leitura — nenhum caminho do código escreve no Jira.
+        {m.noteBefore} <code>CADENCIA_JIRA_*</code> {m.noteMid} <code>secrets/jira_api_token</code> {m.noteAfter}
       </Note>
       <Paper withBorder p="md">
         <Stack gap="xs">
           <Text size="sm">
-            Instância: <b>{health.data?.jira_base_url ?? 'não configurada'}</b> · banco: {health.data?.database ?? '—'} · fuso:{' '}
-            {health.data?.timezone ?? '—'}
+            {m.instance} <b>{health.data?.jira_base_url ?? m.notConfigured}</b>
+            {m.dbAndTz(health.data?.database ?? '—', health.data?.timezone ?? '—')}
           </Text>
           <Group>
             <Button leftSection={<IconPlugConnected size={16} />} onClick={() => test.mutate()} loading={test.isPending} disabled={!health.data?.jira_configured}>
-              Testar conexão
+              {m.test}
             </Button>
             <Button variant="default" onClick={() => discovery.mutate()} loading={discovery.isPending} disabled={!health.data?.jira_configured}>
-              Descobrir boards e campos
+              {m.discover}
             </Button>
           </Group>
           {test.error && <ErrorState error={test.error} />}
           {test.data?.ok && (
-            <Alert color="teal" variant="light" icon={<IconCheck size={18} />} title="Conectado">
-              Autenticado como {test.data.identity?.name} ({test.data.identity?.email ?? test.data.identity?.account_id}). Permissão de leitura de
-              projetos: {test.data.permissions?.BROWSE_PROJECTS ? 'sim' : 'não'}.
+            <Alert color="teal" variant="light" icon={<IconCheck size={18} />} title={m.connected}>
+              {m.authenticatedAs(
+                test.data.identity?.name ?? '',
+                test.data.identity?.email ?? test.data.identity?.account_id ?? '',
+                Boolean(test.data.permissions?.BROWSE_PROJECTS),
+              )}
             </Alert>
           )}
           {test.data && !test.data.ok && (
-            <Alert color="red" variant="light" title={`Falhou: ${test.data.error?.cause}`}>
+            <Alert color="red" variant="light" title={m.failed(String(test.data.error?.cause))}>
               {test.data.error?.message}
               <Text size="sm" fw={500} mt={4}>
-                O que fazer: {test.data.error?.action}
+                {m.whatToDo(String(test.data.error?.action))}
               </Text>
             </Alert>
           )}
           {discovery.error && <ErrorState error={discovery.error} />}
           {discovery.data && (
-            <Alert color={discovery.data.missing_fields.length ? 'yellow' : 'teal'} variant="light" title="Descoberta concluída">
-              {discovery.data.boards.length} boards e {discovery.data.statuses.length} status encontrados.{' '}
-              {discovery.data.missing_fields.length
-                ? `Campos não identificados: ${discovery.data.missing_fields.join(', ')} — informe na aba Campos.`
-                : 'Todos os campos customizados foram identificados.'}
+            <Alert color={discovery.data.missing_fields.length ? 'yellow' : 'teal'} variant="light" title={m.discoveryDone}>
+              {m.discoveryFound(discovery.data.boards.length, discovery.data.statuses.length)}{' '}
+              {discovery.data.missing_fields.length ? m.missingFields(discovery.data.missing_fields.join(', ')) : m.allFound}
             </Alert>
           )}
         </Stack>
       </Paper>
       <Text size="xs" c="dimmed">
-        Configurando do zero? O <Anchor component={Link} to="/inicio">guia de primeiros passos</Anchor> leva pela conexão,
-        os boards, os campos e a primeira coleta nessa ordem.
+        {m.fromScratchBefore} <Anchor component={Link} to="/inicio">{m.guideLink}</Anchor> {m.fromScratchAfter}
       </Text>
     </Stack>
   );
@@ -110,6 +111,7 @@ function BoardsTab() {
   const selectedNow = useBoards('', 1, 500, true);
   const save = useSaveSelection();
   const [draft, setDraft] = useState<Set<number> | null>(null);
+  const m = useT().tracking.settings.boards;
 
   useEffect(() => {
     if (selectedNow.data && draft === null) setDraft(new Set(selectedNow.data.items.map((b) => b.id)));
@@ -128,34 +130,35 @@ function BoardsTab() {
     <Stack gap="sm">
       <Group align="flex-end" justify="space-between" wrap="wrap">
         <TextInput
-          label="Buscar board ou time"
+          label={m.search}
           leftSection={<IconSearch size={14} />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
           w={320}
         />
         <Group>
-          <Text size="sm">{plural(draft?.size ?? 0, 'selecionado', 'selecionados')}</Text>
+          <Text size="sm">{m.selected(draft?.size ?? 0)}</Text>
           <Button
             onClick={() =>
               draft &&
               save.mutate([...draft], {
-                onSuccess: () => notifications.show({ title: 'Seleção salva', message: 'A próxima coleta inclui esses boards.' }),
+                onSuccess: () => notifications.show({ title: m.savedTitle, message: m.savedMessage }),
               })
             }
             loading={save.isPending}
             disabled={!draft}
           >
-            Salvar seleção
+            {m.save}
           </Button>
         </Group>
       </Group>
-      {save.error && <ErrorState error={save.error} title="Seleção não salva" />}
+      {save.error && <ErrorState error={save.error} title={m.notSaved} />}
       {boards.isLoading && <Loading />}
       {boards.error && <ErrorState error={boards.error} />}
       {boards.data && boards.data.total === 0 && (
         <Text size="sm" c="dimmed">
-          Nenhum board conhecido. Use “Descobrir boards e campos” na aba Conexão (ou <code>cadencia discover</code>).
+          {m.noneBefore} <code>cadencia discover</code>
+          {m.noneAfter}
         </Text>
       )}
       {boards.data && boards.data.items.length > 0 && (
@@ -165,11 +168,11 @@ function BoardsTab() {
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th w={40}>
-                    <span className="sr-only">Acompanhar</span>
+                    <span className="sr-only">{m.track}</span>
                   </Table.Th>
-                  <Table.Th>Board</Table.Th>
-                  <Table.Th>Tipo</Table.Th>
-                  <Table.Th>Última coleta</Table.Th>
+                  <Table.Th>{m.colBoard}</Table.Th>
+                  <Table.Th>{m.colType}</Table.Th>
+                  <Table.Th>{m.colLastCollection}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               {boards.data.spaces.map((group) => (
@@ -184,7 +187,7 @@ function BoardsTab() {
                           </Text>
                         )}
                         <Text size="xs" c="dimmed" fw={400}>
-                          · time · {plural(group.boards.length, 'board', 'boards')}
+                          {m.spaceLine(group.boards.length)}
                         </Text>
                       </Group>
                     </Table.Th>
@@ -195,7 +198,7 @@ function BoardsTab() {
                         <Checkbox
                           checked={draft?.has(b.id) ?? false}
                           onChange={() => toggle(b.id)}
-                          aria-label={`Acompanhar ${b.name} (${group.space.name})`}
+                          aria-label={m.trackAria(b.name, group.space.name)}
                         />
                       </Table.Td>
                       <Table.Td>{b.name}</Table.Td>
@@ -209,7 +212,7 @@ function BoardsTab() {
           </Table.ScrollContainer>
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
-              {boards.data.total} boards
+              {m.total(boards.data.total)}
             </Text>
             <Pagination total={Math.ceil(boards.data.total / boards.data.page_size)} value={page} onChange={setPage} size="sm" />
           </Group>
@@ -219,18 +222,13 @@ function BoardsTab() {
   );
 }
 
-const FIELD_LABELS: Record<keyof FieldMap, string> = {
-  story_points: 'Story Points (um ou mais ids, separados por vírgula)',
-  sprint: 'Sprint',
-  epic_link: 'Epic Link (projetos clássicos)',
-  flagged: 'Flagged (impedimento)',
-  rank: 'Rank (ordem do board)',
-};
+const FIELD_KEYS: (keyof FieldMap)[] = ['story_points', 'sprint', 'epic_link', 'flagged', 'rank'];
 
 function FieldsTab() {
   const fields = useFields();
   const save = useSaveOverrides();
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const m = useT().tracking.settings.fields;
   useEffect(() => {
     if (fields.data) {
       const o = fields.data.overrides;
@@ -255,37 +253,34 @@ function FieldsTab() {
         flagged: draft.flagged || null,
         rank: draft.rank || null,
       },
-      { onSuccess: () => notifications.show({ title: 'Sobrescritas salvas', message: 'Vale a partir da próxima coleta.' }) },
+      { onSuccess: () => notifications.show({ title: m.savedTitle, message: m.savedMessage }) },
     );
   return (
     <Stack gap="sm" maw={900}>
-      <Note>
-        Os ids de campos customizados mudam de instância para instância e são descobertos automaticamente. Só preencha uma sobrescrita se a
-        descoberta errar.
-      </Note>
+      <Note>{m.note}</Note>
       {data.missing.length > 0 && (
         <Alert color="yellow" variant="light">
-          Campos não identificados: {data.missing.join(', ')}.
+          {m.missing(data.missing.join(', '))}
         </Alert>
       )}
       <Table>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>Campo</Table.Th>
-            <Table.Th>Descoberto</Table.Th>
-            <Table.Th>Sobrescrita manual</Table.Th>
+            <Table.Th>{m.colField}</Table.Th>
+            <Table.Th>{m.colDiscovered}</Table.Th>
+            <Table.Th>{m.colOverride}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {(Object.keys(FIELD_LABELS) as (keyof FieldMap)[]).map((key) => {
+          {FIELD_KEYS.map((key) => {
             const discovered = data.discovered[key];
             return (
               <Table.Tr key={key}>
-                <Table.Td>{FIELD_LABELS[key]}</Table.Td>
+                <Table.Td>{m.labels[key]}</Table.Td>
                 <Table.Td className="mono">{Array.isArray(discovered) ? discovered.join(', ') || '—' : discovered ?? '—'}</Table.Td>
                 <Table.Td>
                   <TextInput
-                    aria-label={`Sobrescrita de ${FIELD_LABELS[key]}`}
+                    aria-label={m.overrideAria(m.labels[key])}
                     placeholder="customfield_…"
                     value={draft[key] ?? ''}
                     onChange={(e) => setDraft({ ...draft, [key]: e.currentTarget.value })}
@@ -298,20 +293,20 @@ function FieldsTab() {
       </Table>
       <Group>
         <Button onClick={() => submit()} loading={save.isPending}>
-          Salvar sobrescritas
+          {m.save}
         </Button>
-        {save.error && <ErrorState error={save.error} title="Sobrescritas não salvas" />}
+        {save.error && <ErrorState error={save.error} title={m.notSaved} />}
       </Group>
     </Stack>
   );
 }
 
-
-const DISCARD = {
-  title: 'Descartar alterações?',
-  body: 'Há alterações não salvas neste perfil de board.',
-  confirmLabel: 'Descartar',
-};
+/** The confirmation asked before unsaved profile edits are thrown away; read at use time. */
+const discardDialog = (m: Messages['tracking']['settings']) => ({
+  title: m.discardTitle,
+  body: m.discardBody,
+  confirmLabel: m.discardLabel,
+});
 
 /**
  * The board's own profile. It reads and writes its own ``perfil`` parameter (not the shared ``board`` filter,
@@ -328,6 +323,8 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
   const save = useSaveBoardSettings(boardId);
   const [draft, setDraft] = useState<BoardSettings | null>(null);
   const [affinityQuery, setAffinityQuery] = useState('');
+  const settings = useT().tracking.settings;
+  const m = settings.profile;
   useEffect(() => {
     if (detail.data) setDraft(detail.data.settings);
   }, [detail.data]);
@@ -351,11 +348,11 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
 
   const switchBoard = async (value: string | null) => {
     if (!value) return;
-    if (pending && !(await confirm(DISCARD))) return;
+    if (pending && !(await confirm(discardDialog(settings)))) return;
     set({ perfil: value });
   };
 
-  if (selected.data && !selected.data.items.length) return <Text size="sm">Selecione boards na aba Boards primeiro.</Text>;
+  if (selected.data && !selected.data.items.length) return <Text size="sm">{m.selectBoardsFirst}</Text>;
   if (detail.isLoading || !draft) return <Loading />;
   if (detail.error) return <ErrorState error={detail.error} />;
 
@@ -366,12 +363,12 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
   const fractionOf = (percent: number | string, fallback: number) => (percent === '' ? fallback : Number((Number(percent) / 100 - 1).toFixed(4)));
   const affinityPeople = (draft.members.length ? draft.members : peopleOptions.map((p) => p.value))
     .map((account) => ({ account, label: peopleOptions.find((p) => p.value === account)?.label ?? account }))
-    .filter((p) => p.label.toLocaleLowerCase('pt-BR').includes(affinityQuery.trim().toLocaleLowerCase('pt-BR')));
+    .filter((p) => p.label.toLocaleLowerCase(currentLocale()).includes(affinityQuery.trim().toLocaleLowerCase(currentLocale())));
 
   return (
     <Stack gap="md" maw={1000}>
       <Select
-        label="Board"
+        label={m.board}
         data={(selected.data?.items ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
         value={boardId ? String(boardId) : null}
         onChange={switchBoard}
@@ -380,76 +377,76 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
       />
       {detail.data!.overridden.length > 0 && (
         <Text size="xs" c="dimmed">
-          Diferente do padrão global: {detail.data!.overridden.join(', ')}
+          {m.overridden(detail.data!.overridden.join(', '))}
         </Text>
       )}
       <Paper withBorder p="md">
         <Title order={5} mb="sm">
-          Fluxo do board
+          {m.flowTitle}
         </Title>
         <SimpleGrid cols={{ base: 1, md: 3 }}>
           <MultiSelect
-            label="Colunas de trabalho em andamento"
-            description="vazio: colunas cujos status estão na categoria “em andamento”"
+            label={m.wipColumns}
+            description={m.wipColumnsHint}
             data={columns}
             value={draft.wip_columns ?? []}
             onChange={(value) => patch('wip_columns', value.length ? value : null)}
           />
           <MultiSelect
-            label="Colunas ativas (eficiência de fluxo)"
-            description="vazio: as mesmas de andamento"
+            label={m.activeColumns}
+            description={m.activeColumnsHint}
             data={columns}
             value={draft.active_columns ?? []}
             onChange={(value) => patch('active_columns', value.length ? value : null)}
           />
-          <TagsInput label="Status que significam bloqueio" value={draft.blocked_status_names} onChange={(value) => patch('blocked_status_names', value)} />
+          <TagsInput label={m.blockedStatuses} value={draft.blocked_status_names} onChange={(value) => patch('blocked_status_names', value)} />
         </SimpleGrid>
       </Paper>
       <Paper withBorder p="md">
         <Title order={5} mb="sm">
-          Checkpoint e sprint
+          {m.checkpointTitle}
         </Title>
         <SimpleGrid cols={{ base: 1, md: 4 }}>
           <Select
-            label="Dia do checkpoint"
+            label={m.checkpointDay}
             data={weekdays().map((d, i) => ({ value: String(i), label: d }))}
             value={String(draft.checkpoint_weekday)}
             onChange={(value) => value && patch('checkpoint_weekday', Number(value))}
             allowDeselect={false}
           />
-          <NumberInput label="Hora do checkpoint" min={0} max={23} value={draft.checkpoint_hour} onChange={(v) => patch('checkpoint_hour', num(v, 18))} />
-          <Select label="Fuso horário" data={TIMEZONES} value={draft.timezone} onChange={(value) => value && patch('timezone', value)} searchable allowDeselect={false} />
+          <NumberInput label={m.checkpointHour} min={0} max={23} value={draft.checkpoint_hour} onChange={(v) => patch('checkpoint_hour', num(v, 18))} />
+          <Select label={m.timezone} data={TIMEZONES} value={draft.timezone} onChange={(value) => value && patch('timezone', value)} searchable allowDeselect={false} />
           <Stack gap={4}>
             <Text size="sm" fw={500}>
-              Duração quando o Jira não informa
+              {m.defaultDuration}
             </Text>
             <SegmentedControl
               value={String(draft.default_sprint_weeks)}
               onChange={(value) => patch('default_sprint_weeks', Number(value))}
               data={[
-                { value: '2', label: '2 semanas' },
-                { value: '3', label: '3 semanas' },
+                { value: '2', label: m.weeks(2) },
+                { value: '3', label: m.weeks(3) },
               ]}
             />
           </Stack>
           <NumberInput
-            label="Limiar de estagnação"
-            description="checkpoints seguidos sem transição"
+            label={m.stagnation}
+            description={m.stagnationHint}
             min={1}
             max={6}
             value={draft.stagnation_checkpoints}
             onChange={(v) => patch('stagnation_checkpoints', num(v, 1))}
           />
           <NumberInput
-            label="Percentil de envelhecimento"
-            description="aprendido do histórico"
+            label={m.agingPercentile}
+            description={m.agingPercentileHint}
             min={50}
             max={99}
             value={draft.aging_percentile}
             onChange={(v) => patch('aging_percentile', num(v, 85))}
           />
           <TagsInput
-            label="Feriados (AAAA-MM-DD)"
+            label={m.holidays}
             value={draft.holidays}
             onChange={(value) => patch('holidays', value.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))}
           />
@@ -457,46 +454,45 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
       </Paper>
       <Paper withBorder p="md">
         <Title order={5} mb="sm">
-          Capacidade e alocação teórica
+          {m.capacityTitle}
         </Title>
         <SimpleGrid cols={{ base: 1, md: 4 }}>
           <NumberInput
-            label="Horas por dia"
-            description="Bruta; a capacidade líquida multiplica pelo fator de foco abaixo."
+            label={m.hoursPerDay}
+            description={m.hoursPerDayHint}
             min={1}
             max={12}
             value={draft.hours_per_day}
             onChange={(v) => patch('hours_per_day', num(v, 8))}
           />
-          <NumberInput label="Fator de foco" min={0.1} max={1} step={0.05} decimalScale={2} value={draft.focus_factor} onChange={(v) => patch('focus_factor', num(v, 0.7))} />
-          <NumberInput label="Horas por ponto" min={0.5} step={0.5} value={draft.hours_per_point} onChange={(v) => patch('hours_per_point', num(v, 4))} />
-          <NumberInput label="Horas de item sem estimativa" min={1} value={draft.unestimated_item_hours} onChange={(v) => patch('unestimated_item_hours', num(v, 8))} />
-          <NumberInput label="Máximo de itens por pessoa" min={1} value={draft.max_items_per_person} onChange={(v) => patch('max_items_per_person', num(v, 8))} />
+          <NumberInput label={m.focusFactor} min={0.1} max={1} step={0.05} decimalScale={2} value={draft.focus_factor} onChange={(v) => patch('focus_factor', num(v, 0.7))} />
+          <NumberInput label={m.hoursPerPoint} min={0.5} step={0.5} value={draft.hours_per_point} onChange={(v) => patch('hours_per_point', num(v, 4))} />
+          <NumberInput label={m.unestimatedHours} min={1} value={draft.unestimated_item_hours} onChange={(v) => patch('unestimated_item_hours', num(v, 8))} />
+          <NumberInput label={m.maxItems} min={1} value={draft.max_items_per_person} onChange={(v) => patch('max_items_per_person', num(v, 8))} />
           <Text size="xs" c="dimmed" style={{ gridColumn: '1 / -1' }}>
-            O plano de épico usa a própria jornada (Configuração → Plano de épico), pensada para várias pessoas em vários
-            boards ao mesmo tempo, em vez das horas por dia deste board.
+            {m.epicPlanNote}
           </Text>
           <NumberInput
-            label="Sobrecarga: acima de"
-            description="Vale para Pessoas e para o planejamento."
-            suffix=" % da capacidade"
+            label={m.overload}
+            description={m.thresholdHint}
+            suffix={m.capacitySuffix}
             min={0}
             step={5}
             value={percentOf(draft.overload_threshold)}
             onChange={(v) => patch('overload_threshold', fractionOf(v, 0.1))}
           />
           <NumberInput
-            label="Folga: abaixo de"
-            description="Vale para Pessoas e para o planejamento."
-            suffix=" % da capacidade"
+            label={m.idle}
+            description={m.thresholdHint}
+            suffix={m.capacitySuffix}
             min={0}
             step={5}
             value={percentOf(draft.idle_threshold)}
             onChange={(v) => patch('idle_threshold', fractionOf(v, -0.2))}
           />
           <MultiSelect
-            label="Quem conta na capacidade deste board"
-            description="vazio: quem tem itens na sprint"
+            label={m.members}
+            description={m.membersHint}
             data={peopleOptions}
             value={draft.members}
             onChange={(value) => patch('members', value)}
@@ -504,17 +500,20 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
           />
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="md">
-          A pessoa em si — nome, função, descrição — é de <Anchor component={Link} to="/pessoas" size="xs">Pessoas</Anchor>; aqui só
-          quem entra no cálculo de capacidade deste board e a afinidade que só faz sentido nele.
+          {m.personBefore}{' '}
+          <Anchor component={Link} to="/pessoas" size="xs">
+            {m.peopleLink}
+          </Anchor>
+          {m.personAfter}
         </Text>
         <Text size="sm" fw={500} mt="xs">
-          Afinidade explícita (componentes ou etiquetas que cada pessoa atende)
+          {m.affinityTitle}
         </Text>
         <TextInput
           size="xs"
           mt={4}
-          placeholder="Buscar pessoa pelo nome"
-          aria-label="Buscar pessoa na afinidade"
+          placeholder={m.affinitySearch}
+          aria-label={m.affinitySearchAria}
           leftSection={<IconSearch size={12} />}
           value={affinityQuery}
           onChange={(e) => setAffinityQuery(e.currentTarget.value)}
@@ -533,7 +532,7 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
         </Stack>
         {affinityPeople.length > 30 && (
           <Text size="xs" c="dimmed" mt={4}>
-            mostrando 30 de {affinityPeople.length}; busque para ver as outras
+            {m.showing(30, affinityPeople.length)}
           </Text>
         )}
       </Paper>
@@ -541,16 +540,16 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
       <Paper withBorder p="sm" style={{ position: 'sticky', bottom: 8, zIndex: 2 }}>
         <Group justify="space-between" wrap="wrap" gap="sm">
           <Text size="sm" c={pending ? undefined : 'dimmed'}>
-            {pending ? plural(pending, 'alteração não salva', 'alterações não salvas') : 'Nada a salvar'}
+            {pending ? m.unsaved(pending) : m.nothingToSave}
           </Text>
           <Group gap="sm">
-            {save.error && <ErrorState error={save.error} title="Perfil não salvo" />}
+            {save.error && <ErrorState error={save.error} title={m.notSaved} />}
             <Button
               disabled={!pending}
               loading={save.isPending}
-              onClick={() => save.mutate(changed(), { onSuccess: () => notifications.show({ title: 'Salvo', message: 'O board passa a usar os novos valores.' }) })}
+              onClick={() => save.mutate(changed(), { onSuccess: () => notifications.show({ title: m.savedTitle, message: m.savedMessage }) })}
             >
-              Salvar perfil do board
+              {m.save}
             </Button>
           </Group>
         </Group>
@@ -564,26 +563,27 @@ export function SettingsPage() {
   const { get, set } = useFilters();
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [profileDirty, setProfileDirty] = useState(false);
+  const m = useT().tracking.settings;
   const tab = get('tab') ?? 'conexao';
   // Absences are the team's, so they live on Pessoas now; an old link lands there.
   if (tab === 'ausencias') return <Navigate to="/pessoas?ausencias=1" replace />;
   // Leaving a profile with unsaved edits asks first.
   const goTo = async (value: string | null) => {
     if (!value || value === tab) return;
-    if (tab === 'perfil' && profileDirty && !(await confirm(DISCARD))) return;
+    if (tab === 'perfil' && profileDirty && !(await confirm(discardDialog(m)))) return;
     set({ tab: value });
   };
   return (
     <>
-      <PageHeader title="Configuração" subtitle="Conexão, boards acompanhados, campos da instância, perfil de cada board, notificações e os parâmetros do plano de épico." />
+      <PageHeader title={m.title} subtitle={m.subtitle} />
       <Tabs value={tab} onChange={goTo} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="conexao">Conexão</Tabs.Tab>
-          <Tabs.Tab value="boards">Boards</Tabs.Tab>
-          <Tabs.Tab value="campos">Campos</Tabs.Tab>
-          <Tabs.Tab value="perfil">Perfil do board</Tabs.Tab>
-          <Tabs.Tab value="plano-epico">Plano de épico</Tabs.Tab>
-          <Tabs.Tab value="notificacoes">Notificações</Tabs.Tab>
+          <Tabs.Tab value="conexao">{m.tabConnection}</Tabs.Tab>
+          <Tabs.Tab value="boards">{m.tabBoards}</Tabs.Tab>
+          <Tabs.Tab value="campos">{m.tabFields}</Tabs.Tab>
+          <Tabs.Tab value="perfil">{m.tabProfile}</Tabs.Tab>
+          <Tabs.Tab value="plano-epico">{m.tabEpicPlan}</Tabs.Tab>
+          <Tabs.Tab value="notificacoes">{m.tabNotifications}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="notificacoes">
           <NotificationsSettings />

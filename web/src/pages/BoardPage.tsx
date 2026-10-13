@@ -11,20 +11,20 @@ import { RiskCountsInline } from '../components/risk';
 import { RiskTable } from '../components/RiskTable';
 import { TreeTable } from '../components/TreeTable';
 import { WeeklyWindows } from '../components/WeeklyWindows';
+import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
 import { fmtDate } from '../lib/format';
-
-const SPRINT_STATE_LABEL = { active: 'ativa', closed: 'encerrada', future: 'futura' } as const;
 
 /** RF-113: a kanban board's own "Visão geral" — the forecast and the weekly windows a sprint's
  * overview gives, built from the calendar instead of a sprint it does not have. */
 function BoardOverviewTab({ boardId, data }: { boardId: number; data: BoardOverview }) {
   const forecast = useBoardForecast(boardId);
+  const t = useT();
   return (
     <Stack gap="md">
       <SimpleGrid cols={{ base: 1, md: 2 }}>
-        <KpiCard label="Itens por situação de risco" help={HELP['board:risk']}>
+        <KpiCard label={t.tracking.board.riskByItem} help={HELP['board:risk']}>
           <RiskCountsInline counts={data.risk_counts} />
         </KpiCard>
         <ForecastCard query={forecast} />
@@ -36,12 +36,13 @@ function BoardOverviewTab({ boardId, data }: { boardId: number; data: BoardOverv
 
 function BoardTreeTab({ boardId }: { boardId: number }) {
   const { data, isLoading, error } = useBoardTree(boardId);
+  const t = useT();
   if (isLoading) return <Loading rows={8} />;
   if (error) return <ErrorState error={error} />;
   if (!data?.nodes.length) {
     return (
-      <Empty title="Nenhum item neste board" action={{ label: 'Ver o status da coleta', to: '/status' }}>
-        O board está vazio no Jira, ou os itens ainda não foram coletados.
+      <Empty title={t.tracking.board.treeEmptyTitle} action={{ label: t.tracking.board.seeCollectionStatus, to: '/status' }}>
+        {t.tracking.board.treeEmptyBody}
       </Empty>
     );
   }
@@ -56,6 +57,8 @@ export function BoardPage() {
   const { carry, get, set } = useFilters();
   const { data, isLoading, error } = useBoardSprints(boardId);
   const overview = useBoardOverview(boardId);
+  const t = useT();
+  const m = t.tracking.board;
 
   if (isLoading) return <Loading rows={6} />;
   if (error) return <ErrorState error={error} />;
@@ -67,18 +70,18 @@ export function BoardPage() {
     <>
       <PageHeader
         title={data.board.name}
-        subtitle={data.board.type === 'kanban' ? 'Board kanban: janelas semanais de calendário no lugar de sprints.' : 'Nenhuma sprint ativa encontrada.'}
-        crumbs={[{ label: 'Painel', to: '/' }, { label: data.board.name }]}
+        subtitle={data.board.type === 'kanban' ? m.kanbanSubtitle : m.noActiveSprint}
+        crumbs={[{ label: t.tracking.crumbs.home, to: '/' }, { label: data.board.name }]}
       />
       <Freshness freshness={data.freshness} />
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">Visão geral</Tabs.Tab>
-          <Tabs.Tab value="arvore">Árvore de trabalho</Tabs.Tab>
-          <Tabs.Tab value="riscos">Itens em aberto</Tabs.Tab>
-          <Tabs.Tab value="fluxo">Fluxo</Tabs.Tab>
-          {data.sprints.length > 0 && <Tabs.Tab value="sprints">Sprints</Tabs.Tab>}
-          <Tabs.Tab value="mudancas">O que mudou</Tabs.Tab>
+          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="arvore">{m.tabTree}</Tabs.Tab>
+          <Tabs.Tab value="riscos">{m.tabOpen}</Tabs.Tab>
+          <Tabs.Tab value="fluxo">{m.tabFlow}</Tabs.Tab>
+          {data.sprints.length > 0 && <Tabs.Tab value="sprints">{m.tabSprints}</Tabs.Tab>}
+          <Tabs.Tab value="mudancas">{m.tabChanges}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="visao">
           {overview.isLoading && <Loading rows={6} />}
@@ -96,10 +99,10 @@ export function BoardPage() {
         <Tabs.Panel value="fluxo">
           <Stack align="flex-start">
             <Text size="sm" c="dimmed">
-              Fluxo cumulativo, cycle time e envelhecimento ficam na página de Fluxo, onde o período é escolhido.
+              {m.flowHint}
             </Text>
             <Button component={Link} to={`/fluxo?board=${boardId}`} variant="light">
-              Abrir em Fluxo
+              {m.openInFlow}
             </Button>
           </Stack>
         </Tabs.Panel>
@@ -108,9 +111,9 @@ export function BoardPage() {
             <Table>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Sprint</Table.Th>
-                  <Table.Th>Estado</Table.Th>
-                  <Table.Th>Período</Table.Th>
+                  <Table.Th>{m.colSprint}</Table.Th>
+                  <Table.Th>{m.colState}</Table.Th>
+                  <Table.Th>{m.colPeriod}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -121,7 +124,7 @@ export function BoardPage() {
                         {s.name}
                       </Anchor>
                     </Table.Td>
-                    <Table.Td>{SPRINT_STATE_LABEL[s.state]}</Table.Td>
+                    <Table.Td>{m.sprintState[s.state]}</Table.Td>
                     <Table.Td>
                       {fmtDate(s.start)} – {fmtDate(s.end)}
                     </Table.Td>

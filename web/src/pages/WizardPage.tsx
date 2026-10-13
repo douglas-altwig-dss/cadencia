@@ -7,6 +7,7 @@ import { Link, useNavigate } from 'react-router';
 import { useBoards, useCollect, useConnectionTest, useDiscovery, useHealth, useSaveSelection, useStatus } from '../api/hooks';
 import { CollectionProgress } from '../components/CollectionProgress';
 import { ErrorState, PageHeader } from '../components/common';
+import { useT } from '../i18n';
 
 /**
  * RF-79: the first run as a guided path — connect, discover, choose boards, collect, then the deck —
@@ -25,6 +26,7 @@ export function WizardPage() {
   const collect = useCollect();
   const [step, setStep] = useLocalStorage({ key: 'cadencia-inicio-passo', defaultValue: 0, getInitialValueInEffect: false });
   const [chosen, setChosen] = useState<string[]>([]);
+  const m = useT().tracking.wizard;
 
   const selected = useMemo(() => (boards.data?.items ?? []).filter((b) => b.selected).map((b) => String(b.id)), [boards.data]);
   useEffect(() => {
@@ -35,57 +37,59 @@ export function WizardPage() {
   const configured = health.data?.jira_configured ?? false;
 
   const options = (boards.data?.spaces ?? []).map((group) => ({
-    group: group.space.name ?? 'Sem espaço',
+    group: group.space.name ?? m.noSpace,
     items: group.boards.map((b) => ({ value: String(b.id), label: `${b.name} (${b.type})` })),
   }));
 
   return (
     <>
       <PageHeader
-        title="Primeiros passos"
-        subtitle="Do Jira à primeira apresentação em cinco passos. Nada aqui escreve no Jira: a Cadência só lê."
+        title={m.title}
+        subtitle={m.subtitle}
         actions={
           <Button variant="subtle" size="xs" onClick={() => navigate('/')}>
-            Pular e ir para o painel
+            {m.skip}
           </Button>
         }
       />
       <Paper withBorder p="lg">
         <Stepper active={step} onStepClick={setStep} allowNextStepsSelect={false} size="sm">
-          <Stepper.Step label="Conexão" description="credencial do Jira" completedIcon={<IconCheck size={16} />}>
+          <Stepper.Step label={m.stepConnection} description={m.stepConnectionHint} completedIcon={<IconCheck size={16} />}>
             <Stack gap="sm" mt="md">
               {!configured ? (
-                <Alert color="yellow" variant="light" title="O Jira ainda não está configurado">
-                  <Text size="sm">Defina três valores no arquivo <Code>.env</Code> (ou como segredo) e reinicie a API:</Text>
+                <Alert color="yellow" variant="light" title={m.notConfigured}>
+                  <Text size="sm">
+                    {m.setThreeBefore} <Code>.env</Code> {m.setThreeAfter}
+                  </Text>
                   <List size="sm" mt={4}>
-                    <List.Item><Code>CADENCIA_JIRA_BASE_URL</Code> — ex.: https://sua-empresa.atlassian.net</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_EMAIL</Code> — a conta que lê os boards</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_API_TOKEN</Code> — de preferência em <Code>secrets/jira_api_token</Code></List.Item>
+                    <List.Item><Code>CADENCIA_JIRA_BASE_URL</Code> {m.baseUrlHint}</List.Item>
+                    <List.Item><Code>CADENCIA_JIRA_EMAIL</Code> {m.emailHint}</List.Item>
+                    <List.Item><Code>CADENCIA_JIRA_API_TOKEN</Code> {m.tokenHint} <Code>secrets/jira_api_token</Code></List.Item>
                   </List>
                   <Text size="sm" mt={4}>
-                    Sem credenciais ainda? Rode <Code>make demo</Code> para explorar com dados fictícios.
+                    {m.noCredentialsBefore} <Code>make demo</Code> {m.noCredentialsAfter}
                   </Text>
                 </Alert>
               ) : (
                 <Text size="sm">
-                  Instância: <b>{health.data?.jira_base_url ?? 'configurada'}</b>. Teste se a credencial abre os projetos.
+                  {m.instance} <b>{health.data?.jira_base_url ?? m.configured}</b>. {m.testHint}
                 </Text>
               )}
               <Group>
                 <Button leftSection={<IconPlugConnected size={16} />} onClick={() => test.mutate()} loading={test.isPending} disabled={!configured}>
-                  Testar conexão
+                  {m.test}
                 </Button>
                 <Button variant="default" disabled={!test.data?.ok} onClick={() => setStep(1)}>
-                  Continuar
+                  {m.continue}
                 </Button>
               </Group>
               {test.data?.ok && (
                 <Alert color="teal" variant="light">
-                  Conectado como {test.data.identity?.name}. Permissão de leitura: {test.data.permissions?.BROWSE_PROJECTS ? 'sim' : 'não'}.
+                  {m.connectedAs(test.data.identity?.name ?? '', Boolean(test.data.permissions?.BROWSE_PROJECTS))}
                 </Alert>
               )}
               {test.data && !test.data.ok && (
-                <Alert color="red" variant="light" title={test.data.error?.cause ?? 'Falhou'}>
+                <Alert color="red" variant="light" title={test.data.error?.cause ?? m.failed}>
                   {test.data.error?.message} {test.data.error?.action}
                 </Alert>
               )}
@@ -93,24 +97,28 @@ export function WizardPage() {
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Descoberta" description="boards e campos">
+          <Stepper.Step label={m.stepDiscovery} description={m.stepDiscoveryHint}>
             <Stack gap="sm" mt="md">
-              <Text size="sm">Lê os boards visíveis para a conta e encontra os campos customizados (pontos, sprint, épico, impedimento).</Text>
+              <Text size="sm">{m.discoveryBody}</Text>
               <Group>
                 <Button onClick={() => discover.mutate()} loading={discover.isPending}>
-                  Descobrir
+                  {m.discover}
                 </Button>
                 <Button variant="default" disabled={!discover.data && !(boards.data?.total ?? 0)} onClick={() => setStep(2)}>
-                  Continuar
+                  {m.continue}
                 </Button>
               </Group>
               {discover.data && (
                 <Alert color="teal" variant="light">
-                  {discover.data.boards.length} boards em {discover.data.spaces.length} espaços.
+                  {m.discovered(discover.data.boards.length, discover.data.spaces.length)}
                   {discover.data.missing_fields.length > 0 && (
                     <>
-                      {' '}Campos não encontrados: {discover.data.missing_fields.join(', ')} —{' '}
-                      <Anchor component={Link} to="/configuracao?tab=campos">informe manualmente</Anchor>.
+                      {' '}
+                      {m.missingFields(discover.data.missing_fields.join(', '))}{' '}
+                      <Anchor component={Link} to="/configuracao?tab=campos">
+                        {m.fillManually}
+                      </Anchor>
+                      .
                     </>
                   )}
                 </Alert>
@@ -119,11 +127,11 @@ export function WizardPage() {
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Boards" description="o que acompanhar">
+          <Stepper.Step label={m.stepBoards} description={m.stepBoardsHint}>
             <Stack gap="sm" mt="md">
               <MultiSelect
-                label="Boards acompanhados"
-                description="Agrupados pelo espaço (time) a que pertencem. Dá para mudar depois em Configuração."
+                label={m.trackedBoards}
+                description={m.trackedBoardsHint}
                 data={options}
                 value={chosen}
                 onChange={setChosen}
@@ -136,54 +144,49 @@ export function WizardPage() {
                   loading={select.isPending}
                   onClick={() => select.mutate(chosen.map(Number), { onSuccess: () => setStep(3) })}
                 >
-                  Salvar e continuar
+                  {m.saveAndContinue}
                 </Button>
               </Group>
               {select.error && <ErrorState error={select.error} />}
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Primeira coleta" description="histórico completo">
+          <Stepper.Step label={m.stepCollection} description={m.stepCollectionHint}>
             <Stack gap="sm" mt="md">
-              <Text size="sm">
-                A primeira coleta lê o histórico inteiro de cada item e congela os checkpoints passados. Pode levar alguns minutos em
-                boards grandes; o progresso aparece abaixo.
-              </Text>
+              <Text size="sm">{m.collectionBody}</Text>
               <Group>
                 <Button onClick={() => collect.mutate({ mode: 'full' })} loading={collect.isPending} disabled={status.data?.collecting}>
-                  Coletar agora
+                  {m.collectNow}
                 </Button>
                 <Button variant="default" disabled={!collected} onClick={() => setStep(4)}>
-                  Continuar
+                  {m.continue}
                 </Button>
               </Group>
               <CollectionProgress />
-              {collected && !status.data?.collecting && <Alert color="teal" variant="light">Coleta concluída. Os painéis já têm dados.</Alert>}
+              {collected && !status.data?.collecting && <Alert color="teal" variant="light">{m.collected}</Alert>}
               {collect.error && <ErrorState error={collect.error} />}
             </Stack>
           </Stepper.Step>
 
-          <Stepper.Step label="Apresentação" description="o modelo da empresa">
+          <Stepper.Step label={m.stepDeck} description={m.stepDeckHint}>
             <Stack gap="sm" mt="md">
-              <Title order={5}>Última etapa: o modelo .pptx</Title>
-              <Text size="sm">
-                Envie o modelo da apresentação de sexta. A Cadência sugere onde cada dado entra; você revisa no editor e gera.
-              </Text>
+              <Title order={5}>{m.deckTitle}</Title>
+              <Text size="sm">{m.deckBody}</Text>
               <Group>
                 <Button component={Link} to="/apresentacao" onClick={() => setStep(5)}>
-                  Abrir a apresentação
+                  {m.openDeck}
                 </Button>
                 <Button variant="default" onClick={() => (setStep(5), navigate('/'))}>
-                  Deixar para depois
+                  {m.later}
                 </Button>
               </Group>
             </Stack>
           </Stepper.Step>
           <Stepper.Completed>
             <Stack gap="sm" mt="md" align="flex-start">
-              <Text>Tudo pronto. A coleta roda sozinha a cada hora e congela os checkpoints no horário de cada board.</Text>
+              <Text>{m.allSet}</Text>
               <Button component={Link} to="/">
-                Ir para o painel
+                {m.goHome}
               </Button>
             </Stack>
           </Stepper.Completed>

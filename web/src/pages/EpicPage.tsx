@@ -9,6 +9,7 @@ import { ForecastCard } from '../components/ForecastCard';
 import { ItemDescription } from '../components/ItemDescription';
 import { RiskCountsInline } from '../components/risk';
 import { TreeTable } from '../components/TreeTable';
+import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { fmtDay, fmtNum } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
@@ -23,6 +24,8 @@ export function EpicPage() {
   const board = useBoardSprints(boardId);
   const epic = useEpic(key, boardId);
   const forecast = useEpicForecast(key, boardId);
+  const t = useT();
+  const m = t.tracking.epic;
 
   if (epic.isLoading) return <Loading rows={8} />;
   if (epic.error) return <ErrorState error={epic.error} />;
@@ -30,8 +33,8 @@ export function EpicPage() {
   const data = epic.data;
   const sprint = board.data?.sprints.find((s) => String(s.id) === sprintId);
   const crumbs = [
-    { label: 'Painel', to: '/' },
-    { label: board.data?.board.name ?? `Board ${boardId}`, to: `/boards/${boardId}` },
+    { label: t.tracking.crumbs.home, to: '/' },
+    { label: board.data?.board.name ?? t.tracking.crumbs.board(boardId), to: `/boards/${boardId}` },
     ...(sprint ? [{ label: sprint.name, to: `/boards/${boardId}/sprints/${sprint.id}?tab=arvore` }] : []),
     { label: key },
   ];
@@ -41,14 +44,14 @@ export function EpicPage() {
 
   return (
     <>
-      <PageHeader title={data.epic.summary} subtitle={`Épico ${key} · todas as sprints`} crumbs={crumbs} />
+      <PageHeader title={data.epic.summary} subtitle={m.subtitle(key)} crumbs={crumbs} />
       <Freshness freshness={data.freshness} />
       {/* Not the tree/plan's own content, so it stays above the tabs: it is true whichever one is open. */}
       <Group gap="xs" mb="md">
         <IssueLink issue={data.epic} showSummary={false} />
         <IssueStatusBadge status={data.epic.status} category={data.epic.category} />
         <Text size="sm" c="dimmed">
-          {data.epic.due_date ? `data limite ${fmtDay(data.epic.due_date)}` : 'data limite não definida'}
+          {data.epic.due_date ? m.dueDate(fmtDay(data.epic.due_date)) : m.noDueDate}
         </Text>
       </Group>
       <Box mb="md">
@@ -56,8 +59,8 @@ export function EpicPage() {
       </Box>
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">Visão geral</Tabs.Tab>
-          <Tabs.Tab value="plano">Plano</Tabs.Tab>
+          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="plano">{m.tabPlan}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="plano">
           <EpicPlanTab epicKey={key} />
@@ -66,23 +69,23 @@ export function EpicPage() {
           <Stack gap="md">
             {/* Numbers first, then the forecast, then the items they add up from. */}
             <SimpleGrid cols={{ base: 1, md: 3 }}>
-              <KpiCard label="Progresso dos filhos diretos" help={HELP['epic:progress']}>
+              <KpiCard label={m.progress} help={HELP['epic:progress']}>
                 <ProgressBars progress={data.tree?.progress ?? null} />
               </KpiCard>
-              <KpiCard label="Situação dos itens abertos" help={HELP['epic:risk']}>
+              <KpiCard label={m.risk} help={HELP['epic:risk']}>
                 <RiskCountsInline counts={data.risk_counts} />
               </KpiCard>
               <KpiCard
-                label="Estimativa acumulada"
+                label={m.estimate}
                 help={HELP['epic:estimate']}
-                value={estimate != null ? `${fmtNum(estimate)} pts` : '—'}
+                value={estimate != null ? m.points(fmtNum(estimate)) : '—'}
               />
             </SimpleGrid>
             <ForecastCard query={forecast} />
             {data.tree && data.tree.children.length ? (
               <TreeTable nodes={data.tree.children} boardId={boardId} sprintId={sprintId ? Number(sprintId) : undefined} />
             ) : (
-              <Empty title="Este épico não tem itens coletados." />
+              <Empty title={m.empty} />
             )}
           </Stack>
         </Tabs.Panel>

@@ -1,5 +1,5 @@
 import type { Situation, SprintTimelineNode, TimelineState } from '../api/types';
-import { collator } from '../i18n';
+import { collator, t as t_ } from '../i18n';
 
 /**
  * The sprint timeline as pure functions: which rows to show, and where each bar goes.
@@ -85,7 +85,7 @@ export function ticksOf(axis: Axis, maxDaily = 16): Tick[] {
   for (let t = axis.start; t < axis.end; t = nextMidnight(t)) {
     const date = new Date(t);
     if (days > maxDaily && date.getDay() !== 1 && t !== axis.start) continue;
-    out.push({ at: t, label: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}` });
+    out.push({ at: t, label: t_().tracking.timeline.tick(String(date.getDate()).padStart(2, '0'), String(date.getMonth() + 1).padStart(2, '0')) });
   }
   return out;
 }
@@ -262,7 +262,6 @@ export interface Lane {
   atRisk: number;
 }
 
-const NO_OWNER = 'Sem responsável';
 
 /**
  * The same rows regrouped by who holds them: one lane per assignee, alphabetical, the unassigned last.
@@ -270,6 +269,7 @@ const NO_OWNER = 'Sem responsável';
  */
 export function personLanes(nodes: SprintTimelineNode[], filters: Filters): Lane[] {
   const lanes = new Map<string, Lane>();
+  const NO_OWNER = t_().tracking.timeline.unassigned;
   walk(nodes, (node) => {
     if (isContainer(node) || !node.issue || !keeps(node, filters)) return;
     const name = node.issue.assignee ?? NO_OWNER;

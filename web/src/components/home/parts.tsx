@@ -2,18 +2,20 @@ import { Group, Text, Tooltip } from '@mantine/core';
 import { IconAlertTriangle, IconArrowDownRight, IconArrowUpRight, IconMinus, IconPlugConnectedX } from '@tabler/icons-react';
 
 import type { DashboardRow, TrendPoint } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtDateTime, fromNow } from '../../lib/format';
 import { InfoTip } from '../common';
 
 // The small drawings the Home tiles share: bars of a trend, a sparkline, a direction, a freshness.
 
 export function MiniBars({ trend }: { trend: TrendPoint[] }) {
+  const m = useT().tracking.home;
   if (!trend.length) return <Text size="sm" c="dimmed">—</Text>;
   const max = Math.max(1, ...trend.map((t) => Math.max(t.delivered, t.committed ?? 0)));
   const width = 14;
   const gap = 6;
   const height = 34;
-  const label = `Entregues por período: ${trend.map((t) => `${t.label} ${t.delivered}${t.committed != null ? ` de ${t.committed}` : ''}`).join('; ')}`;
+  const label = m.deliveredPerPeriod(trend.map((t) => m.deliveredOf(t.label, t.delivered, t.committed ?? null)).join('; '));
   return (
     <svg width={trend.length * (width + gap)} height={height} role="img" aria-label={label}>
       <title>{label}</title>
@@ -42,6 +44,7 @@ export function MiniBars({ trend }: { trend: TrendPoint[] }) {
 
 export function Throughput({ row }: { row: DashboardRow }) {
   const { current, previous } = row.throughput;
+  const m = useT().tracking.home;
   if (current == null) return <Text size="sm" c="dimmed">—</Text>;
   const delta = previous == null ? 0 : current - previous;
   const Icon = delta > 0 ? IconArrowUpRight : delta < 0 ? IconArrowDownRight : IconMinus;
@@ -52,7 +55,7 @@ export function Throughput({ row }: { row: DashboardRow }) {
       </Text>
       <Icon size={14} aria-hidden />
       <Text size="xs" c="dimmed">
-        {previous == null ? 'sem janela anterior' : `anterior: ${previous}`}
+        {previous == null ? m.noPreviousWindow : m.previous(previous)}
       </Text>
     </Group>
   );
@@ -60,20 +63,21 @@ export function Throughput({ row }: { row: DashboardRow }) {
 
 export function FreshnessCell({ row }: { row: DashboardRow }) {
   const f = row.freshness;
+  const m = useT().tracking.home;
   return (
     <Group gap={6} wrap="nowrap">
-      <Tooltip label={f.last_success_at ? fmtDateTime(f.last_success_at) : 'nunca coletado'}>
+      <Tooltip label={f.last_success_at ? fmtDateTime(f.last_success_at) : m.neverCollected}>
         <Text size="sm">{fromNow(f.last_success_at)}</Text>
       </Tooltip>
       {f.last_error && (
         <Group gap={4} wrap="nowrap">
           <IconPlugConnectedX size={16} color="var(--mantine-color-red-6)" aria-hidden />
-          <InfoTip label={`Última coleta falhou: ${f.last_error}`} about="Falha na última coleta" width={280} />
+          <InfoTip label={m.lastFailed(f.last_error)} about={m.lastFailedAbout} width={280} />
         </Group>
       )}
       {!f.last_error && f.stale && (
-        <Tooltip label="Dados possivelmente desatualizados">
-          <IconAlertTriangle size={16} color="var(--mantine-color-yellow-6)" aria-label="Dados desatualizados" />
+        <Tooltip label={m.maybeStale}>
+          <IconAlertTriangle size={16} color="var(--mantine-color-yellow-6)" aria-label={m.stale} />
         </Tooltip>
       )}
     </Group>
@@ -99,12 +103,13 @@ export function Sparkline({ values, label }: { values: number[]; label: string }
 
 /** A change against the period before, in words as well as an arrow, and whether it is the better direction. */
 export function Delta({ value, better, unit = '' }: { value: number | null; better: 'up' | 'down'; unit?: string }) {
-  if (value == null) return <Text size="xs" c="dimmed">sem período anterior</Text>;
+  const m = useT().tracking.home;
+  if (value == null) return <Text size="xs" c="dimmed">{m.noPreviousPeriod}</Text>;
   if (value === 0) {
     return (
       <Group gap={2}>
         <IconMinus size={12} aria-hidden />
-        <Text size="xs" c="dimmed">igual ao anterior</Text>
+        <Text size="xs" c="dimmed">{m.sameAsBefore}</Text>
       </Group>
     );
   }
@@ -114,9 +119,7 @@ export function Delta({ value, better, unit = '' }: { value: number | null; bett
     <Group gap={2}>
       <Icon size={12} aria-hidden />
       <Text size="xs" c={good ? 'teal.8' : 'red.8'}>
-        {value > 0 ? '+' : ''}
-        {Number.isInteger(value) ? value : value.toFixed(1)}
-        {unit} {good ? '(melhor)' : '(pior)'}
+        {m.delta(`${value > 0 ? '+' : ''}${Number.isInteger(value) ? value : value.toFixed(1)}${unit}`, good)}
       </Text>
     </Group>
   );

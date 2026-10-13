@@ -7,15 +7,10 @@ import { useAllocation, useCapacity, useCreateAllocation, useSimulate, type Simu
 import type { PersonLoad, PlanView, WorkloadState } from '../api/types';
 import { ErrorState, Loading, Stat } from '../components/common';
 import { StateBadge } from '../components/people/indicators';
+import { useT } from '../i18n';
 import { fmtNum, fmtPct } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
 
-const RULES: Record<string, string> = {
-  afinidade_explicita: 'afinidade explícita',
-  afinidade_historica: 'afinidade histórica',
-  capacidade: 'maior folga',
-  sem_capacidade: 'sem capacidade',
-};
 /** The planning's load states are the same rule Pessoas uses, so they read with the same words and badges. */
 const LOAD_STATE: Record<PersonLoad['state'], WorkloadState> = {
   sobrecarga: 'acima',
@@ -26,36 +21,40 @@ const LOAD_STATE: Record<PersonLoad['state'], WorkloadState> = {
 
 function PlanResult({ view }: { view: PlanView }) {
   const comparison = view.comparison;
+  const m = useT().tracking.planning;
   return (
     <Stack gap="md">
       {/* The model's limits are stated where the numbers appear, not only in the PRD. */}
-      <Alert color="yellow" variant="light" icon={<IconScale size={18} />} title="Linha de base heurística, não verdade">
+      <Alert color="yellow" variant="light" icon={<IconScale size={18} />} title={m.disclaimerTitle}>
         {view.disclaimer}
       </Alert>
       {view.plan.warnings.length > 0 && (
-        <Alert color="orange" variant="light" title="Avisos da alocação">
+        <Alert color="orange" variant="light" title={m.warnings}>
           {view.plan.warnings.join(' ')}
         </Alert>
       )}
-      <Stat label="Aderência de atribuição" help={HELP['planning:adherence']} value={fmtPct(comparison.adherence)} hint={`${comparison.matches} de ${comparison.compared} itens caíram em quem o modelo previu`} />
+      <Stat label={m.adherence} help={HELP['planning:adherence']} value={fmtPct(comparison.adherence)} hint={m.adherenceHint(comparison.matches, comparison.compared)} />
       <Text size="sm" c="dimmed">
-        Parâmetros: foco {fmtNum(Number(view.plan.parameters.focus_factor ?? 0), 2)} · {fmtNum(Number(view.plan.parameters.hours_per_point ?? 0))} h/ponto ·{' '}
-        {fmtNum(Number(view.plan.parameters.unestimated_item_hours ?? 0))} h sem estimativa · ajustar em{' '}
+        {m.parameters(
+          fmtNum(Number(view.plan.parameters.focus_factor ?? 0), 2),
+          fmtNum(Number(view.plan.parameters.hours_per_point ?? 0)),
+          fmtNum(Number(view.plan.parameters.unestimated_item_hours ?? 0)),
+        )}{' '}
         <Anchor component={Link} to="/configuracao?tab=perfil" size="sm">
-          Configuração → Perfil do board
+          {m.profileLink}
         </Anchor>
       </Text>
-      <Title order={5}>Carga por pessoa</Title>
+      <Title order={5}>{m.loadByPerson}</Title>
       <Table.ScrollContainer minWidth={700}>
         <Table>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Pessoa</Table.Th>
-              <Table.Th className="num">Capacidade (h)</Table.Th>
-              <Table.Th className="num">Carga prevista (h)</Table.Th>
-              <Table.Th className="num">Carga real (h)</Table.Th>
-              <Table.Th className="num">Desvio</Table.Th>
-              <Table.Th>Leitura</Table.Th>
+              <Table.Th>{m.colPerson}</Table.Th>
+              <Table.Th className="num">{m.colCapacity}</Table.Th>
+              <Table.Th className="num">{m.colPlanned}</Table.Th>
+              <Table.Th className="num">{m.colActual}</Table.Th>
+              <Table.Th className="num">{m.colDeviation}</Table.Th>
+              <Table.Th>{m.colReading}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -74,17 +73,17 @@ function PlanResult({ view }: { view: PlanView }) {
           </Table.Tbody>
         </Table>
       </Table.ScrollContainer>
-      <Title order={5}>Itens: previsto × real</Title>
+      <Title order={5}>{m.itemsTitle}</Title>
       <Table.ScrollContainer minWidth={800}>
         <Table verticalSpacing={4}>
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Item</Table.Th>
-              <Table.Th className="num">Custo (h)</Table.Th>
-              <Table.Th>Regra</Table.Th>
-              <Table.Th>Previsto</Table.Th>
-              <Table.Th>Real</Table.Th>
-              <Table.Th>Coincide</Table.Th>
+              <Table.Th>{m.colItem}</Table.Th>
+              <Table.Th className="num">{m.colCost}</Table.Th>
+              <Table.Th>{m.colRule}</Table.Th>
+              <Table.Th>{m.colPlannedTo}</Table.Th>
+              <Table.Th>{m.colActualTo}</Table.Th>
+              <Table.Th>{m.colMatch}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -96,17 +95,17 @@ function PlanResult({ view }: { view: PlanView }) {
                   </Text>
                 </Table.Td>
                 <Table.Td className="num">{fmtNum(i.cost_hours)}</Table.Td>
-                <Table.Td>{RULES[i.rule] ?? i.rule}</Table.Td>
+                <Table.Td>{m.rules[i.rule] ?? i.rule}</Table.Td>
                 <Table.Td>{i.planned ?? '—'}</Table.Td>
-                <Table.Td>{i.actual ?? 'sem responsável'}</Table.Td>
+                <Table.Td>{i.actual ?? m.unassigned}</Table.Td>
                 <Table.Td>
                   {i.match ? (
                     <Group gap={4}>
-                      <IconCheck size={14} aria-hidden /> sim
+                      <IconCheck size={14} aria-hidden /> {m.yes}
                     </Group>
                   ) : (
                     <Group gap={4}>
-                      <IconX size={14} aria-hidden /> não
+                      <IconX size={14} aria-hidden /> {m.no}
                     </Group>
                   )}
                 </Table.Td>
@@ -126,6 +125,7 @@ function SimulationPanel({ sprintId, people }: { sprintId: number; people: { val
   const [remove, setRemove] = useState<string[]>([]);
   const [extraName, setExtraName] = useState('');
   const [extraHours, setExtraHours] = useState<number | string>('');
+  const m = useT().tracking.planning;
 
   const run = () => {
     const body: Simulation = {};
@@ -133,7 +133,7 @@ function SimulationPanel({ sprintId, people }: { sprintId: number; people: { val
     if (hours !== '') body.hours_per_day = Number(hours);
     if (remove.length) body.remove_people = remove;
     if (extraName && extraHours !== '')
-      body.add_people = [{ account_id: `simulada:${extraName}`, display_name: `${extraName} (simulada)`, capacity_hours: Number(extraHours) }];
+      body.add_people = [{ account_id: `simulada:${extraName}`, display_name: m.simulatedName(extraName), capacity_hours: Number(extraHours) }];
     simulate.mutate(body);
   };
 
@@ -142,22 +142,22 @@ function SimulationPanel({ sprintId, people }: { sprintId: number; people: { val
       <Stack gap="sm">
         <Group gap="xs">
           <IconFlask size={18} />
-          <Title order={5}>E se…? (simulação, nada é gravado)</Title>
+          <Title order={5}>{m.whatIf}</Title>
         </Group>
         <Group align="flex-end" wrap="wrap">
-          <NumberInput label="Fator de foco" min={0.1} max={1} step={0.05} decimalScale={2} value={focus} onChange={setFocus} w={140} />
-          <NumberInput label="Horas por dia" min={1} max={12} value={hours} onChange={setHours} w={130} />
-          <MultiSelect label="Tirar pessoas" data={people} value={remove} onChange={setRemove} w={260} clearable />
-          <TextInput label="Pessoa a mais" placeholder="nome" value={extraName} onChange={(e) => setExtraName(e.currentTarget.value)} w={160} />
-          <NumberInput label="Capacidade (h)" min={0} value={extraHours} onChange={setExtraHours} w={130} />
+          <NumberInput label={m.focusFactor} min={0.1} max={1} step={0.05} decimalScale={2} value={focus} onChange={setFocus} w={140} />
+          <NumberInput label={m.hoursPerDay} min={1} max={12} value={hours} onChange={setHours} w={130} />
+          <MultiSelect label={m.removePeople} data={people} value={remove} onChange={setRemove} w={260} clearable />
+          <TextInput label={m.extraPerson} placeholder={m.extraPersonPlaceholder} value={extraName} onChange={(e) => setExtraName(e.currentTarget.value)} w={160} />
+          <NumberInput label={m.capacity} min={0} value={extraHours} onChange={setExtraHours} w={130} />
           <Button onClick={run} loading={simulate.isPending}>
-            Simular
+            {m.simulate}
           </Button>
         </Group>
         {simulate.error && <ErrorState error={simulate.error} />}
         {simulate.data && (
           <>
-            <Badge variant="outline">resultado simulado</Badge>
+            <Badge variant="outline">{m.simulated}</Badge>
             <PlanResult view={simulate.data} />
           </>
         )}
@@ -171,6 +171,7 @@ export function PlanningTab({ sprintId }: { sprintId: number }) {
   const capacity = useCapacity(sprintId);
   const allocation = useAllocation(sprintId);
   const create = useCreateAllocation(sprintId);
+  const m = useT().tracking.planning;
 
   if (capacity.isLoading || allocation.isLoading) return <Loading rows={6} />;
   if (capacity.error) return <ErrorState error={capacity.error} />;
@@ -180,20 +181,20 @@ export function PlanningTab({ sprintId }: { sprintId: number }) {
   return (
     <Stack gap="lg">
       <Stack gap="xs">
-        <Title order={4}>Capacidade teórica</Title>
+        <Title order={4}>{m.capacityTitle}</Title>
         <Text size="sm" c="dimmed">
-          Dias úteis × horas por dia × fator de foco × dedicação, menos as ausências (Pessoas → Capacidade).
+          {m.capacityHint}
         </Text>
         <Table.ScrollContainer minWidth={640}>
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Pessoa</Table.Th>
-                <Table.Th className="num">Dias úteis</Table.Th>
-                <Table.Th className="num">Ausências</Table.Th>
-                <Table.Th className="num">Horas/dia</Table.Th>
-                <Table.Th className="num">Fator de foco</Table.Th>
-                <Table.Th className="num">Capacidade (h)</Table.Th>
+                <Table.Th>{m.colPerson}</Table.Th>
+                <Table.Th className="num">{m.colWorkingDays}</Table.Th>
+                <Table.Th className="num">{m.colAbsences}</Table.Th>
+                <Table.Th className="num">{m.colHoursPerDay}</Table.Th>
+                <Table.Th className="num">{m.colFocus}</Table.Th>
+                <Table.Th className="num">{m.colCapacity}</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -210,17 +211,17 @@ export function PlanningTab({ sprintId }: { sprintId: number }) {
             </Table.Tbody>
           </Table>
         </Table.ScrollContainer>
-        <Text size="sm">Total: {fmtNum(capacity.data?.total_hours)} h</Text>
+        <Text size="sm">{m.total(fmtNum(capacity.data?.total_hours))}</Text>
       </Stack>
       <Stack gap="xs">
         <Group justify="space-between">
-          <Title order={4}>Distribuição teórica × real</Title>
+          <Title order={4}>{m.distributionTitle}</Title>
           <Button onClick={() => create.mutate()} loading={create.isPending} variant={plan ? 'default' : 'filled'}>
-            {plan ? 'Recalcular' : 'Calcular distribuição teórica'}
+            {plan ? m.recalculate : m.calculate}
           </Button>
         </Group>
         {create.error && <ErrorState error={create.error} />}
-        {plan ? <PlanResult view={plan} /> : <Text size="sm" c="dimmed">Nenhuma distribuição calculada para esta sprint.</Text>}
+        {plan ? <PlanResult view={plan} /> : <Text size="sm" c="dimmed">{m.noPlan}</Text>}
       </Stack>
       <SimulationPanel sprintId={sprintId} people={people} />
     </Stack>

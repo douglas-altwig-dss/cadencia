@@ -33,8 +33,9 @@ import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useSta
 import { Link } from 'react-router';
 
 import type { Situation, SprintTimelineNode, SprintTimelineView, TimelineState } from '../api/types';
+import { type Messages, useT } from '../i18n';
 import { useFilters } from '../lib/filters';
-import { fmtDate, plural } from '../lib/format';
+import { fmtDate } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
 import {
   activeAt,
@@ -62,12 +63,15 @@ import {
 import { InfoTip } from './common';
 import { EvidenceList, RiskBadge, SITUATIONS } from './risk';
 
-const STATE: Record<TimelineState, { label: string; color: string; mantine: string }> = {
-  concluido: { label: 'concluído', color: 'var(--mantine-color-teal-6)', mantine: 'teal' },
-  andamento: { label: 'em andamento', color: 'var(--mantine-color-blue-6)', mantine: 'blue' },
-  bloqueado: { label: 'bloqueado', color: 'var(--mantine-color-red-6)', mantine: 'red' },
-  aberto: { label: 'não iniciado', color: 'var(--mantine-color-gray-5)', mantine: 'gray' },
+/** Colours only; the words are `tracking.timeline.states`, read at render time. */
+const STATE: Record<TimelineState, { color: string; mantine: string }> = {
+  concluido: { color: 'var(--mantine-color-teal-6)', mantine: 'teal' },
+  andamento: { color: 'var(--mantine-color-blue-6)', mantine: 'blue' },
+  bloqueado: { color: 'var(--mantine-color-red-6)', mantine: 'red' },
+  aberto: { color: 'var(--mantine-color-gray-5)', mantine: 'gray' },
 };
+
+type TimelineText = Messages['tracking']['timeline'];
 
 const STATES = Object.keys(STATE) as TimelineState[];
 const ZOOM_MAX = 4;
@@ -75,15 +79,15 @@ const ZOOM_MAX = 4;
 type View = 'hierarquia' | 'pessoa';
 
 /** What kind of thing a row is, by its hierarchy level first (classification never depends on a type name). */
-function kindOf(node: SprintTimelineNode) {
+function kindOf(node: SprintTimelineNode, m: TimelineText) {
   const level = node.issue?.level ?? 1;
   const type = (node.issue?.type ?? '').toLowerCase();
-  if (node.synthetic) return { icon: IconFolder, label: 'Grupo' };
-  if (level > 0) return { icon: IconBolt, label: 'Épico' };
-  if (level < 0) return { icon: IconSubtask, label: 'Subtarefa' };
-  if (type.includes('bug')) return { icon: IconBug, label: 'Bug' };
-  if (/task|tarefa/.test(type)) return { icon: IconChecklist, label: node.issue?.type ?? 'Tarefa' };
-  return { icon: IconBookmark, label: node.issue?.type ?? 'História' };
+  if (node.synthetic) return { icon: IconFolder, label: m.kindGroup };
+  if (level > 0) return { icon: IconBolt, label: m.kindEpic };
+  if (level < 0) return { icon: IconSubtask, label: m.kindSubtask };
+  if (type.includes('bug')) return { icon: IconBug, label: m.kindBug };
+  if (/task|tarefa/.test(type)) return { icon: IconChecklist, label: node.issue?.type ?? m.kindTask };
+  return { icon: IconBookmark, label: node.issue?.type ?? m.kindStory };
 }
 
 const toggled = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
@@ -100,6 +104,7 @@ const toggled = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
  */
 export function SprintTimeline({ view }: { view: SprintTimelineView }) {
   const { carry } = useFilters();
+  const m = useT().tracking.timeline;
   const [mode, setMode] = useState<View>('hierarquia');
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState('');
@@ -209,15 +214,15 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
         <Group justify="space-between" align="baseline" mb="xs" wrap="wrap" gap="xs">
           <Group gap={6} wrap="nowrap">
             <Text fw={600} size="sm">
-              Resumo da sprint
+              {m.summaryTitle}
             </Text>
-            <InfoTip label={HELP['timeline:summary']} about="Resumo da sprint" />
+            <InfoTip label={HELP['timeline:summary']} about={m.summaryTitle} />
           </Group>
           <Text size="sm" c="dimmed">
-            {doneItems} de {plural(summary.items, 'item', 'itens')} concluído{doneItems === 1 ? '' : 's'}
+            {m.summaryDone(doneItems, summary.items)}
           </Text>
         </Group>
-        <Progress.Root size="lg" radius="sm" aria-label={`Itens por situação: ${STATES.map((s) => `${summary.states[s]} ${STATE[s].label}`).join(', ')}`}>
+        <Progress.Root size="lg" radius="sm" aria-label={m.byState(STATES.map((s) => m.stateCount(summary.states[s], m.states[s])).join(', '))}>
           {STATES.filter((s) => summary.states[s] > 0).map((s) => (
             <Progress.Section key={s} value={(summary.states[s] / summary.items) * 100} color={STATE[s].mantine} />
           ))}
@@ -234,7 +239,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                 onClick={() => pickState(s)}
                 leftSection={<span className={`tl-swatch${s === 'bloqueado' ? ' is-striped' : ''}`} style={{ background: STATE[s].color }} aria-hidden />}
               >
-                {summary.states[s]} {STATE[s].label}
+                {m.stateCount(summary.states[s], m.states[s])}
               </Button>
             ))}
           </Group>
@@ -255,7 +260,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                   leftSection={<Icon size={12} stroke={2} aria-hidden />}
                   styles={{ label: { textTransform: 'none', fontWeight: 500 } }}
                 >
-                  {summary.situations[s.key]} {s.label.toLowerCase()}
+                  {m.situationCount(summary.situations[s.key] ?? 0, s.label)}
                 </Badge>
               );
             })}
@@ -263,49 +268,49 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
         </Group>
         <Group gap="xs" mt="md" wrap="nowrap" align="center">
           <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-            Dia {day.day} de {day.total}
+            {m.day(day.day, day.total)}
           </Text>
-          <Progress value={day.share} size="xs" radius="sm" aria-label={`Dia ${day.day} de ${day.total} da sprint`} style={{ flex: 1 }} />
-          <InfoTip label={HELP['timeline:time']} about="Tempo da sprint" />
+          <Progress value={day.share} size="xs" radius="sm" aria-label={m.dayAria(day.day, day.total)} style={{ flex: 1 }} />
+          <InfoTip label={HELP['timeline:time']} about={m.sprintTime} />
         </Group>
       </Paper>
 
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
         <Group align="flex-end" wrap="wrap" gap="sm">
           <SegmentedControl
-            aria-label="Agrupar por"
+            aria-label={m.groupBy}
             value={mode}
             onChange={(value) => setMode(value as View)}
             size="xs"
             data={[
-              { value: 'hierarquia', label: 'Por hierarquia' },
-              { value: 'pessoa', label: 'Por pessoa' },
+              { value: 'hierarquia', label: m.byHierarchy },
+              { value: 'pessoa', label: m.byPerson },
             ]}
           />
           <TextInput
-            aria-label="Buscar item"
-            placeholder="Chave, resumo ou responsável"
+            aria-label={m.search}
+            placeholder={m.searchPlaceholder}
             leftSection={<IconSearch size={14} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
             w={250}
           />
           <Select
-            aria-label="Filtrar por situação"
+            aria-label={m.filterState}
             data={[
-              { value: 'todos', label: 'Todas as situações' },
-              { value: 'andamento', label: 'Em andamento' },
-              { value: 'bloqueado', label: 'Bloqueados' },
-              { value: 'concluido', label: 'Concluídos' },
-              { value: 'aberto', label: 'Não iniciados' },
+              { value: 'todos', label: m.allStates },
+              { value: 'andamento', label: m.inProgress },
+              { value: 'bloqueado', label: m.blocked },
+              { value: 'concluido', label: m.done },
+              { value: 'aberto', label: m.notStarted },
             ]}
             value={state}
             onChange={(value) => setState((value ?? 'todos') as StateFilter)}
             allowDeselect={false}
             w={180}
           />
-          <Switch label="Só em risco" checked={atRisk} onChange={(e) => setAtRisk(e.currentTarget.checked)} mb={6} />
-          <Switch label="Subtarefas" checked={subtasks} onChange={(e) => setSubtasks(e.currentTarget.checked)} mb={6} />
+          <Switch label={m.onlyAtRisk} checked={atRisk} onChange={(e) => setAtRisk(e.currentTarget.checked)} mb={6} />
+          <Switch label={m.subtasks} checked={subtasks} onChange={(e) => setSubtasks(e.currentTarget.checked)} mb={6} />
           {filtered && (
             <Button
               variant="subtle"
@@ -318,13 +323,13 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                 setAtRisk(false);
               }}
             >
-              Limpar filtros
+              {m.clearFilters}
             </Button>
           )}
         </Group>
         <Group gap="sm" wrap="nowrap" align="center">
           <Slider
-            aria-label="Zoom do eixo do tempo"
+            aria-label={m.zoom}
             min={1}
             max={ZOOM_MAX}
             step={0.5}
@@ -341,10 +346,10 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
           {mode === 'hierarquia' && (
             <>
               <Button variant="default" size="xs" onClick={() => setCollapsed(new Set())}>
-                Expandir
+                {m.expand}
               </Button>
               <Button variant="default" size="xs" onClick={() => setCollapsed(new Set(branchKeys(view.nodes)))}>
-                Recolher
+                {m.collapse}
               </Button>
             </>
           )}
@@ -357,7 +362,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
               setScrollToToday(true);
             }}
           >
-            Hoje
+            {m.today}
           </Button>
         </Group>
       </Group>
@@ -365,16 +370,16 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
       <Paper withBorder p="md">
         <Group justify="space-between" mb="sm" wrap="wrap" gap="xs">
           <Text size="xs" c="dimmed">
-            {counts.epicos} {counts.epicos === 1 ? 'épico' : 'épicos'} · {plural(counts.itens, 'item', 'itens')} · {plural(counts.subtarefas, 'subtarefa', 'subtarefas')}
+            {m.counts(counts.epicos, counts.itens, counts.subtarefas)}
           </Text>
           <Text size="xs" c="dimmed" component="span">
-            <span className="tl-end-mark" aria-hidden /> fim da sprint
-            {view.window.today && <> · hoje: {fmtDate(view.window.today)}</>}
+            <span className="tl-end-mark" aria-hidden /> {m.sprintEnd}
+            {view.window.today && m.todayOn(fmtDate(view.window.today))}
           </Text>
         </Group>
         {empty ? (
           <Text size="sm" c="dimmed">
-            {filtered ? 'Nenhum item com esses filtros.' : 'Nenhum item nesta sprint.'}
+            {filtered ? m.noneFiltered : m.none}
           </Text>
         ) : (
           <div ref={scrollRef} className={`tl-scroll${zoom > 1 ? ' is-wide' : ''}`}>
@@ -382,7 +387,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
               ref={listRef}
               className="tl tl-sprint"
               role="list"
-              aria-label={mode === 'pessoa' ? 'Itens da sprint por pessoa' : 'Itens da sprint ao longo do tempo'}
+              aria-label={mode === 'pessoa' ? m.listByPerson : m.listOverTime}
               onMouseMove={onMove}
               onMouseLeave={() => setCursor(null)}
               onKeyDown={onListKey}
@@ -401,7 +406,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                   ))}
                   {cursorLeft != null && cursorDate != null && (
                     <span className={`tl-cursor-label${cursorLeft > 75 ? ' is-left' : ''}`} style={{ left: `${cursorLeft}%` }} aria-hidden>
-                      {fmtDate(new Date(cursorDate).toISOString())} · {plural(cursorLive, 'item', 'itens')} em andamento
+                      {m.cursor(fmtDate(new Date(cursorDate).toISOString()), cursorLive)}
                     </span>
                   )}
                 </div>
@@ -446,10 +451,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
       </Paper>
 
       <Text size="xs" c="dimmed" component="div">
-        Clique numa barra ou num nome para ver o item ao lado. Setas sobem e descem entre as linhas, Enter abre a que estiver focada. Passe o
-        mouse sobre o eixo para ler a data e quantos itens estavam em andamento nela. Cada barra vai de quando o item entrou em andamento até a
-        conclusão, ou até hoje. A ponta cortada à esquerda começou antes da sprint, <IconPlus size={11} style={{ verticalAlign: '-1px' }} aria-hidden /> marca o
-        que entrou depois do início, e a linha tracejada é o fim da sprint; o que passa dela aparece sombreado.
+        {m.helpBefore} <IconPlus size={11} style={{ verticalAlign: '-1px' }} aria-hidden /> {m.helpAfter}
       </Text>
 
       <Drawer
@@ -458,7 +460,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
         position="right"
         size="md"
         title={detail ? `${detail.key}` : ''}
-        aria-label="Detalhes do item"
+        aria-label={m.detailAria}
       >
         {detail && (
           <ItemDetail
@@ -490,7 +492,8 @@ function ItemDetail({
   onPrev?: () => void;
   onNext?: () => void;
 }) {
-  const kind = kindOf(node);
+  const m = useT().tracking.timeline;
+  const kind = kindOf(node, m);
   const Icon = kind.icon;
   const issue = node.issue;
   const days = node.start ? durationDays(node.start, node.end, axis.today) : null;
@@ -504,46 +507,46 @@ function ItemDetail({
           {kind.label}
         </Text>
         <Badge variant="light" color={STATE[node.state].mantine} size="sm">
-          {STATE[node.state].label}
+          {m.states[node.state]}
         </Badge>
         {node.risk && node.risk.situation !== 'em_dia' && isAtRisk(node) && <RiskBadge situation={node.risk.situation} />}
       </Group>
       <Text fw={600}>{node.label}</Text>
       <Stack gap={6}>
-        <DetailLine label="Início" value={node.start ? fmtDate(node.start, true) : 'ainda não começou'} />
-        <DetailLine label="Conclusão" value={node.end ? fmtDate(node.end, true) : node.start ? 'em aberto' : '—'} />
-        <DetailLine label="Duração" value={days != null ? plural(days, 'dia', 'dias') : '—'} />
-        {due && <DetailLine label="Prazo" value={`${fmtDate(due, true)}${late ? ' · vencido' : ''}`} />}
-        <DetailLine label="Responsável" value={issue?.assignee ?? 'Sem responsável'} />
-        {issue?.status && <DetailLine label="Status no Jira" value={issue.status} />}
-        {issue?.estimate != null && <DetailLine label="Estimativa" value={`${issue.estimate} pts`} />}
-        {node.carried && <DetailLine label="Na sprint" value="começou antes da sprint" />}
-        {node.added && <DetailLine label="Na sprint" value="entrou depois do início" />}
+        <DetailLine label={m.start} value={node.start ? fmtDate(node.start, true) : m.notStartedYet} />
+        <DetailLine label={m.end} value={node.end ? fmtDate(node.end, true) : node.start ? m.open : '—'} />
+        <DetailLine label={m.duration} value={days != null ? m.days(days) : '—'} />
+        {due && <DetailLine label={m.due} value={m.dueValue(fmtDate(due, true), late)} />}
+        <DetailLine label={m.assignee} value={issue?.assignee ?? m.unassigned} />
+        {issue?.status && <DetailLine label={m.jiraStatus} value={issue.status} />}
+        {issue?.estimate != null && <DetailLine label={m.estimate} value={m.points(issue.estimate)} />}
+        {node.carried && <DetailLine label={m.inSprint} value={m.carried} />}
+        {node.added && <DetailLine label={m.inSprint} value={m.added} />}
       </Stack>
       {node.risk && node.risk.situation !== 'em_dia' && (
         <Stack gap="xs">
           <Text size="sm" fw={600}>
-            Por que está nesta situação
+            {m.why}
           </Text>
           <EvidenceList risk={node.risk} />
         </Stack>
       )}
       <Group justify="space-between" wrap="nowrap">
         <Group gap="xs" wrap="nowrap">
-          <ActionIcon variant="default" aria-label="Item anterior" disabled={!onPrev} onClick={onPrev}>
+          <ActionIcon variant="default" aria-label={m.previous} disabled={!onPrev} onClick={onPrev}>
             <IconChevronUp size={16} />
           </ActionIcon>
-          <ActionIcon variant="default" aria-label="Próximo item" disabled={!onNext} onClick={onNext}>
+          <ActionIcon variant="default" aria-label={m.next} disabled={!onNext} onClick={onNext}>
             <IconChevronDown size={16} />
           </ActionIcon>
           {at && (
             <Text size="xs" c="dimmed">
-              {at.index + 1} de {at.total}
+              {m.position(at.index + 1, at.total)}
             </Text>
           )}
         </Group>
         <Anchor component={Link} to={link} size="sm">
-          Abrir item <IconChevronRight size={12} style={{ verticalAlign: '-2px' }} aria-hidden />
+          {m.openItem} <IconChevronRight size={12} style={{ verticalAlign: '-2px' }} aria-hidden />
         </Anchor>
       </Group>
     </Stack>
@@ -586,19 +589,19 @@ function LaneBlock({
   onOpen: (key: string) => void;
   onLabelClick: (event: MouseEvent<HTMLDivElement>, key: string) => void;
 }) {
+  const m = useT().tracking.timeline;
   return (
-    <div className="tl-lane" role="group" aria-label={`${lane.name}: ${plural(lane.items, 'item', 'itens')}`}>
+    <div className="tl-lane" role="group" aria-label={m.lane(lane.name, lane.items)}>
       <div className="tl-row tl-lane-head" role="presentation">
         <div className="tl-label">
-          <ActionIcon size="xs" variant="subtle" color="gray" aria-expanded={!folded} aria-label={`${folded ? 'Mostrar' : 'Ocultar'} itens de ${lane.name}`} onClick={onFold}>
+          <ActionIcon size="xs" variant="subtle" color="gray" aria-expanded={!folded} aria-label={folded ? m.showLane(lane.name) : m.hideLane(lane.name)} onClick={onFold}>
             {folded ? <IconChevronRight size={14} /> : <IconChevronDown size={14} />}
           </ActionIcon>
           <Text size="sm" fw={600} lineClamp={1}>
             {lane.name}
           </Text>
           <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-            {plural(lane.items, 'item', 'itens')} · {lane.done} concluído{lane.done === 1 ? '' : 's'}
-            {lane.atRisk > 0 && ` · ${lane.atRisk} em risco`}
+            {m.laneSummary(lane.items, lane.done, lane.atRisk)}
           </Text>
         </div>
         <div className="tl-track tl-track-quiet">
@@ -639,7 +642,8 @@ interface RowProps extends TrackProps {
 /** One row of either reading: its label on the left, its bar on the axis. Focusable, and clickable anywhere but its links. */
 function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onToggle, onOpen, onLabelClick, showOwner = true }: RowProps) {
   const { node, depth, hasChildren, collapsed: folded } = row;
-  const kind = kindOf(node);
+  const m = useT().tracking.timeline;
+  const kind = kindOf(node, m);
   const Icon = kind.icon;
   const container = node.synthetic || (node.issue?.level ?? 0) > 0;
   const bar = barOf(node, axis);
@@ -648,8 +652,8 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
   const from = node.start ? fmtDate(node.start, true) : null;
   const days = node.start ? durationDays(node.start, node.end, axis.today) : 0;
   const span = bar
-    ? `${STATE[node.state].label}, de ${from} ${node.end ? `a ${fmtDate(node.end, true)}` : 'até hoje'}${node.carried ? ' (começou antes da sprint)' : ''}`
-    : `${STATE[node.state].label}: sem início registrado`;
+    ? m.span(m.states[node.state], from ?? '', node.end ? fmtDate(node.end, true) : null, node.carried)
+    : m.noStart(m.states[node.state]);
   const risky = isAtRisk(node) && !container;
   const interactive = !node.synthetic;
 
@@ -669,7 +673,7 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
             variant="subtle"
             color="gray"
             aria-expanded={!folded}
-            aria-label={`${folded ? 'Expandir' : 'Recolher'} ${node.key}`}
+            aria-label={folded ? m.expandKey(node.key) : m.collapseKey(node.key)}
             onClick={() => onToggle(node.key)}
           >
             {folded ? <IconChevronRight size={14} /> : <IconChevronDown size={14} />}
@@ -693,7 +697,7 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
           </Anchor>
         )}
         {node.added && (
-          <span title="Entrou na sprint depois do início" aria-label="Entrou na sprint depois do início" role="img" style={{ display: 'inline-flex' }}>
+          <span title={m.addedAfterStart} aria-label={m.addedAfterStart} role="img" style={{ display: 'inline-flex' }}>
             <IconPlus size={12} color="var(--mantine-color-blue-7)" aria-hidden />
           </span>
         )}
@@ -725,13 +729,13 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
           >
             {!container && bar.width >= 9 && (
               <span className="tl-bar-days" aria-hidden>
-                {days} {days === 1 ? 'dia' : 'dias'}
+                {m.days(days)}
               </span>
             )}
           </span>
         ) : (
           <span className="tl-note" title={span}>
-            {node.issue?.status ?? STATE[node.state].label}
+            {node.issue?.status ?? m.states[node.state]}
           </span>
         )}
         {due != null && due >= axis.start && due <= axis.end && (
@@ -739,8 +743,8 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
             className={`tl-due${late ? ' is-late' : ''}`}
             style={{ left: `${position(due, axis)}%` }}
             role="img"
-            aria-label={`${late ? 'Prazo vencido' : 'Prazo'}: ${fmtDate(node.issue!.due_date, true)}`}
-            title={`${late ? 'Prazo vencido' : 'Prazo'}: ${fmtDate(node.issue!.due_date, true)}`}
+            aria-label={m.dueMark(fmtDate(node.issue!.due_date, true), late)}
+            title={m.dueMark(fmtDate(node.issue!.due_date, true), late)}
           />
         )}
       </div>

@@ -16,6 +16,7 @@ import {
   type TileSize,
   type TileState,
 } from '../../lib/mosaic';
+import { useT } from '../../i18n';
 import { announce } from '../Announcer';
 import { TILE_VIEWS, UnknownTile } from './tiles';
 
@@ -23,8 +24,9 @@ import { TILE_VIEWS, UnknownTile } from './tiles';
 export function MosaicSkeleton({ tiles }: { tiles: TileState[] }) {
   const breakpoint = useBreakpoint();
   const height: Record<TileSize, number> = { P: 120, M: 210, G: 280 };
+  const m = useT().tracking.home;
   return (
-    <div className="mosaic" aria-busy="true" aria-label="Carregando o painel">
+    <div className="mosaic" aria-busy="true" aria-label={m.loading}>
       {tiles.map((tile) => (
         <Skeleton key={tile.id} h={height[tile.size]} radius="md" style={{ gridColumn: `span ${spanFor(tile.size, breakpoint)}` }} />
       ))}
@@ -49,6 +51,7 @@ export function MosaicGrid({ tiles, editing, onChange }: { tiles: TileState[]; e
   const breakpoint = useBreakpoint();
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const m = useT().tracking.home;
 
   const label = (tile: TileState) => entryOf(tile.type)?.label ?? tile.type;
   const side = (id: string) => {
@@ -57,7 +60,7 @@ export function MosaicGrid({ tiles, editing, onChange }: { tiles: TileState[]; e
   };
 
   return (
-    <div className="mosaic" role="list" aria-label="Indicadores do painel">
+    <div className="mosaic" role="list" aria-label={m.gridLabel}>
       {tiles.map((tile, index) => {
         const View = TILE_VIEWS[tile.type] ?? UnknownTile;
         return (
@@ -81,7 +84,7 @@ export function MosaicGrid({ tiles, editing, onChange }: { tiles: TileState[]; e
               event.preventDefault();
               if (dragging && dragging !== tile.id) {
                 onChange(moveTile(tiles, dragging, index));
-                announce(`${label(tiles.find((t) => t.id === dragging)!)} movido para a posição ${index + 1}.`);
+                announce(m.moved(label(tiles.find((t) => t.id === dragging)!), index + 1));
               }
               setDragging(null);
               setOver(null);
@@ -98,51 +101,51 @@ export function MosaicGrid({ tiles, editing, onChange }: { tiles: TileState[]; e
                 <Group gap={4} wrap="nowrap">
                   <SegmentedControl
                     size="xs"
-                    aria-label={`Tamanho de ${label(tile)}`}
+                    aria-label={m.sizeOf(label(tile))}
                     value={tile.size}
                     data={SIZES.map((s) => ({ value: s.value, label: s.label }))}
                     onChange={(value) => {
                       onChange(resizeTile(tiles, tile.id, value as TileSize));
-                      announce(`${label(tile)} agora é ${SIZES.find((s) => s.value === value)?.hint.split(':')[0].toLowerCase()}.`);
+                      announce(m.resized(label(tile), SIZES.find((s) => s.value === value)?.hint.split(':')[0] ?? String(value)));
                     }}
                   />
-                  <Tooltip label="Mover para antes">
+                  <Tooltip label={m.moveBefore}>
                     <ActionIcon
                       size="sm"
                       variant="subtle"
-                      aria-label={`Mover ${label(tile)} para antes`}
+                      aria-label={m.moveBeforeAria(label(tile))}
                       disabled={index === 0}
                       onClick={() => {
                         onChange(shiftTile(tiles, tile.id, -1));
-                        announce(`${label(tile)} na posição ${index}.`);
+                        announce(m.atPosition(label(tile), index));
                       }}
                     >
                       <IconChevronLeft size={14} />
                     </ActionIcon>
                   </Tooltip>
-                  <Tooltip label="Mover para depois">
+                  <Tooltip label={m.moveAfter}>
                     <ActionIcon
                       size="sm"
                       variant="subtle"
-                      aria-label={`Mover ${label(tile)} para depois`}
+                      aria-label={m.moveAfterAria(label(tile))}
                       disabled={index === tiles.length - 1}
                       onClick={() => {
                         onChange(shiftTile(tiles, tile.id, 1));
-                        announce(`${label(tile)} na posição ${index + 2}.`);
+                        announce(m.atPosition(label(tile), index + 2));
                       }}
                     >
                       <IconChevronRight size={14} />
                     </ActionIcon>
                   </Tooltip>
-                  <Tooltip label="Tirar do painel">
+                  <Tooltip label={m.remove}>
                     <ActionIcon
                       size="sm"
                       variant="subtle"
                       color="red"
-                      aria-label={`Tirar ${label(tile)} do painel`}
+                      aria-label={m.removeAria(label(tile))}
                       onClick={() => {
                         onChange(removeTile(tiles, tile.id));
-                        announce(`${label(tile)} removido do painel.`);
+                        announce(m.removed(label(tile)));
                       }}
                     >
                       <IconX size={14} />

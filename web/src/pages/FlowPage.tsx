@@ -6,13 +6,15 @@ import { useBoards, useBoardSprints, useFlow } from '../api/hooks';
 import { Empty, ErrorState, ExportMenu, Freshness, KpiCard, Loading, Note, PageHeader, Percentiles, Stat } from '../components/common';
 import { axisStyle, EChart } from '../components/EChart';
 import { FlowCharts } from '../components/FlowCharts';
+import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
-import { fmtDate, fmtNum, fmtPct, plural } from '../lib/format';
+import { fmtDate, fmtNum, fmtPct } from '../lib/format';
 
 /** RF-20 … RF-22: flow metrics per board, people alphabetical against the boards' median. */
 export function FlowPage() {
   const { get, set, carry } = useFilters();
+  const m = useT().tracking.flow;
   const filters = { board: get('board'), type: get('type'), start: get('start'), end: get('end') };
   const boards = useBoards('', 1, 200, true);
   const flow = useFlow(filters);
@@ -30,37 +32,37 @@ export function FlowPage() {
   return (
     <>
       <PageHeader
-        title="Métricas de fluxo"
-        subtitle="Números para sustentar conversa: percentis com tamanho de amostra, nunca médias ou rankings."
+        title={m.title}
+        subtitle={m.subtitle}
         actions={
           <>
-            <ExportMenu label="Exportar itens" dataset="flow" params={{ board_id: filters.board, type: filters.type, start: filters.start, end: filters.end }} />
-            <ExportMenu label="Exportar por pessoa" dataset="flow_people" params={{ board_id: filters.board, start: filters.start, end: filters.end }} />
+            <ExportMenu label={m.exportItems} dataset="flow" params={{ board_id: filters.board, type: filters.type, start: filters.start, end: filters.end }} />
+            <ExportMenu label={m.exportPeople} dataset="flow_people" params={{ board_id: filters.board, start: filters.start, end: filters.end }} />
           </>
         }
       />
       {soleBoard.data && <Freshness freshness={soleBoard.data.freshness} />}
       <Group align="flex-end" mb="md" wrap="wrap">
         <MultiSelect
-          label="Boards"
-          placeholder="Todos os acompanhados"
+          label={m.boards}
+          placeholder={m.allTracked}
           data={(boards.data?.items ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
           value={filters.board ? filters.board.split(',') : []}
           onChange={(value) => set({ board: value.join(',') })}
           w={280}
           clearable
         />
-        <Select label="Tipo" placeholder="Todos" data={types} value={filters.type ?? null} onChange={(value) => set({ type: value })} clearable w={160} />
+        <Select label={m.type} placeholder={m.all} data={types} value={filters.type ?? null} onChange={(value) => set({ type: value })} clearable w={160} />
         <DatePickerInput
           type="range"
-          label="Período (conclusão)"
-          placeholder="últimas 12 semanas"
-          description={data ? `Período: ${fmtDate(data.period.start, true)} a ${fmtDate(data.period.end, true)}` : undefined}
+          label={m.period}
+          placeholder={m.periodPlaceholder}
+          description={data ? m.periodDescription(fmtDate(data.period.start, true), fmtDate(data.period.end, true)) : undefined}
           value={range}
           onChange={(value) => set({ start: value[0] ?? undefined, end: value[1] ?? undefined })}
           clearable
           w={260}
-          valueFormat="DD/MM/YYYY"
+          valueFormat={m.dateFormat}
         />
       </Group>
       {flow.isLoading && <Loading rows={6} />}
@@ -68,53 +70,53 @@ export function FlowPage() {
       {data && (
         <Stack gap="lg">
           <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-            <Stat label="Itens concluídos" help={HELP['flow:completed']} value={data.summary.completed} />
-            <KpiCard label="Lead time · P85" help={HELP['flow:lead']} value={data.summary.lead_time.n ? `${fmtNum(data.summary.lead_time.p85)} d` : '—'}>
+            <Stat label={m.completed} help={HELP['flow:completed']} value={data.summary.completed} />
+            <KpiCard label={m.leadP85} help={HELP['flow:lead']} value={data.summary.lead_time.n ? m.days(fmtNum(data.summary.lead_time.p85)) : '—'}>
               <Percentiles dist={data.summary.lead_time} />
-              criação → conclusão
+              {m.leadHint}
             </KpiCard>
-            <KpiCard label="Cycle time · P85" help={HELP['flow:cycle']} value={data.summary.cycle_time.n ? `${fmtNum(data.summary.cycle_time.p85)} d` : '—'}>
+            <KpiCard label={m.cycleP85} help={HELP['flow:cycle']} value={data.summary.cycle_time.n ? m.days(fmtNum(data.summary.cycle_time.p85)) : '—'}>
               <Percentiles dist={data.summary.cycle_time} />
-              início → conclusão
+              {m.cycleHint}
             </KpiCard>
-            <Stat label="Em andamento (média diária)" help={HELP['flow:wip']} value={fmtNum(data.wip_average)} />
-            <Stat label="Eficiência de fluxo" help={HELP['flow:efficiency']} value={fmtPct(data.summary.flow_efficiency)} hint="tempo ativo ÷ lead time" />
-            <Stat label="Aderência ao compromisso" help={HELP['flow:adherence']} value={fmtPct(data.commitment_adherence)} hint="mediana das sprints encerradas" />
-            <Stat label="Taxa de arrasto" help={HELP['flow:carryover']} value={fmtPct(data.carryover_rate)} hint="mediana das sprints encerradas" />
-            <Stat label="Taxa de reabertura" help={HELP['flow:reopen']} value={fmtPct(data.summary.reopen_rate)} hint={plural(data.summary.backward_moves, 'transição para trás', 'transições para trás')} />
+            <Stat label={m.wip} help={HELP['flow:wip']} value={fmtNum(data.wip_average)} />
+            <Stat label={m.efficiency} help={HELP['flow:efficiency']} value={fmtPct(data.summary.flow_efficiency)} hint={m.efficiencyHint} />
+            <Stat label={m.adherence} help={HELP['flow:adherence']} value={fmtPct(data.commitment_adherence)} hint={m.closedSprintsMedian} />
+            <Stat label={m.carryover} help={HELP['flow:carryover']} value={fmtPct(data.carryover_rate)} hint={m.closedSprintsMedian} />
+            <Stat label={m.reopen} help={HELP['flow:reopen']} value={fmtPct(data.summary.reopen_rate)} hint={m.backwardMoves(data.summary.backward_moves)} />
           </SimpleGrid>
           {data.summary.completed === 0 ? (
             <Empty
-              title="Nenhum item concluído neste período"
+              title={m.emptyTitle}
               action={
-                filters.start || filters.end ? { label: 'Ampliar o período', onClick: () => set({ start: undefined, end: undefined }) } : undefined
+                filters.start || filters.end ? { label: m.widenPeriod, onClick: () => set({ start: undefined, end: undefined }) } : undefined
               }
             >
-              Os gráficos de vazão e de mix aparecem quando houver conclusões no período escolhido.
+              {m.emptyBody}
             </Empty>
           ) : (
             <SimpleGrid cols={{ base: 1, lg: 2 }}>
               <Paper withBorder p="md">
-                <Title order={4}>Vazão por semana</Title>
+                <Title order={4}>{m.throughput}</Title>
                 <EChart
-                  label={`Itens concluídos por semana: ${data.throughput.map((t) => t.count).join(', ')}`}
+                  label={m.throughputLabel(data.throughput.map((t) => t.count).join(', '))}
                   deps={[data]}
                   height={260}
                   build={(p) => ({
                     tooltip: { trigger: 'axis' },
                     xAxis: { type: 'category', data: data.throughput.map((t) => fmtDate(t.end)), ...axisStyle(p) },
                     yAxis: { type: 'value', minInterval: 1, ...axisStyle(p) },
-                    series: [{ type: 'bar', name: 'Concluídos', itemStyle: { color: p.done }, data: data.throughput.map((t) => t.count) }],
+                    series: [{ type: 'bar', name: m.seriesCompleted, itemStyle: { color: p.done }, data: data.throughput.map((t) => t.count) }],
                   })}
                 />
               </Paper>
               <Paper withBorder p="md">
-                <Title order={4}>Distribuição do trabalho</Title>
+                <Title order={4}>{m.mix}</Title>
                 <Text size="xs" c="dimmed">
-                  Quanto do que saiu foi bug, história, tarefa…
+                  {m.mixHint}
                 </Text>
                 <EChart
-                  label={`Concluídos por tipo: ${Object.entries(data.summary.work_mix).map(([k, v]) => `${k} ${v}`).join(', ')}`}
+                  label={m.mixLabel(Object.entries(data.summary.work_mix).map(([k, v]) => `${k} ${v}`).join(', '))}
                   deps={[data]}
                   height={240}
                   build={(p) => ({
@@ -130,19 +132,19 @@ export function FlowPage() {
           {soleBoardId ? (
             <FlowCharts boardId={soleBoardId} start={filters.start} end={filters.end} />
           ) : (
-            <Note>Escolha um board para ver fluxo cumulativo, cycle time e envelhecimento.</Note>
+            <Note>{m.chooseBoard}</Note>
           )}
           <Stack gap="xs">
-            <Title order={4}>Por pessoa</Title>
-            <Note title="Por que não há ranking">{data.note}</Note>
+            <Title order={4}>{m.byPerson}</Title>
+            <Note title={m.whyNoRanking}>{data.note}</Note>
             <Table.ScrollContainer minWidth={760}>
               <Table>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th>Pessoa (ordem alfabética)</Table.Th>
-                    <Table.Th className="num">Concluídos</Table.Th>
-                    <Table.Th>Cycle time</Table.Th>
-                    <Table.Th>P50 frente à mediana dos boards</Table.Th>
+                    <Table.Th>{m.colPerson}</Table.Th>
+                    <Table.Th className="num">{m.colCompleted}</Table.Th>
+                    <Table.Th>{m.colCycle}</Table.Th>
+                    <Table.Th>{m.colVsMedian}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -163,7 +165,7 @@ export function FlowPage() {
                       </Table.Td>
                       <Table.Td>
                         {p.cycle_time.p50 != null && overallP50 != null
-                          ? `${fmtNum(p.cycle_time.p50)} d vs ${fmtNum(overallP50)} d dos boards`
+                          ? m.vsMedian(fmtNum(p.cycle_time.p50), fmtNum(overallP50))
                           : '—'}
                       </Table.Td>
                     </Table.Tr>

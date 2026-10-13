@@ -5,8 +5,9 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import type { DashboardRow } from '../../api/types';
+import { type Messages, useT } from '../../i18n';
 import { useFilters } from '../../lib/filters';
-import { fmtDate, plural } from '../../lib/format';
+import { fmtDate } from '../../lib/format';
 import { HELP } from '../../lib/indicatorHelp';
 import { InfoTip, ProgressBars, Tipped } from '../common';
 import { RiskCountsInline } from '../risk';
@@ -14,15 +15,12 @@ import { FreshnessCell, MiniBars, Throughput } from './parts';
 
 type ColumnId = 'space' | 'sprint' | 'progress' | 'risk' | 'throughput' | 'trend' | 'data';
 
-const COLUMNS: { id: ColumnId; label: string; help: string }[] = [
-  { id: 'space', label: 'Time (espaço)', help: HELP['col:space'] },
-  { id: 'sprint', label: 'Sprint · janela', help: HELP['col:sprint'] },
-  { id: 'progress', label: 'Progresso da sprint', help: HELP['col:progress'] },
-  { id: 'risk', label: 'Em risco', help: HELP['col:risk'] },
-  { id: 'throughput', label: 'Vazão da janela', help: HELP['col:throughput'] },
-  { id: 'trend', label: 'Tendência', help: HELP['col:trend'] },
-  { id: 'data', label: 'Dados', help: HELP['col:data'] },
-];
+type HomeText = Messages['tracking']['home'];
+
+/** The columns in their default order; the label is `tracking.home.columns[id]`, read at render time. */
+const COLUMN_IDS: ColumnId[] = ['space', 'sprint', 'progress', 'risk', 'throughput', 'trend', 'data'];
+
+const column = (id: ColumnId, m: HomeText) => ({ id, label: m.columns[id], help: HELP[`col:${id}`] });
 
 export interface BoardsConfig {
   order?: ColumnId[];
@@ -31,7 +29,7 @@ export interface BoardsConfig {
 
 /** The stored order, with a column added in a later version at the end instead of never. */
 function ordered(config: BoardsConfig): ColumnId[] {
-  const known = COLUMNS.map((c) => c.id);
+  const known = COLUMN_IDS;
   const kept = (config.order ?? []).filter((id) => known.includes(id));
   return [...kept, ...known.filter((id) => !kept.includes(id))];
 }
@@ -46,7 +44,7 @@ function elapsedOf(row: DashboardRow): number | null {
 }
 
 /** ``compact`` is the desktop table's short risk names; a card on a phone has the room for the full ones. */
-function cell(id: ColumnId, row: DashboardRow, compact = false): ReactNode {
+function cell(id: ColumnId, row: DashboardRow, m: HomeText, compact = false): ReactNode {
   switch (id) {
     case 'space':
       return <Text size="sm">{row.board.space_name ?? row.board.space_key ?? '—'}</Text>;
@@ -56,21 +54,21 @@ function cell(id: ColumnId, row: DashboardRow, compact = false): ReactNode {
           <Text size="sm">{row.sprint.name}</Text>
           {row.window && (
             <Text size="xs" c="dimmed">
-              janela {row.window.index} de {row.window.total} · até {fmtDate(row.window.end)}
+              {m.windowOf(row.window.index, row.window.total, fmtDate(row.window.end))}
             </Text>
           )}
           {row.warnings.length > 0 && (
             <Group gap={4} wrap="nowrap">
               <Text size="xs" c="yellow.8">
-                {plural(row.warnings.length, 'aviso', 'avisos')}
+                {m.warnings(row.warnings.length)}
               </Text>
-              <InfoTip label={row.warnings.join(' ')} about="Avisos da sprint" width={300} />
+              <InfoTip label={row.warnings.join(' ')} about={m.sprintWarnings} width={300} />
             </Group>
           )}
         </>
       ) : (
         <Text size="sm" c="dimmed">
-          fluxo contínuo
+          {m.continuousFlow}
         </Text>
       );
     case 'progress':
@@ -90,6 +88,7 @@ function cell(id: ColumnId, row: DashboardRow, compact = false): ReactNode {
 function ColumnsMenu({ config, onChange }: { config: BoardsConfig; onChange: (next: BoardsConfig) => void }) {
   const order = ordered(config);
   const hidden = config.hidden ?? [];
+  const m = useT().tracking.home;
   const toggle = (id: ColumnId) => onChange({ ...config, order, hidden: hidden.includes(id) ? hidden.filter((h) => h !== id) : [...hidden, id] });
   const move = (id: ColumnId, delta: number) => {
     const next = [...order];
@@ -103,22 +102,22 @@ function ColumnsMenu({ config, onChange }: { config: BoardsConfig; onChange: (ne
     <Menu position="bottom-end" width={280} closeOnItemClick={false} withinPortal>
       <Menu.Target>
         <Button variant="default" size="compact-xs" leftSection={<IconAdjustmentsHorizontal size={14} />}>
-          Colunas
+          {m.columnsButton}
         </Button>
       </Menu.Target>
       <Menu.Dropdown>
-        <Menu.Label>Colunas da tabela</Menu.Label>
+        <Menu.Label>{m.columnsTitle}</Menu.Label>
         <Stack gap={4} px="sm" pb="xs">
           {order.map((id, index) => {
-            const column = COLUMNS.find((c) => c.id === id)!;
+            const label = m.columns[id];
             return (
               <Group key={id} justify="space-between" wrap="nowrap">
-                <Checkbox size="xs" label={column.label} checked={!hidden.includes(id)} onChange={() => toggle(id)} />
+                <Checkbox size="xs" label={label} checked={!hidden.includes(id)} onChange={() => toggle(id)} />
                 <Group gap={2} wrap="nowrap">
-                  <ActionIcon size="sm" variant="subtle" aria-label={`Mover ${column.label} para cima`} disabled={index === 0} onClick={() => move(id, -1)}>
+                  <ActionIcon size="sm" variant="subtle" aria-label={m.moveUp(label)} disabled={index === 0} onClick={() => move(id, -1)}>
                     <IconArrowUp size={12} />
                   </ActionIcon>
-                  <ActionIcon size="sm" variant="subtle" aria-label={`Mover ${column.label} para baixo`} disabled={index === order.length - 1} onClick={() => move(id, 1)}>
+                  <ActionIcon size="sm" variant="subtle" aria-label={m.moveDown(label)} disabled={index === order.length - 1} onClick={() => move(id, 1)}>
                     <IconArrowDown size={12} />
                   </ActionIcon>
                 </Group>
@@ -128,7 +127,7 @@ function ColumnsMenu({ config, onChange }: { config: BoardsConfig; onChange: (ne
         </Stack>
         <Menu.Divider />
         <Menu.Item onClick={() => onChange({})} closeMenuOnClick>
-          Restaurar as colunas
+          {m.resetColumns}
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>
@@ -138,6 +137,7 @@ function ColumnsMenu({ config, onChange }: { config: BoardsConfig; onChange: (ne
 /** RF-86: on a phone each board is a card; a nine-column table does not fit a thumb. */
 function BoardCards({ rows, columns }: { rows: DashboardRow[]; columns: ColumnId[] }) {
   const { carry } = useFilters();
+  const m = useT().tracking.home;
   return (
     <Stack gap="xs">
       {rows.map((row) => (
@@ -159,10 +159,10 @@ function BoardCards({ rows, columns }: { rows: DashboardRow[]; columns: ColumnId
               {columns.map((id) => (
                 <Group key={id} justify="space-between" align="flex-start" wrap="nowrap" gap="sm">
                   <Text size="xs" c="dimmed" w={110}>
-                    {COLUMNS.find((c) => c.id === id)!.label}
-                    <InfoTip label={COLUMNS.find((c) => c.id === id)!.help} width={260} about={COLUMNS.find((c) => c.id === id)!.label} />
+                    {column(id, m).label}
+                    <InfoTip label={column(id, m).help} width={260} about={column(id, m).label} />
                   </Text>
-                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right' }}>{cell(id, row)}</div>
+                  <div style={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', textAlign: 'right' }}>{cell(id, row, m)}</div>
                 </Group>
               ))}
             </Stack>
@@ -178,11 +178,12 @@ export function BoardsTile({ rows, config, onConfig }: { rows: DashboardRow[]; c
   const { carry } = useFilters();
   const phone = useMediaQuery('(max-width: 48em)') ?? false;
   const columns = ordered(config).filter((id) => !(config.hidden ?? []).includes(id));
+  const m = useT().tracking.home;
   return (
     <Stack gap="xs">
       <Group justify="space-between" wrap="nowrap">
         <Text className="kpi-label">
-          <Tipped help={HELP['tile:boards']}>Boards</Tipped>
+          <Tipped help={HELP['tile:boards']}>{m.boards}</Tipped>
         </Text>
         <ColumnsMenu config={config} onChange={onConfig} />
       </Group>
@@ -194,11 +195,11 @@ export function BoardsTile({ rows, config, onConfig }: { rows: DashboardRow[]; c
             <Table highlightOnHover verticalSpacing="sm">
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Board</Table.Th>
+                  <Table.Th>{m.colBoard}</Table.Th>
                   {columns.map((id) => (
                     <Table.Th key={id}>
-                      {COLUMNS.find((c) => c.id === id)!.label}
-                      <InfoTip label={COLUMNS.find((c) => c.id === id)!.help} width={280} about={COLUMNS.find((c) => c.id === id)!.label} />
+                      {column(id, m).label}
+                      <InfoTip label={column(id, m).help} width={280} about={column(id, m).label} />
                     </Table.Th>
                   ))}
                 </Table.Tr>
@@ -221,7 +222,7 @@ export function BoardsTile({ rows, config, onConfig }: { rows: DashboardRow[]; c
                         </Text>
                       </Table.Td>
                     ) : (
-                      columns.map((id) => <Table.Td key={id}>{cell(id, row, true)}</Table.Td>)
+                      columns.map((id) => <Table.Td key={id}>{cell(id, row, m, true)}</Table.Td>)
                     )}
                   </Table.Tr>
                 ))}

@@ -6,21 +6,16 @@ import { useIssue } from '../api/hooks';
 import { ErrorState, Freshness, IssueLink, IssueStatusBadge, Loading, PageHeader, Stat } from '../components/common';
 import { ItemDescription } from '../components/ItemDescription';
 import { EvidenceList, RiskBadge } from '../components/risk';
+import { useT } from '../i18n';
 import { fmtDateTime, fmtDay, fmtDays, fmtNum, fmtPct } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
 
-const FIELD_LABELS: Record<string, string> = {
-  status: 'Status',
-  assignee: 'Responsável',
-  sprint: 'Sprint',
-  estimate: 'Estimativa',
-  flagged: 'Impedimento',
-  parent: 'Pai',
-};
 
 export function IssuePage() {
   const key = useParams().key!;
   const { data, isLoading, error } = useIssue(key);
+  const { tracking } = useT();
+  const m = tracking.issue;
   if (isLoading) return <Loading rows={8} />;
   if (error) return <ErrorState error={error} />;
   if (!data) return null;
@@ -40,44 +35,44 @@ export function IssuePage() {
           <Group gap="xs" component="span">
             <Badge variant="outline">{issue.type}</Badge>
             <IssueStatusBadge status={issue.status} category={issue.category} />
-            <span>{issue.assignee ?? 'Sem responsável'}</span>
-            {issue.due_date && <span>· prazo {fmtDay(issue.due_date)}</span>}
+            <span>{issue.assignee ?? m.unassigned}</span>
+            {issue.due_date && <span>{m.due(fmtDay(issue.due_date))}</span>}
             {issue.url && (
               <Anchor href={issue.url} target="_blank" rel="noreferrer" size="sm">
-                abrir no Jira <IconExternalLink size={12} />
+                {m.openInJira} <IconExternalLink size={12} />
               </Anchor>
             )}
           </Group>
         }
-        crumbs={[{ label: 'Painel', to: '/' }, { label: data.board.name, to: `/boards/${data.board.id}` }, { label: issue.key }]}
+        crumbs={[{ label: tracking.crumbs.home, to: '/' }, { label: data.board.name, to: `/boards/${data.board.id}` }, { label: issue.key }]}
       />
       <Freshness freshness={data.freshness} />
       <Stack gap="lg">
         <Paper withBorder p="md">
           <Group mb="sm" gap="sm">
-            <Title order={4}>Situação</Title>
+            <Title order={4}>{m.situation}</Title>
             <RiskBadge situation={data.risk.situation} />
           </Group>
           <EvidenceList risk={data.risk} />
         </Paper>
         <ItemDescription text={data.description} />
         <SimpleGrid cols={{ base: 2, sm: 4 }}>
-          <Stat label="Lead time" help={HELP['issue:lead']} value={fmtDays(metrics.lead_days)} hint="criação → conclusão" />
-          <Stat label="Cycle time" help={HELP['issue:cycle']} value={fmtDays(metrics.cycle_days)} hint="início do trabalho → conclusão" />
-          <Stat label="Tempo em fila" help={HELP['issue:queue']} value={fmtDays(metrics.queue_days)} hint="antes do início" />
-          <Stat label="Tempo bloqueado" help={HELP['issue:blocked']} value={fmtDays(metrics.blocked_days)} />
-          <Stat label="Tempo ativo" help={HELP['issue:active']} value={fmtDays(metrics.active_days)} />
-          <Stat label="Eficiência de fluxo" help={HELP['issue:efficiency']} value={fmtPct(metrics.flow_efficiency)} hint="ativo ÷ lead time" />
-          <Stat label="Transições para trás" help={HELP['issue:backward']} value={metrics.backward_moves} hint="indicador de retrabalho" />
-          <Stat label="Reaberto" help={HELP['issue:reopened']} value={metrics.reopened ? 'sim' : 'não'} />
+          <Stat label={m.leadTime} help={HELP['issue:lead']} value={fmtDays(metrics.lead_days)} hint={m.leadHint} />
+          <Stat label={m.cycleTime} help={HELP['issue:cycle']} value={fmtDays(metrics.cycle_days)} hint={m.cycleHint} />
+          <Stat label={m.queueTime} help={HELP['issue:queue']} value={fmtDays(metrics.queue_days)} hint={m.queueHint} />
+          <Stat label={m.blockedTime} help={HELP['issue:blocked']} value={fmtDays(metrics.blocked_days)} />
+          <Stat label={m.activeTime} help={HELP['issue:active']} value={fmtDays(metrics.active_days)} />
+          <Stat label={m.efficiency} help={HELP['issue:efficiency']} value={fmtPct(metrics.flow_efficiency)} hint={m.efficiencyHint} />
+          <Stat label={m.backward} help={HELP['issue:backward']} value={metrics.backward_moves} hint={m.backwardHint} />
+          <Stat label={m.reopened} help={HELP['issue:reopened']} value={metrics.reopened ? m.yes : m.no} />
         </SimpleGrid>
         <SimpleGrid cols={{ base: 1, md: 2 }}>
           <Paper withBorder p="md">
             <Title order={5} mb="xs">
-              Hierarquia
+              {m.hierarchy}
             </Title>
             <Text size="sm" c="dimmed">
-              Pai
+              {m.parent}
             </Text>
             {data.parent ? (
               <Group gap={6} wrap="nowrap" justify="space-between">
@@ -85,10 +80,10 @@ export function IssuePage() {
                 <IssueStatusBadge status={data.parent.status} category={data.parent.category} />
               </Group>
             ) : (
-              <Text size="sm">sem pai (“sem épico”)</Text>
+              <Text size="sm">{m.noParent}</Text>
             )}
             <Text size="sm" c="dimmed" mt="sm">
-              Filhos ({data.children.length})
+              {m.children(data.children.length)}
             </Text>
             {data.children.length ? (
               <Stack gap={2}>
@@ -101,25 +96,25 @@ export function IssuePage() {
               </Stack>
             ) : (
               <Text size="sm" c="dimmed">
-                nenhum
+                {m.noChildren}
               </Text>
             )}
             <Text size="sm" c="dimmed" mt="sm">
-              Sprints
+              {m.sprints}
             </Text>
-            <Text size="sm">{data.sprints.map((s) => s.name).join(', ') || 'nenhuma'}</Text>
+            <Text size="sm">{data.sprints.map((s) => s.name).join(', ') || m.noSprints}</Text>
           </Paper>
           <Paper withBorder p="md">
             <Title order={5} mb="xs">
-              Linha do tempo de status
+              {m.statusTimeline}
             </Title>
             <Table verticalSpacing={4}>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Status</Table.Th>
-                  <Table.Th>Coluna</Table.Th>
-                  <Table.Th>Desde</Table.Th>
-                  <Table.Th className="num">Dias</Table.Th>
+                  <Table.Th>{m.colStatus}</Table.Th>
+                  <Table.Th>{m.colColumn}</Table.Th>
+                  <Table.Th>{m.colSince}</Table.Th>
+                  <Table.Th className="num">{m.colDays}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -137,24 +132,24 @@ export function IssuePage() {
         </SimpleGrid>
         <Paper withBorder p="md">
           <Title order={5} mb="xs">
-            Histórico de alterações
+            {m.history}
           </Title>
           <Table.ScrollContainer minWidth={600}>
             <Table verticalSpacing={4}>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Quando</Table.Th>
-                  <Table.Th>Campo</Table.Th>
-                  <Table.Th>De</Table.Th>
-                  <Table.Th>Para</Table.Th>
-                  <Table.Th>Autor</Table.Th>
+                  <Table.Th>{m.colWhen}</Table.Th>
+                  <Table.Th>{m.colField}</Table.Th>
+                  <Table.Th>{m.colFrom}</Table.Th>
+                  <Table.Th>{m.colTo}</Table.Th>
+                  <Table.Th>{m.colAuthor}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
                 {data.transitions.map((t, i) => (
                   <Table.Tr key={`${t.at}-${i}`}>
                     <Table.Td>{fmtDateTime(t.at)}</Table.Td>
-                    <Table.Td>{FIELD_LABELS[t.field] ?? t.field}</Table.Td>
+                    <Table.Td>{m.fields[t.field] ?? t.field}</Table.Td>
                     <Table.Td>{t.from ?? '—'}</Table.Td>
                     <Table.Td>{t.to ?? '—'}</Table.Td>
                     <Table.Td>{t.author ?? '—'}</Table.Td>

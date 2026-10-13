@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { SprintTimelineNode, TimelineState } from '../api/types';
+import { type Locale, setLocaleForTests } from '../i18n';
 import {
   axisOf,
   barOf,
@@ -249,6 +250,15 @@ describe('durationDays', () => {
 });
 
 describe('personLanes', () => {
+  // The unassigned lane is named in the current language; these assertions use the pt-BR wording.
+  let previous: Locale;
+  beforeEach(() => {
+    previous = setLocaleForTests('pt-BR');
+  });
+  afterEach(() => {
+    setLocaleForTests(previous);
+  });
+
   const rows = [
     node('B-1', { assignee: 'Bia', state: 'andamento', start: at(8) }),
     node('A-1', { assignee: 'Ana', state: 'concluido', start: at(7), end: at(8) }),

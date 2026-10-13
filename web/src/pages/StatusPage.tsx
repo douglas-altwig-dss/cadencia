@@ -8,16 +8,17 @@ import type { StatusEntity } from '../api/types';
 import { CollectionProgress } from '../components/CollectionProgress';
 import { ErrorState, Loading, PageHeader, useConfirm } from '../components/common';
 import { HealthPanel } from '../components/HealthPanel';
+import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
-import { fmtDateTime, fromNow, plural } from '../lib/format';
+import { fmtDateTime, fromNow } from '../lib/format';
 
 const STATUS_COLOR: Record<string, string> = { success: 'teal', partial: 'yellow', failed: 'red', running: 'petrol', empty: 'gray' };
-const STATUS_LABEL: Record<string, string> = { success: 'sucesso', partial: 'parcial', failed: 'falhou', running: 'em andamento', empty: 'nada a coletar', cancelled: 'cancelada', skipped: 'ignorada (outra em andamento)' };
 
 function StatusBadge({ status }: { status: string }) {
+  const labels = useT().tracking.status.runStatus;
   return (
     <Badge variant="light" color={STATUS_COLOR[status] ?? 'gray'}>
-      {STATUS_LABEL[status] ?? status}
+      {labels[status] ?? status}
     </Badge>
   );
 }
@@ -29,9 +30,10 @@ const counter = (counters: Record<string, unknown>, key: string) => (counters[ke
 function EntityBadge({ entity }: { entity: StatusEntity['entity'] }) {
   const space = entity === 'space';
   const Icon = space ? IconUsersGroup : IconLayoutKanban;
+  const m = useT().tracking.status;
   return (
     <Badge variant={space ? 'light' : 'default'} color={space ? 'petrol' : 'gray'} leftSection={<Icon size={12} />}>
-      {space ? 'espaço (time)' : 'board'}
+      {space ? m.entitySpace : m.entityBoard}
     </Badge>
   );
 }
@@ -44,22 +46,23 @@ export function StatusPage() {
   const { get, set } = useFilters();
   const tab = get('tab') ?? 'coleta';
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const m = useT().tracking.status;
   const start = (mode: 'incremental' | 'full') =>
     collect.mutate(
       { mode },
       {
         onSuccess: () =>
           notifications.show({
-            title: mode === 'full' ? 'Reconciliação iniciada' : 'Coleta iniciada',
-            message: 'O andamento aparece nesta página.',
+            title: mode === 'full' ? m.fullStarted : m.started,
+            message: m.progressHere,
           }),
       },
     );
   const reconcile = async () => {
     const ok = await confirm({
-      title: 'Reconciliação completa?',
-      body: 'Relê todo o histórico; demora mais e usa mais chamadas à API do Jira.',
-      confirmLabel: 'Reconciliar',
+      title: m.confirmTitle,
+      body: m.confirmBody,
+      confirmLabel: m.confirmLabel,
     });
     if (ok) start('full');
   };
@@ -67,8 +70,8 @@ export function StatusPage() {
   return (
     <>
       <PageHeader
-        title="Status da coleta"
-        subtitle="A coleta acontece por board; a linha do espaço resume os boards do time pela coleta mais antiga. Falha de um board não derruba os outros."
+        title={m.title}
+        subtitle={m.subtitle}
         actions={
           <>
             <Button
@@ -77,26 +80,26 @@ export function StatusPage() {
               loading={collect.isPending || data?.collecting}
               disabled={!data?.jira_configured}
             >
-              Coletar agora
+              {m.collectNow}
             </Button>
             <Button variant="default" onClick={reconcile} disabled={!data?.jira_configured || data?.collecting}>
-              Reconciliação completa
+              {m.fullReconciliation}
             </Button>
           </>
         }
       />
       {status.isLoading && <Loading />}
       {status.error && <ErrorState error={status.error} />}
-      {collect.error && <ErrorState error={collect.error} title="A coleta não pôde começar" />}
+      {collect.error && <ErrorState error={collect.error} title={m.couldNotStart} />}
       {data && !data.jira_configured && (
-        <Alert color="yellow" variant="light" title="Jira não configurado" mb="md">
-          Defina CADENCIA_JIRA_BASE_URL, CADENCIA_JIRA_EMAIL e CADENCIA_JIRA_API_TOKEN no ambiente da API (ou use <code>cadencia demo</code> para dados de exemplo).
+        <Alert color="yellow" variant="light" title={m.jiraNotConfigured} mb="md">
+          {m.jiraBefore} <code>cadencia demo</code> {m.jiraAfter}
         </Alert>
       )}
       <Tabs value={tab} onChange={(value) => set({ tab: value })} mb="md" keepMounted={false}>
         <Tabs.List>
-          <Tabs.Tab value="coleta">Coleta</Tabs.Tab>
-          <Tabs.Tab value="saude">Saúde dos dados</Tabs.Tab>
+          <Tabs.Tab value="coleta">{m.tabCollection}</Tabs.Tab>
+          <Tabs.Tab value="saude">{m.tabHealth}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="saude">
           <HealthPanel />
@@ -106,18 +109,18 @@ export function StatusPage() {
           <Stack gap="lg">
             <CollectionProgress />
             <Stack gap="xs">
-              <Title order={4}>Espaços e boards acompanhados</Title>
+              <Title order={4}>{m.tracked}</Title>
               <Table.ScrollContainer minWidth={1000}>
                 <Table verticalSpacing="sm">
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Tipo</Table.Th>
-                      <Table.Th>Nome</Table.Th>
-                      <Table.Th>Última coleta bem-sucedida</Table.Th>
-                      <Table.Th>Última reconciliação</Table.Th>
-                      <Table.Th>Última execução</Table.Th>
-                      <Table.Th>Itens · históricos · snapshots</Table.Th>
-                      <Table.Th>Causa e ação</Table.Th>
+                      <Table.Th>{m.colType}</Table.Th>
+                      <Table.Th>{m.colName}</Table.Th>
+                      <Table.Th>{m.colLastSuccess}</Table.Th>
+                      <Table.Th>{m.colLastFull}</Table.Th>
+                      <Table.Th>{m.colLastRun}</Table.Th>
+                      <Table.Th>{m.colCounters}</Table.Th>
+                      <Table.Th>{m.colCause}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
@@ -135,13 +138,13 @@ export function StatusPage() {
                             <Text fw={600}>{e.name}</Text>
                           )}
                           <Text size="xs" c="dimmed">
-                            {e.entity === 'space' ? plural(e.boards ?? 0, 'board', 'boards') : e.space.name}
+                            {e.entity === 'space' ? m.boards(e.boards ?? 0) : e.space.name}
                           </Text>
                         </Table.Td>
                         <Table.Td>
                           {fromNow(e.last_success_at)}
                           <Text size="xs" c="dimmed">
-                            {e.entity === 'space' && e.last_success_at ? `mais antiga · ${fmtDateTime(e.last_success_at)}` : fmtDateTime(e.last_success_at)}
+                            {e.entity === 'space' && e.last_success_at ? m.oldest(fmtDateTime(e.last_success_at)) : fmtDateTime(e.last_success_at)}
                           </Text>
                         </Table.Td>
                         <Table.Td>{fmtDateTime(e.last_full_at)}</Table.Td>
@@ -173,27 +176,27 @@ export function StatusPage() {
               </Table.ScrollContainer>
             </Stack>
             <Stack gap="xs">
-              <Title order={4}>Execuções recentes</Title>
+              <Title order={4}>{m.recentRuns}</Title>
               <Table.ScrollContainer minWidth={900}>
                 <Table>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th>Execução</Table.Th>
-                      <Table.Th>Modo</Table.Th>
-                      <Table.Th>Status</Table.Th>
-                      <Table.Th>Início</Table.Th>
-                      <Table.Th>Fim</Table.Th>
-                      <Table.Th className="num">Chamadas</Table.Th>
-                      <Table.Th className="num">Esperas por limite</Table.Th>
-                      <Table.Th className="num">Retentativas</Table.Th>
-                      <Table.Th>Erros por tipo</Table.Th>
+                      <Table.Th>{m.colRun}</Table.Th>
+                      <Table.Th>{m.colMode}</Table.Th>
+                      <Table.Th>{m.colStatus}</Table.Th>
+                      <Table.Th>{m.colStart}</Table.Th>
+                      <Table.Th>{m.colEnd}</Table.Th>
+                      <Table.Th className="num">{m.colCalls}</Table.Th>
+                      <Table.Th className="num">{m.colWaits}</Table.Th>
+                      <Table.Th className="num">{m.colRetries}</Table.Th>
+                      <Table.Th>{m.colErrors}</Table.Th>
                     </Table.Tr>
                   </Table.Thead>
                   <Table.Tbody>
                     {data.runs.map((r) => (
                       <Table.Tr key={r.id}>
                         <Table.Td className="mono">{r.id}</Table.Td>
-                        <Table.Td>{r.mode === 'full' ? 'completa' : 'incremental'}</Table.Td>
+                        <Table.Td>{r.mode === 'full' ? m.modeFull : m.modeIncremental}</Table.Td>
                         <Table.Td>
                           <Group gap={4}>
                             <StatusBadge status={r.status} />
