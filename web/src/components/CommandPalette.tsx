@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router';
 
 import { useSearch, useViews } from '../api/featureHooks';
 import { useCollect } from '../api/hooks';
+import { useT } from '../i18n';
 import type { SearchItem } from '../api/types';
 import { useCommands } from '../lib/commands';
 import { palettePages } from '../lib/navigation';
@@ -20,20 +21,6 @@ interface Entry {
   run: () => void;
 }
 
-const KIND_LABELS: Record<string, string> = {
-  acao: 'ação',
-  pagina: 'página',
-  visao: 'visão salva',
-  board: 'board',
-  sprint: 'sprint',
-  item: 'item',
-  epico: 'épico',
-  iniciativa: 'iniciativa',
-  pessoa: 'pessoa',
-  modelo: 'modelo',
-  comando: 'nesta tela',
-};
-
 const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
 /**
@@ -41,6 +28,7 @@ const fold = (text: string) => text.normalize('NFD').replace(/\p{Diacritic}/gu, 
  * view — or runs an action. Local entries match as you type; the server search joins after a pause.
  */
 export function CommandPalette() {
+  const t = useT();
   const [opened, setOpened] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -85,21 +73,21 @@ export function CommandPalette() {
     const actions: Entry[] = [
       {
         id: 'acao:coletar',
-        label: 'Coletar agora',
-        detail: 'coleta incremental de todos os boards',
+        label: t.shell.palette.collectNow,
+        detail: t.shell.palette.collectNowDetail,
         kind: 'acao',
         run: () => {
           close();
           collect.mutate(
             { mode: 'incremental' },
             {
-              onSuccess: () => notifications.show({ title: 'Coleta iniciada', message: 'Acompanhe em Status da coleta.' }),
-              onError: (error) => notifications.show({ color: 'red', title: 'Coleta não iniciada', message: error.message }),
+              onSuccess: () => notifications.show({ title: t.shell.palette.collectionStarted, message: t.shell.palette.collectionStartedMessage }),
+              onError: (error) => notifications.show({ color: 'red', title: t.shell.palette.collectionNotStarted, message: error.message }),
             },
           );
         },
       },
-      { id: 'acao:atalhos', label: 'Mostrar atalhos de teclado', kind: 'acao', run: () => (close(), openShortcuts()) },
+      { id: 'acao:atalhos', label: t.shell.palette.showShortcuts, kind: 'acao', run: () => (close(), openShortcuts()) },
     ];
     // #21: what the open screen offers comes first — it is what somebody pressing Ctrl+K there wants.
     const local: Entry[] = screen
@@ -132,7 +120,7 @@ export function CommandPalette() {
     }));
     return [...local, ...actions, ...pages, ...saved].filter((e) => matches(`${e.label} ${e.detail ?? ''}`)).concat(remote).slice(0, 40);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, views.data, search.data, screen, opened]);
+  }, [query, views.data, search.data, screen, opened, t]);
 
   useEffect(() => {
     list.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -156,22 +144,22 @@ export function CommandPalette() {
       <Stack gap="xs">
         <TextInput
           data-autofocus
-          placeholder="Buscar board, sprint, item (CAD-14), pessoa, modelo ou ação…"
+          placeholder={t.shell.palette.placeholder}
           leftSection={<IconSearch size={16} />}
           value={query}
           onChange={(event) => setQuery(event.currentTarget.value)}
           onKeyDown={onKeyDown}
-          aria-label="Buscar"
+          aria-label={t.shell.palette.search}
           aria-controls="paleta-resultados"
           aria-activedescendant={entries[active] ? `paleta-${active}` : undefined}
           rightSection={<Kbd size="xs">Esc</Kbd>}
           rightSectionWidth={48}
         />
         <ScrollArea.Autosize mah="55vh" viewportRef={list}>
-          <Stack gap={2} id="paleta-resultados" role="listbox" aria-label="Resultados">
+          <Stack gap={2} id="paleta-resultados" role="listbox" aria-label={t.shell.palette.results}>
             {entries.length === 0 && (
               <Text size="sm" c="dimmed" p="sm">
-                {search.isFetching ? 'Buscando…' : 'Nada encontrado.'}
+                {search.isFetching ? t.shell.palette.searching : t.shell.palette.nothingFound}
               </Text>
             )}
             {entries.map((entry, index) => (
@@ -201,7 +189,7 @@ export function CommandPalette() {
                     )}
                   </Stack>
                   <Badge size="xs" variant="light" color="gray" style={{ flexShrink: 0 }}>
-                    {KIND_LABELS[entry.kind] ?? entry.kind}
+                    {t.shell.palette.kinds[entry.kind] ?? entry.kind}
                   </Badge>
                 </Group>
               </UnstyledButton>
@@ -209,7 +197,7 @@ export function CommandPalette() {
           </Stack>
         </ScrollArea.Autosize>
         <Text size="xs" c="dimmed" px={4}>
-          <Kbd size="xs">↑</Kbd> <Kbd size="xs">↓</Kbd> escolher · <Kbd size="xs">Enter</Kbd> abrir
+          <Kbd size="xs">↑</Kbd> <Kbd size="xs">↓</Kbd> {t.shell.palette.choose} · <Kbd size="xs">Enter</Kbd> {t.shell.palette.open}
         </Text>
       </Stack>
     </Modal>

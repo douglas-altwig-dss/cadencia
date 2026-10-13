@@ -1,15 +1,19 @@
 import { ColorInput, Group, SimpleGrid, Stack, Text, TextInput } from '@mantine/core';
 
 import type { DeckPalette } from '../api/types';
+import { currentLocale, t as messages, useT } from '../i18n';
 import { bestText } from '../lib/contrast';
 
-/** The four deck statuses, in the order a semáforo reads. */
-export const STATUS_NAMES: Record<string, string> = {
-  concluido: 'Concluído',
-  em_dia: 'Em dia',
-  risco: 'Em risco',
-  atrasado: 'Atrasado',
-};
+const STATUS_KEYS = ['concluido', 'em_dia', 'risco', 'atrasado'];
+
+/**
+ * The four deck statuses, in the order a semáforo reads. Each name is read in the current language
+ * when it is read (a getter per key), so nothing holds a copy in the language of the first load.
+ */
+export const STATUS_NAMES: Readonly<Record<string, string>> = Object.defineProperties(
+  {},
+  Object.fromEntries(STATUS_KEYS.map((key) => [key, { enumerable: true, get: () => messages().shell.statusPalette.names[key] }])),
+) as Record<string, string>;
 
 /**
  * RF-62: the one place the status colours and words are configured.
@@ -34,6 +38,8 @@ export function StatusPalette({
   inherited?: DeckPalette;
   columns?: number;
 }) {
+  const t = useT();
+  const w = t.shell.statusPalette;
   return (
     <SimpleGrid cols={columns}>
       {Object.entries(STATUS_NAMES).map(([key, name]) => {
@@ -42,7 +48,7 @@ export function StatusPalette({
         return (
           <Stack key={key} gap={4}>
             <ColorInput
-              label={`Cor: ${name}`}
+              label={w.color(name)}
               format="hex"
               value={colour ? `#${colour}` : ''}
               onChange={(value) =>
@@ -50,18 +56,18 @@ export function StatusPalette({
               }
             />
             <TextInput
-              label={`Rótulo: ${name}`}
+              label={w.label(name)}
               value={labels[key] ?? inherited?.status_labels[key] ?? ''}
               onChange={(event) => onChange({ status_labels: { ...labels, [key]: event.currentTarget.value } })}
             />
             {colour && bestText(colour).ratio < 4.5 && (
               <Text size="xs" c="orange.8">
-                Contraste baixo: o texto mais legível sobre esta cor fica em {bestText(colour).ratio.toFixed(1)}:1 (o mínimo recomendado é 4,5:1).
+                {w.lowContrast(bestText(colour).ratio.toLocaleString(currentLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }))}
               </Text>
             )}
             {inherited && !overridden && (
               <Text size="xs" c="dimmed">
-                herdado da configuração comum
+                {w.inherited}
               </Text>
             )}
           </Stack>

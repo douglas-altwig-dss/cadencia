@@ -30,15 +30,11 @@ import {
   useTestChannel,
 } from '../api/featureHooks';
 import type { DigestSchedule, NotifyChannel, NotifyEvent } from '../api/types';
-import { TIMEZONES, fmtDateTime, plural, weekdays } from '../lib/format';
+import { useT } from '../i18n';
+import { TIMEZONES, fmtDateTime, weekdays } from '../lib/format';
 import { ErrorState, Loading } from './common';
 
-const KINDS = [
-  { value: 'slack', label: 'Slack (webhook)' },
-  { value: 'teams', label: 'Teams (webhook)' },
-  { value: 'webhook', label: 'Webhook JSON' },
-  { value: 'email', label: 'E-mail' },
-];
+const KINDS = ['slack', 'teams', 'webhook', 'email'] as const;
 
 const blank = (): NotifyChannel => ({ name: '', kind: 'slack', target: '', events: ['deck', 'digest'], enabled: true });
 
@@ -48,6 +44,8 @@ const blank = (): NotifyChannel => ({ name: '', kind: 'slack', target: '', event
  * the masked value back keeps the stored one.
  */
 export function NotificationsSettings() {
+  const t = useT();
+  const w = t.shell.notifications;
   const view = useNotifications();
   const save = useSaveChannels();
   const saveDigest = useSaveDigestSchedule();
@@ -73,21 +71,20 @@ export function NotificationsSettings() {
   return (
     <Stack gap="lg" maw={1100}>
       {!data.public_url && (
-        <Alert color="yellow" variant="light" title="Links nas mensagens">
-          Defina <code>CADENCIA_PUBLIC_URL</code> (o endereço em que as pessoas abrem a Cadência) para as mensagens trazerem um link
-          direto para a apresentação ou o painel.
+        <Alert color="yellow" variant="light" title={w.linksTitle}>
+          {w.linksBody(<code key="variable">CADENCIA_PUBLIC_URL</code>)}
         </Alert>
       )}
       <Paper withBorder p="md">
         <Group justify="space-between" mb="sm">
-          <Title order={4}>Canais</Title>
+          <Title order={4}>{w.channels}</Title>
           <Button size="xs" variant="default" leftSection={<IconPlus size={14} />} onClick={() => setDraft([...draft, blank()])}>
-            Adicionar canal
+            {w.addChannel}
           </Button>
         </Group>
         {draft.length === 0 && (
           <Text size="sm" c="dimmed">
-            Nenhum canal. Um webhook de entrada do Slack ou do Teams é o jeito mais simples de começar.
+            {w.noChannels}
           </Text>
         )}
         {draft.length > 0 && (
@@ -95,12 +92,12 @@ export function NotificationsSettings() {
             <Table verticalSpacing="xs">
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Nome</Table.Th>
-                  <Table.Th>Tipo</Table.Th>
-                  <Table.Th>Destino</Table.Th>
-                  <Table.Th>Avisar sobre</Table.Th>
-                  <Table.Th>Ativo</Table.Th>
-                  <Table.Th>Último envio</Table.Th>
+                  <Table.Th>{w.name}</Table.Th>
+                  <Table.Th>{w.type}</Table.Th>
+                  <Table.Th>{w.target}</Table.Th>
+                  <Table.Th>{w.events}</Table.Th>
+                  <Table.Th>{w.enabled}</Table.Th>
+                  <Table.Th>{w.lastSent}</Table.Th>
                   <Table.Th />
                 </Table.Tr>
               </Table.Thead>
@@ -108,23 +105,23 @@ export function NotificationsSettings() {
                 {draft.map((channel, index) => (
                   <Table.Tr key={channel.id ?? `novo-${index}`}>
                     <Table.Td>
-                      <TextInput size="xs" value={channel.name} placeholder="ex.: #time-produto" onChange={(e) => patch(index, { name: e.currentTarget.value })} aria-label="Nome do canal" w={150} />
+                      <TextInput size="xs" value={channel.name} placeholder={w.namePlaceholder} onChange={(e) => patch(index, { name: e.currentTarget.value })} aria-label={w.channelName} w={150} />
                     </Table.Td>
                     <Table.Td>
-                      <Select size="xs" data={KINDS} value={channel.kind} onChange={(value) => value && patch(index, { kind: value as NotifyChannel['kind'] })} allowDeselect={false} w={150} aria-label="Tipo do canal" />
+                      <Select size="xs" data={KINDS.map((kind) => ({ value: kind, label: w.kinds[kind] }))} value={channel.kind} onChange={(value) => value && patch(index, { kind: value as NotifyChannel['kind'] })} allowDeselect={false} w={150} aria-label={w.channelType} />
                     </Table.Td>
                     <Table.Td>
                       <TextInput
                         size="xs"
                         value={channel.target}
-                        placeholder={channel.kind === 'email' ? 'ana@empresa.com, bia@empresa.com' : 'https://hooks.slack.com/services/…'}
+                        placeholder={channel.kind === 'email' ? w.emailPlaceholder : 'https://hooks.slack.com/services/…'}
                         onChange={(e) => patch(index, { target: e.currentTarget.value })}
-                        aria-label="Destino"
+                        aria-label={w.target}
                         w={260}
                       />
                       {channel.kind === 'email' && !data.smtp_configured && (
                         <Text size="xs" c="yellow.8">
-                          SMTP não configurado (CADENCIA_SMTP_HOST)
+                          {w.smtpMissing}
                         </Text>
                       )}
                     </Table.Td>
@@ -140,13 +137,13 @@ export function NotificationsSettings() {
                       </Chip.Group>
                     </Table.Td>
                     <Table.Td>
-                      <Checkbox checked={channel.enabled} onChange={(e) => patch(index, { enabled: e.currentTarget.checked })} aria-label="Canal ativo" />
+                      <Checkbox checked={channel.enabled} onChange={(e) => patch(index, { enabled: e.currentTarget.checked })} aria-label={w.channelEnabled} />
                     </Table.Td>
                     <Table.Td>
                       {channel.last ? (
                         <Tooltip label={channel.last.error ?? fmtDateTime(channel.last.at)} multiline w={260}>
                           <Badge color={channel.last.ok ? 'teal' : 'red'} variant="light" style={{ cursor: 'help' }}>
-                            {channel.last.ok ? 'entregue' : 'falhou'}
+                            {channel.last.ok ? w.delivered : w.failed}
                           </Badge>
                         </Tooltip>
                       ) : (
@@ -157,10 +154,10 @@ export function NotificationsSettings() {
                     </Table.Td>
                     <Table.Td>
                       <Group gap={4} wrap="nowrap">
-                        <Tooltip label={channel.id && !dirty ? 'Enviar uma mensagem de teste' : 'Salve antes de testar'}>
+                        <Tooltip label={channel.id && !dirty ? w.sendTest : w.saveFirst}>
                           <ActionIcon
                             variant="default"
-                            aria-label="Testar canal"
+                            aria-label={w.testChannel}
                             disabled={!channel.id || dirty}
                             loading={test.isPending && test.variables === channel.id}
                             onClick={() =>
@@ -169,8 +166,8 @@ export function NotificationsSettings() {
                                 onSuccess: (r) =>
                                   notifications.show({
                                     color: r.result?.ok ? 'teal' : 'red',
-                                    title: r.result?.ok ? 'Mensagem de teste enviada' : 'O teste falhou',
-                                    message: r.result?.error ?? 'Confira o canal.',
+                                    title: r.result?.ok ? w.testSent : w.testFailed,
+                                    message: r.result?.error ?? w.checkChannel,
                                   }),
                               })
                             }
@@ -178,7 +175,7 @@ export function NotificationsSettings() {
                             <IconSend size={14} />
                           </ActionIcon>
                         </Tooltip>
-                        <ActionIcon variant="subtle" color="red" aria-label="Remover canal" onClick={() => setDraft(draft.filter((_, i) => i !== index))}>
+                        <ActionIcon variant="subtle" color="red" aria-label={w.removeChannel} onClick={() => setDraft(draft.filter((_, i) => i !== index))}>
                           <IconTrash size={14} />
                         </ActionIcon>
                       </Group>
@@ -189,28 +186,27 @@ export function NotificationsSettings() {
             </Table>
           </Table.ScrollContainer>
         )}
-        {save.error && <ErrorState error={save.error} title="Canais não salvos" />}
+        {save.error && <ErrorState error={save.error} title={w.notSaved} />}
         <Group justify="flex-end" mt="sm">
-          <Button disabled={!dirty} loading={save.isPending} onClick={() => save.mutate(draft, { onSuccess: () => notifications.show({ title: 'Canais salvos', message: '' }) })}>
-            Salvar canais
+          <Button disabled={!dirty} loading={save.isPending} onClick={() => save.mutate(draft, { onSuccess: () => notifications.show({ title: w.saved, message: '' }) })}>
+            {w.saveChannels}
           </Button>
         </Group>
       </Paper>
 
       <Paper withBorder p="md">
         <Title order={4} mb="xs">
-          Resumo de riscos
+          {w.digestTitle}
         </Title>
         <Text size="sm" c="dimmed" mb="sm">
-          Uma mensagem por espaço com o que ficou estagnado, bloqueado ou atrasado desde o último checkpoint. Espaço sem novidade não
-          recebe mensagem.
+          {w.digestBody}
         </Text>
         <Stack gap="sm">
-          <Switch label="Enviar o resumo automaticamente" checked={schedule.enabled} onChange={(e) => setSchedule({ ...schedule, enabled: e.currentTarget.checked })} />
+          <Switch label={w.autoSend} checked={schedule.enabled} onChange={(e) => setSchedule({ ...schedule, enabled: e.currentTarget.checked })} />
           <Group gap="md" align="flex-end" wrap="wrap">
             <Stack gap={4}>
               <Text size="sm" fw={500}>
-                Dias
+                {w.days}
               </Text>
               <Chip.Group multiple value={schedule.weekdays.map(String)} onChange={(value) => setSchedule({ ...schedule, weekdays: value.map(Number).sort() })}>
                 <Group gap={4}>
@@ -222,21 +218,21 @@ export function NotificationsSettings() {
                 </Group>
               </Chip.Group>
             </Stack>
-            <NumberInput label="Hora" min={0} max={23} value={schedule.hour} onChange={(v) => setSchedule({ ...schedule, hour: Number(v) || 0 })} w={90} />
-            <Select label="Fuso horário" data={TIMEZONES} value={schedule.timezone} onChange={(v) => v && setSchedule({ ...schedule, timezone: v })} searchable w={220} allowDeselect={false} />
+            <NumberInput label={w.hour} min={0} max={23} value={schedule.hour} onChange={(v) => setSchedule({ ...schedule, hour: Number(v) || 0 })} w={90} />
+            <Select label={w.timezone} data={TIMEZONES} value={schedule.timezone} onChange={(v) => v && setSchedule({ ...schedule, timezone: v })} searchable w={220} allowDeselect={false} />
             <Button
               variant="default"
               loading={saveDigest.isPending}
               disabled={!schedule.weekdays.length}
-              onClick={() => saveDigest.mutate(schedule, { onSuccess: () => notifications.show({ title: 'Agendamento salvo', message: 'O serviço de coleta aplica em até 5 minutos.' }) })}
+              onClick={() => saveDigest.mutate(schedule, { onSuccess: () => notifications.show({ title: w.scheduleSaved, message: w.scheduleSavedMessage }) })}
             >
-              Salvar agendamento
+              {w.saveSchedule}
             </Button>
           </Group>
           {saveDigest.error && <ErrorState error={saveDigest.error} />}
         </Stack>
         <Title order={5} mt="lg" mb="xs">
-          Prévia de hoje
+          {w.todayPreview}
         </Title>
         {digest.isLoading && <Loading rows={2} />}
         {digest.data && (
@@ -246,7 +242,7 @@ export function NotificationsSettings() {
               return (
                 <Paper key={space.space.key ?? 'sem'} withBorder p="xs">
                   <Text size="sm" fw={500}>
-                    {space.space.name}: {plural(risks.length, 'novo risco', 'novos riscos')}
+                    {w.newRisks(space.space.name, risks.length)}
                   </Text>
                   {risks.slice(0, 8).map((r) => (
                     <Text key={r.key} size="xs">
@@ -266,16 +262,16 @@ export function NotificationsSettings() {
                   send.mutate(undefined, {
                     onSuccess: (r) =>
                       notifications.show({
-                        title: r.sent.length ? 'Resumo enviado' : 'Nada novo para enviar',
-                        message: r.sent.map((s) => `${s.space.name}: ${s.new_risks}`).join(' · ') || 'Nenhum espaço tem risco novo desde o último checkpoint.',
+                        title: r.sent.length ? w.digestSent : w.nothingNew,
+                        message: r.sent.map((s) => `${s.space.name}: ${s.new_risks}`).join(' · ') || w.nothingNewMessage,
                       }),
                   })
                 }
               >
-                Enviar agora
+                {w.sendNow}
               </Button>
               <Text size="xs" c="dimmed">
-                vai para os canais marcados com “{data.events.find((e) => e.id === 'digest')?.label}”
+                {w.goesTo(data.events.find((e) => e.id === 'digest')?.label ?? '')}
               </Text>
             </Group>
           </Stack>

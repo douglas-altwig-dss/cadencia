@@ -24,6 +24,7 @@ import { Link } from 'react-router';
 
 import { ApiError, exportUrl } from '../api/client';
 import type { Category, Distribution, Freshness as FreshnessData, IssueBrief, Progress as ProgressData } from '../api/types';
+import { t as messages, useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { fmtDateTime, fmtNum, fmtPct, fromNow } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
@@ -42,6 +43,7 @@ export function PageHeader({
   /** The browser tab's title when ``title`` is not plain text. */
   documentTitle?: string;
 }) {
+  const t = useT();
   const { carry } = useFilters();
   // The tab, the history and a screen reader's page announcement all say where you are.
   const named = documentTitle ?? (typeof title === 'string' ? title : undefined);
@@ -51,7 +53,7 @@ export function PageHeader({
   return (
     <Stack gap={4} mb="lg">
       {crumbs && crumbs.length > 0 && (
-        <Breadcrumbs aria-label="Caminho percorrido" separator="/" separatorMargin={6}>
+        <Breadcrumbs aria-label={t.shell.common.breadcrumbs} separator="/" separatorMargin={6}>
           {crumbs.map((c) =>
             c.to ? (
               <Anchor key={c.label} component={Link} to={carry(c.to)} size="xs" c="dimmed" underline="hover">
@@ -87,6 +89,7 @@ export function PageHeader({
 
 /** RF-35: every screen states when the data was collected; stale or failed data is never silent. */
 export function Freshness({ freshness }: { freshness?: FreshnessData }) {
+  const t = useT();
   if (!freshness) return null;
   const last = freshness.last_success_at;
   const state = freshness.last_error ? 'red' : freshness.stale ? 'yellow' : 'teal';
@@ -95,27 +98,27 @@ export function Freshness({ freshness }: { freshness?: FreshnessData }) {
       <Group gap={6} w="fit-content" wrap="nowrap">
         <Box w={7} h={7} style={{ borderRadius: 99, background: `var(--mantine-color-${state}-6)` }} aria-hidden />
         <Text size="xs" c="dimmed">
-          Dados coletados {fromNow(last)}
+          {t.shell.common.collectedAt(fromNow(last))}
           {last ? ` · ${fmtDateTime(last)}` : ''}
         </Text>
-        <InfoTip label={HELP['freshness']} about="Frescor dos dados" />
+        <InfoTip label={HELP['freshness']} about={t.shell.common.freshness} />
       </Group>
       {freshness.last_error && (
-        <Alert color="red" variant="light" icon={<IconPlugConnectedX size={18} />} title="A última coleta deste board falhou">
+        <Alert color="red" variant="light" icon={<IconPlugConnectedX size={18} />} title={t.shell.common.lastFailedTitle}>
           <Stack gap="xs" align="flex-start">
-            <Text size="sm">{freshness.last_error} — os números abaixo são da última coleta bem-sucedida.</Text>
+            <Text size="sm">{t.shell.common.lastFailedBody(freshness.last_error)}</Text>
             <Button component={Link} to="/status" size="xs" variant="light">
-              Abrir Status da coleta
+              {t.shell.common.openStatus}
             </Button>
           </Stack>
         </Alert>
       )}
       {!freshness.last_error && freshness.stale && (
-        <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={18} />} title="Dados possivelmente desatualizados">
+        <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={18} />} title={t.shell.common.staleTitle}>
           <Stack gap="xs" align="flex-start">
-            <Text size="sm">A última coleta bem-sucedida foi {fromNow(last)}.</Text>
+            <Text size="sm">{t.shell.common.staleBody(fromNow(last))}</Text>
             <Button component={Link} to="/status" size="xs" variant="light">
-              Abrir Status da coleta
+              {t.shell.common.openStatus}
             </Button>
           </Stack>
         </Alert>
@@ -124,7 +127,9 @@ export function Freshness({ freshness }: { freshness?: FreshnessData }) {
   );
 }
 
-export function ErrorState({ error, title = 'Não foi possível carregar' }: { error: unknown; title?: string }) {
+export function ErrorState({ error, title: given }: { error: unknown; title?: string }) {
+  const t = useT();
+  const title = given ?? t.shell.common.loadFailed;
   const apiError = error instanceof ApiError ? error : null;
   return (
     <Alert color="red" variant="light" title={apiError ? `${title}: ${apiError.reason}` : title} icon={<IconAlertTriangle size={18} />}>
@@ -132,7 +137,7 @@ export function ErrorState({ error, title = 'Não foi possível carregar' }: { e
         <Text size="sm">{apiError?.message ?? String(error)}</Text>
         {apiError?.action && (
           <Text size="sm" fw={500}>
-            O que fazer: {apiError.action}
+            {t.shell.common.whatToDo(apiError.action)}
           </Text>
         )}
       </Stack>
@@ -141,8 +146,9 @@ export function ErrorState({ error, title = 'Não foi possível carregar' }: { e
 }
 
 export function Loading({ rows = 4 }: { rows?: number }) {
+  const t = useT();
   return (
-    <Stack gap="xs" aria-busy="true" aria-label="Carregando">
+    <Stack gap="xs" aria-busy="true" aria-label={t.shell.common.loading}>
       {Array.from({ length: rows }, (_, i) => (
         <Skeleton key={i} h={28} />
       ))}
@@ -217,6 +223,7 @@ export function Note({ children, title, color = 'petrol' }: { children: ReactNod
 }
 
 export function IssueLink({ issue, showSummary = true }: { issue: Pick<IssueBrief, 'key' | 'summary' | 'url'>; showSummary?: boolean }) {
+  const t = useT();
   const { carry } = useFilters();
   return (
     <Group gap={6} wrap="nowrap">
@@ -229,7 +236,7 @@ export function IssueLink({ issue, showSummary = true }: { issue: Pick<IssueBrie
         </Text>
       )}
       {issue.url && (
-        <Anchor href={issue.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${issue.key} no Jira`} c="dimmed">
+        <Anchor href={issue.url} target="_blank" rel="noreferrer" aria-label={t.shell.common.openInJira(issue.key)} c="dimmed">
           <IconExternalLink size={14} />
         </Anchor>
       )}
@@ -251,7 +258,8 @@ export function IssueStatusBadge({ status, category }: { status: string; categor
 
 /** A flat list of keys, each resolved to its own `IssueLink` when its brief was fetched. */
 export function KeyList({ keys, items }: { keys: string[]; items: Record<string, IssueBrief> }) {
-  if (!keys.length) return <Text size="sm" c="dimmed">nenhum</Text>;
+  const t = useT();
+  if (!keys.length) return <Text size="sm" c="dimmed">{t.shell.common.none}</Text>;
   return (
     <Stack gap={2}>
       {keys.map((k) => (items[k] ? <IssueLink key={k} issue={items[k]} /> : <Text key={k} size="sm" className="mono">{k}</Text>))}
@@ -280,7 +288,8 @@ export function KeyRow({ k, items }: { k: string; items: Record<string, IssueBri
  * it — `sprint_overview`/`board_overview` both do) falls back to the flat row it always was.
  */
 export function GroupedKeyList({ keys, items }: { keys: string[]; items: Record<string, IssueBrief> }) {
-  if (!keys.length) return <Text size="sm" c="dimmed">nenhum</Text>;
+  const t = useT();
+  if (!keys.length) return <Text size="sm" c="dimmed">{t.shell.common.none}</Text>;
   const groups = new Map<string, string[]>();
   const loose: string[] = [];
   for (const k of keys) {
@@ -307,7 +316,7 @@ export function GroupedKeyList({ keys, items }: { keys: string[]; items: Record<
           <Group gap={6} wrap="nowrap" justify="space-between">
             <Group gap={6} wrap="nowrap">
               <Badge size="xs" variant="light" color="gray">
-                épico
+                {t.shell.common.epic}
               </Badge>
               <IssueLink issue={items[epicKey]} />
             </Group>
@@ -333,10 +342,11 @@ export function ProgressBars({
   /** How much of the sprint's time has passed, 0 to 1: a mark on the items bar to read the work against. */
   elapsed?: number | null;
 }) {
+  const t = useT();
   if (!progress || progress.total === 0) return <Text size="sm" c="dimmed">—</Text>;
   const count = (progress.count_ratio ?? 0) * 100;
   const estimate = (progress.estimate_ratio ?? 0) * 100;
-  const countLabel = `Itens concluídos: ${fmtPct(progress.count_ratio)}`;
+  const countLabel = t.shell.common.itemsDone(fmtPct(progress.count_ratio));
   return (
     <Stack gap={4} miw={compact ? 150 : 200}>
       <Group gap="xs" wrap="nowrap">
@@ -344,7 +354,7 @@ export function ProgressBars({
           <Progress
             value={count}
             size="sm"
-            aria-label={elapsed == null ? countLabel : `${countLabel}. Tempo da sprint passado: ${Math.round(elapsed * 100)}%`}
+            aria-label={elapsed == null ? countLabel : t.shell.common.sprintElapsed(countLabel, Math.round(elapsed * 100))}
           />
           {elapsed != null && (
             <span
@@ -355,7 +365,7 @@ export function ProgressBars({
           )}
         </Box>
         <Text size="xs" className="num" w={88}>
-          {progress.done}/{progress.total} itens
+          {t.shell.common.itemsCount(progress.done, progress.total)}
         </Text>
       </Group>
       <Group gap="xs" wrap="nowrap">
@@ -364,18 +374,18 @@ export function ProgressBars({
           size="sm"
           color="gray"
           style={{ flex: 1 }}
-          aria-label={`Estimativa concluída: ${fmtPct(progress.estimate_ratio)}`}
+          aria-label={t.shell.common.estimateDone(fmtPct(progress.estimate_ratio))}
         />
         <Text size="xs" className="num" w={88}>
-          {fmtNum(progress.estimate_done)}/{fmtNum(progress.estimate_total)} pts
+          {t.shell.common.points(fmtNum(progress.estimate_done), fmtNum(progress.estimate_total))}
         </Text>
       </Group>
       {progress.coverage_warning && (
         <Group gap={4} wrap="nowrap">
           <Badge variant="outline" color="yellow" size="xs" leftSection={<IconAlertTriangle size={10} />}>
-            cobertura {fmtPct(progress.coverage)}
+            {t.shell.common.coverage(fmtPct(progress.coverage))}
           </Badge>
-          <InfoTip label={`${HELP['progress:coverage']}\n\n${progress.coverage_warning}`} about="Cobertura" width={280} />
+          <InfoTip label={`${HELP['progress:coverage']}\n\n${progress.coverage_warning}`} about={t.shell.common.coverageAbout} width={280} />
         </Group>
       )}
     </Stack>
@@ -383,8 +393,10 @@ export function ProgressBars({
 }
 
 /** RF-22: percentiles always with the sample size; small samples are flagged. */
-export function Percentiles({ dist, unit = 'd' }: { dist: Distribution; unit?: string }) {
-  if (!dist.n) return <Text size="sm" c="dimmed">sem amostra</Text>;
+export function Percentiles({ dist, unit: given }: { dist: Distribution; unit?: string }) {
+  const t = useT();
+  const unit = given ?? t.shell.format.dayUnit;
+  if (!dist.n) return <Text size="sm" c="dimmed">{t.shell.common.noSample}</Text>;
   return (
     <Group gap="xs" wrap="wrap">
       <Text size="sm" className="num">
@@ -396,9 +408,9 @@ export function Percentiles({ dist, unit = 'd' }: { dist: Distribution; unit?: s
       {dist.low_confidence && (
         <Group gap={4} wrap="nowrap">
           <Badge size="xs" variant="outline" color="yellow">
-            baixa confiança
+            {t.shell.common.lowConfidence}
           </Badge>
-          <InfoTip label={HELP['sample:low']} about="Confiança da amostra" />
+          <InfoTip label={HELP['sample:low']} about={t.shell.common.sampleConfidence} />
         </Group>
       )}
     </Group>
@@ -415,6 +427,7 @@ export function Percentiles({ dist, unit = 'd' }: { dist: Distribution; unit?: s
  * be a button inside a button: it becomes a plain hover-only mark.
  */
 export function InfoTip({ label, width = 320, about, nested = false }: { label: ReactNode; width?: number; about?: string; nested?: boolean }) {
+  const t = useT();
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -429,7 +442,7 @@ export function InfoTip({ label, width = 320, about, nested = false }: { label: 
     return () => document.removeEventListener('pointerdown', away);
   }, [pinned]);
 
-  const name = about ? `Como é calculado: ${about}` : 'Mais informações';
+  const name = about ? t.shell.common.howCalculated(about) : t.shell.common.moreInfo;
   // A long explanation reads better as paragraphs: a blank line in the text starts a new one.
   const body =
     typeof label === 'string' && label.includes('\n\n') ? (
@@ -581,6 +594,7 @@ interface ConfirmRequest {
  * agreed; render ``dialog`` once in the component that calls it.
  */
 export function useConfirm() {
+  const t = useT();
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   const confirm = useCallback(
     (options: Omit<ConfirmRequest, 'resolve'>) => new Promise<boolean>((resolve) => setRequest({ ...options, resolve })),
@@ -596,7 +610,7 @@ export function useConfirm() {
         <Text size="sm">{request?.body}</Text>
         <Group justify="flex-end" gap="xs">
           <Button variant="default" onClick={() => settle(false)}>
-            Cancelar
+            {t.shell.common.cancel}
           </Button>
           <Button color="red" onClick={() => settle(true)}>
             {request?.confirmLabel}
@@ -623,7 +637,7 @@ export function notifyUndo(title: string, undo: () => void) {
           undo();
         }}
       >
-        Desfazer
+        {messages().shell.common.undo}
       </Button>
     ),
     autoClose: 8000,
@@ -633,22 +647,23 @@ export function notifyUndo(title: string, undo: () => void) {
 export function ExportMenu({
   dataset,
   params,
-  label = 'Exportar',
+  label,
 }: {
   dataset: string;
   params: Record<string, string | number | undefined>;
   label?: string;
 }) {
+  const t = useT();
   return (
     <Menu position="bottom-end" withinPortal>
       <Menu.Target>
         <Button variant="default" size="xs" leftSection={<IconDownload size={14} />}>
-          {label}
+          {label ?? t.shell.common.export}
         </Button>
       </Menu.Target>
       <Menu.Dropdown>
         <Menu.Item component="a" href={exportUrl(dataset, { ...params, format: 'csv' })}>
-          CSV (Excel)
+          {t.shell.common.csv}
         </Menu.Item>
         <Menu.Item component="a" href={exportUrl(dataset, { ...params, format: 'json' })}>
           JSON

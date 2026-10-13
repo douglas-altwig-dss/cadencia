@@ -1,6 +1,8 @@
 import { Button, Paper, Stack, Text, Title } from '@mantine/core';
 import { useState } from 'react';
 
+import { useT } from '../i18n';
+
 /** Past this many characters the text is folded, so a long spec does not push the numbers away. */
 const FOLD_AFTER = 900;
 
@@ -34,6 +36,7 @@ function blocksOf(text: string): Block[] {
 
 /** The item's description, shown on every detail page: epic, story, task, subtask, bug. */
 export function ItemDescription({ text }: { text: string | null | undefined }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const value = (text ?? '').trim();
   const long = value.length > FOLD_AFTER;
@@ -42,7 +45,7 @@ export function ItemDescription({ text }: { text: string | null | undefined }) {
   return (
     <Paper withBorder p="md">
       <Title order={5} mb="xs">
-        Descrição
+        {t.shell.description.title}
       </Title>
       {value ? (
         <>
@@ -61,13 +64,13 @@ export function ItemDescription({ text }: { text: string | null | undefined }) {
           </Stack>
           {long && (
             <Button variant="subtle" size="compact-sm" mt="xs" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-              {open ? 'Mostrar menos' : 'Mostrar tudo'}
+              {open ? t.shell.description.showLess : t.shell.description.showAll}
             </Button>
           )}
         </>
       ) : (
         <Text size="sm" c="dimmed">
-          Sem descrição no Jira.
+          {t.shell.description.empty}
         </Text>
       )}
     </Paper>

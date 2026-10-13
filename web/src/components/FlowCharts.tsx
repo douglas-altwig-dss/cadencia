@@ -1,7 +1,8 @@
 import { Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 
 import { useAging, useCfd, useCvd, useScatter } from '../api/hooks';
-import { fmtDate, fmtNum } from '../lib/format';
+import { useT } from '../i18n';
+import { fmtDate, fmtDays, fmtNum } from '../lib/format';
 import { Empty, ErrorState, Loading, Percentiles } from './common';
 import { axisStyle, EChart } from './EChart';
 
@@ -20,19 +21,20 @@ function ChartCard({ title, caption, children }: { title: string; caption: strin
 }
 
 function CumulativeFlow({ boardId, start, end }: { boardId: number; start?: string; end?: string }) {
+  const t = useT();
   const { data, isLoading, error } = useCfd(boardId, start, end);
   if (isLoading) return <Loading />;
   if (error) return <ErrorState error={error} />;
-  if (!data || !data.dates.length) return <Empty title="Sem dados no período" action={{ label: 'Ver o status da coleta', to: '/status' }}>Amplie o período nos filtros ou confira se a última coleta deste board terminou.</Empty>;
+  if (!data || !data.dates.length) return <Empty title={t.shell.flowCharts.noData} action={{ label: t.shell.flowCharts.seeStatus, to: '/status' }}>{t.shell.flowCharts.noDataBody}</Empty>;
   const columns = [...data.columns].reverse(); // done at the bottom, backlog on top
   return (
     <EChart
-      label={`Fluxo cumulativo de ${data.dates[0]} a ${data.dates[data.dates.length - 1]} por coluna: ${data.columns.map((c) => c.name).join(', ')}`}
+      label={t.shell.flowCharts.cfdLabel(data.dates[0], data.dates[data.dates.length - 1], data.columns.map((c) => c.name).join(', '))}
       deps={[data]}
       build={(p) => ({
         tooltip: { trigger: 'axis' },
         legend: { top: 0, textStyle: { color: p.text } },
-        xAxis: { type: 'category', boundaryGap: false, data: data.dates.map((d) => d.slice(8, 10) + '/' + d.slice(5, 7)), ...axisStyle(p) },
+        xAxis: { type: 'category', boundaryGap: false, data: data.dates.map((d) => t.shell.format.dayMonth(d.slice(8, 10), d.slice(5, 7))), ...axisStyle(p) },
         yAxis: { type: 'value', minInterval: 1, ...axisStyle(p) },
         color: [p.done, p.progress, p.warn, p.todo, p.added, p.risk],
         series: columns.map((c) => ({ name: c.name, type: 'line', stack: 'cfd', areaStyle: { opacity: 0.85 }, symbol: 'none', lineStyle: { width: 0.5 }, data: c.counts })),
@@ -42,30 +44,31 @@ function CumulativeFlow({ boardId, start, end }: { boardId: number; start?: stri
 }
 
 function CycleScatter({ boardId, start, end }: { boardId: number; start?: string; end?: string }) {
+  const t = useT();
   const { data, isLoading, error } = useScatter(boardId, start, end);
   if (isLoading) return <Loading />;
   if (error) return <ErrorState error={error} />;
-  if (!data || !data.points.length) return <Empty title="Nenhum item concluído no período">Amplie o período nos filtros: o gráfico precisa de itens que já terminaram para mostrar o tempo de ciclo.</Empty>;
+  if (!data || !data.points.length) return <Empty title={t.shell.flowCharts.noneDone}>{t.shell.flowCharts.noneDoneBody}</Empty>;
   const pct = data.percentiles;
   const lines = (['p50', 'p85', 'p95'] as const)
     .filter((k) => pct[k] != null)
-    .map((k) => ({ yAxis: pct[k] as number, name: k.toUpperCase(), label: { formatter: `${k.toUpperCase()} ${fmtNum(pct[k])} d` } }));
+    .map((k) => ({ yAxis: pct[k] as number, name: k.toUpperCase(), label: { formatter: `${k.toUpperCase()} ${fmtDays(pct[k])}` } }));
   return (
     <Stack gap={4}>
       <Percentiles dist={pct} />
       <EChart
-        label={`Cycle time de ${data.points.length} itens concluídos; P50 ${fmtNum(pct.p50)} dias, P85 ${fmtNum(pct.p85)}, P95 ${fmtNum(pct.p95)}`}
+        label={t.shell.flowCharts.scatterLabel(data.points.length, fmtNum(pct.p50), fmtNum(pct.p85), fmtNum(pct.p95))}
         deps={[data]}
         build={(p) => ({
           tooltip: {
             trigger: 'item',
             formatter: (params: unknown) => {
               const v = (params as { data: [string, number, string, string] }).data;
-              return `${v[2]} — ${v[3]}<br/>${fmtNum(v[1])} dias · concluído em ${fmtDate(v[0])}`;
+              return `${v[2]} — ${v[3]}<br/>${t.shell.flowCharts.scatterTip(fmtNum(v[1]), fmtDate(v[0]))}`;
             },
           },
           xAxis: { type: 'time', ...axisStyle(p) },
-          yAxis: { type: 'value', name: 'dias', ...axisStyle(p) },
+          yAxis: { type: 'value', name: t.shell.flowCharts.days, ...axisStyle(p) },
           series: [
             {
               type: 'scatter',
@@ -82,26 +85,27 @@ function CycleScatter({ boardId, start, end }: { boardId: number; start?: string
 }
 
 function AgingChart({ boardId }: { boardId: number }) {
+  const t = useT();
   const { data, isLoading, error } = useAging(boardId);
   if (isLoading) return <Loading />;
   if (error) return <ErrorState error={error} />;
-  if (!data || !data.items.length) return <Empty title="Nenhum item em andamento">Nada nas colunas de andamento deste board agora. Se isso não bate com o Jira, confira as colunas em Configuração → Perfil do board.</Empty>;
+  if (!data || !data.items.length) return <Empty title={t.shell.flowCharts.noneInProgress}>{t.shell.flowCharts.noneInProgressBody}</Empty>;
   const columns = data.columns.length ? data.columns : [...new Set(data.items.map((i) => i.column))];
   const p85 = data.percentiles.p85;
   return (
     <EChart
-      label={`${data.items.length} itens em andamento por coluna; limite P85 histórico ${fmtNum(p85)} dias`}
+      label={t.shell.flowCharts.agingLabel(data.items.length, fmtNum(p85))}
       deps={[data]}
       build={(p) => ({
         tooltip: {
           trigger: 'item',
           formatter: (params: unknown) => {
             const v = (params as { data: [string, number, string, string, string | null] }).data;
-            return `${v[2]} — ${v[3]}<br/>${fmtNum(v[1])} dias em andamento${v[4] ? ` · ${v[4]}` : ''}`;
+            return `${v[2]} — ${v[3]}<br/>${t.shell.flowCharts.agingTip(fmtNum(v[1]))}${v[4] ? ` · ${v[4]}` : ''}`;
           },
         },
         xAxis: { type: 'category', data: columns, ...axisStyle(p) },
-        yAxis: { type: 'value', name: 'dias', ...axisStyle(p) },
+        yAxis: { type: 'value', name: t.shell.flowCharts.days, ...axisStyle(p) },
         series: [
           {
             type: 'scatter',
@@ -113,7 +117,7 @@ function AgingChart({ boardId }: { boardId: number }) {
             })),
             markLine:
               p85 != null
-                ? { symbol: 'none', lineStyle: { color: p.warn, type: 'dashed' }, label: { formatter: `P85 ${fmtNum(p85)} d`, color: p.text }, data: [{ yAxis: p85 }] }
+                ? { symbol: 'none', lineStyle: { color: p.warn, type: 'dashed' }, label: { formatter: `P85 ${fmtDays(p85)}`, color: p.text }, data: [{ yAxis: p85 }] }
                 : undefined,
           },
         ],
@@ -123,14 +127,15 @@ function AgingChart({ boardId }: { boardId: number }) {
 }
 
 function CommittedVsDelivered({ boardId }: { boardId: number }) {
+  const t = useT();
   const { data, isLoading, error } = useCvd(boardId);
   if (isLoading) return <Loading />;
   if (error) return <ErrorState error={error} />;
-  if (!data || !data.items.length) return <Empty title="Sem sprints para comparar">O comparativo aparece depois da primeira sprint encerrada com compromisso registrado.</Empty>;
+  if (!data || !data.items.length) return <Empty title={t.shell.flowCharts.noSprints}>{t.shell.flowCharts.noSprintsBody}</Empty>;
   const rows = data.items;
   return (
     <EChart
-      label={`Comprometido versus entregue: ${rows.map((r) => `${r.sprint.name} ${r.delivered} de ${r.committed}, ${r.added} adicionados`).join('; ')}`}
+      label={t.shell.flowCharts.cvdLabel(rows.map((r) => t.shell.flowCharts.cvdRow(r.sprint.name, r.delivered, r.committed, r.added)).join('; '))}
       deps={[data]}
       build={(p) => ({
         tooltip: { trigger: 'axis' },
@@ -138,9 +143,9 @@ function CommittedVsDelivered({ boardId }: { boardId: number }) {
         xAxis: { type: 'category', data: rows.map((r) => r.sprint.name), ...axisStyle(p) },
         yAxis: { type: 'value', minInterval: 1, ...axisStyle(p) },
         series: [
-          { name: 'Comprometido no início', type: 'bar', itemStyle: { color: p.todo }, data: rows.map((r) => r.committed) },
-          { name: 'Entregue do compromisso', type: 'bar', itemStyle: { color: p.done }, data: rows.map((r) => r.delivered) },
-          { name: 'Escopo adicionado', type: 'bar', itemStyle: { color: p.added }, data: rows.map((r) => r.added) },
+          { name: t.shell.flowCharts.committed, type: 'bar', itemStyle: { color: p.todo }, data: rows.map((r) => r.committed) },
+          { name: t.shell.flowCharts.delivered, type: 'bar', itemStyle: { color: p.done }, data: rows.map((r) => r.delivered) },
+          { name: t.shell.flowCharts.added, type: 'bar', itemStyle: { color: p.added }, data: rows.map((r) => r.added) },
         ],
       })}
     />
@@ -149,18 +154,19 @@ function CommittedVsDelivered({ boardId }: { boardId: number }) {
 
 /** RF-33 flow views for one board. */
 export function FlowCharts({ boardId, start, end }: { boardId: number; start?: string; end?: string }) {
+  const t = useT();
   return (
     <SimpleGrid cols={{ base: 1, lg: 2 }} spacing="md">
-      <ChartCard title="Fluxo cumulativo" caption="Itens por coluna, dia a dia: faixas que engordam mostram acúmulo.">
+      <ChartCard title={t.shell.flowCharts.cfdTitle} caption={t.shell.flowCharts.cfdCaption}>
         <CumulativeFlow boardId={boardId} start={start} end={end} />
       </ChartCard>
-      <ChartCard title="Cycle time" caption="Cada ponto é um item concluído; linhas tracejadas são os percentis 50, 85 e 95.">
+      <ChartCard title={t.shell.flowCharts.cycleTitle} caption={t.shell.flowCharts.cycleCaption}>
         <CycleScatter boardId={boardId} start={start} end={end} />
       </ChartCard>
-      <ChartCard title="Envelhecimento do trabalho em andamento" caption="Idade de cada item aberto por coluna; losangos passaram do P85 histórico do tipo.">
+      <ChartCard title={t.shell.flowCharts.agingTitle} caption={t.shell.flowCharts.agingCaption}>
         <AgingChart boardId={boardId} />
       </ChartCard>
-      <ChartCard title="Comprometido × entregue" caption="Escopo que entrou depois do início aparece à parte, para não confundir compromisso com demanda nova.">
+      <ChartCard title={t.shell.flowCharts.cvdTitle} caption={t.shell.flowCharts.cvdCaption}>
         <CommittedVsDelivered boardId={boardId} />
       </ChartCard>
     </SimpleGrid>

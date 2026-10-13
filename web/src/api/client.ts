@@ -1,4 +1,4 @@
-import { currentLocale } from '../i18n/runtime';
+import { currentLocale, t } from '../i18n/runtime';
 import type { ApiErrorDetail } from './types';
 
 /** An API failure with the backend's human cause and suggested action (RF-35). */
@@ -13,7 +13,7 @@ export class ApiError extends Error {
   }
 
   get reason(): string {
-    return this.detail.cause ?? 'falha na requisição';
+    return this.detail.cause ?? t().shell.api.requestFailed;
   }
 
   get action(): string | undefined {
@@ -53,8 +53,8 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
     response = await fetch(`/api${path}`, init);
   } catch {
     throw new ApiError(0, {
-      cause: 'API inacessível',
-      action: 'Confira se o serviço da API está no ar (cadencia serve ou make up).',
+      cause: t().shell.api.unreachable,
+      action: t().shell.api.unreachableAction,
     });
   }
   if (!response.ok) {
@@ -63,7 +63,7 @@ async function request<T>(method: string, path: string, body?: unknown, isForm =
       const payload = await response.json();
       const raw = payload?.detail;
       if (raw && typeof raw === 'object' && !Array.isArray(raw)) detail = raw;
-      else if (Array.isArray(raw)) detail = { cause: 'requisição inválida', message: raw.map((e) => e.msg).join('; ') };
+      else if (Array.isArray(raw)) detail = { cause: t().shell.api.invalidRequest, message: raw.map((e) => e.msg).join('; ') };
       else if (raw) detail = { message: String(raw) };
     } catch {
       /* body is not JSON */

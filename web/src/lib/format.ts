@@ -64,7 +64,7 @@ export function fmtPct(ratio?: number | null): string {
 }
 
 export function fmtDays(value?: number | null): string {
-  return value === null || value === undefined ? '—' : `${fmtNum(value)} d`;
+  return value === null || value === undefined ? '—' : t().shell.format.days(fmtNum(value));
 }
 
 const relatives = new Map<string, Intl.RelativeTimeFormat>();

@@ -2,10 +2,12 @@ import { Group, Kbd, Modal, SimpleGrid, Stack, Text, Title } from '@mantine/core
 import { Fragment, useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 
+import { useT } from '../i18n';
 import { groupsFor, SHORTCUT_EVENT, typing } from '../lib/shortcuts';
 
 /** RF-81: `?` anywhere shows the shortcuts, the current screen's first. */
 export function ShortcutsHelp() {
+  const t = useT();
   const [opened, setOpened] = useState(false);
   const location = useLocation();
 
@@ -26,7 +28,7 @@ export function ShortcutsHelp() {
   }, []);
 
   return (
-    <Modal opened={opened} onClose={() => setOpened(false)} title="Atalhos de teclado" size="xl">
+    <Modal opened={opened} onClose={() => setOpened(false)} title={t.shell.shortcuts.title} size="xl">
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
         {groupsFor(location.pathname).map((group) => (
           <Stack key={group.id} gap={6}>
@@ -52,7 +54,7 @@ export function ShortcutsHelp() {
         ))}
       </SimpleGrid>
       <Text size="xs" c="dimmed" mt="md">
-        No Mac, Ctrl é ⌘.
+        {t.shell.shortcuts.macNote}
       </Text>
     </Modal>
   );

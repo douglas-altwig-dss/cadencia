@@ -6,6 +6,8 @@
  * `type` to a component. That is what lets the arrangement be tested without a browser.
  */
 
+import { t } from '../i18n';
+
 export type TileSize = 'P' | 'M' | 'G';
 export type Breakpoint = 'phone' | 'tablet' | 'desktop';
 
@@ -31,48 +33,76 @@ const SPANS: Record<Breakpoint, Record<TileSize, number>> = {
 
 export const spanFor = (size: TileSize, breakpoint: Breakpoint): number => SPANS[breakpoint][size];
 
-export const SIZES: { value: TileSize; label: string; hint: string }[] = [
-  { value: 'P', label: 'P', hint: 'Pequeno: um quarto da largura' },
-  { value: 'M', label: 'M', hint: 'Médio: metade da largura' },
-  { value: 'G', label: 'G', hint: 'Grande: a largura toda' },
-];
+export interface SizeOption {
+  value: TileSize;
+  /** One letter, in the current language. */
+  readonly label: string;
+  /** "Small: a quarter of the width": the word before the colon names the size on its own. */
+  readonly hint: string;
+}
+
+const sizeOption = (value: TileSize): SizeOption => ({
+  value,
+  get label() {
+    return t().shell.mosaic.sizes[value].label;
+  },
+  get hint() {
+    return t().shell.mosaic.sizes[value].hint;
+  },
+});
+
+/** The three sizes; `label` and `hint` read the current language each time they are read. */
+export const SIZES: SizeOption[] = (['P', 'M', 'G'] as const).map(sizeOption);
 
 export type TileGroup = 'indicadores' | 'pessoas' | 'acontecendo' | 'boards' | 'sistema';
 
 export interface CatalogEntry {
   type: string;
-  label: string;
-  description: string;
+  readonly label: string;
+  readonly description: string;
   group: TileGroup;
   size: TileSize;
 }
 
-export const GROUP_LABELS: Record<TileGroup, string> = {
-  indicadores: 'Indicadores dos boards',
-  pessoas: 'Pessoas',
-  acontecendo: 'O que está acontecendo',
-  boards: 'Boards e sprints',
-  sistema: 'Sistema',
-};
+const GROUPS: TileGroup[] = ['indicadores', 'pessoas', 'acontecendo', 'boards', 'sistema'];
+
+/** Each group's name, read in the current language when it is read (a getter per group). */
+export const GROUP_LABELS: Readonly<Record<TileGroup, string>> = Object.defineProperties(
+  {},
+  Object.fromEntries(GROUPS.map((group) => [group, { enumerable: true, get: () => t().shell.mosaic.groups[group] }])),
+) as Record<TileGroup, string>;
+
+/** A catalogue entry whose title and description follow the language at the moment they are read. */
+const entry = (type: string, group: TileGroup, size: TileSize): CatalogEntry => ({
+  type,
+  group,
+  size,
+  get label() {
+    return t().shell.mosaic.tiles[type]?.label ?? type;
+  },
+  get description() {
+    return t().shell.mosaic.tiles[type]?.description ?? '';
+  },
+});
 
 /** Every tile that can be on the Home page, in the order the catalogue lists them. */
 export const CATALOG: CatalogEntry[] = [
-  { type: 'kpi:risk', group: 'indicadores', size: 'P', label: 'Itens em risco', description: 'Quantos itens estão em risco agora, somando todos os boards.' },
-  { type: 'kpi:throughput', group: 'indicadores', size: 'P', label: 'Vazão da janela', description: 'Itens concluídos na janela atual, contra a anterior.' },
-  { type: 'kpi:progress', group: 'indicadores', size: 'P', label: 'Progresso médio', description: 'Itens concluídos ÷ itens da sprint, média entre boards (sem ponderar).' },
-  { type: 'kpi:adherence', group: 'indicadores', size: 'P', label: 'Aderência ao compromisso', description: 'O que foi entregue do que se comprometeu, sprint a sprint.' },
-  { type: 'sprint:scope', group: 'indicadores', size: 'P', label: 'Escopo adicionado', description: 'Itens que entraram nas sprints depois do início.' },
-  { type: 'team:load', group: 'pessoas', size: 'P', label: 'Carga do time', description: 'Horas abertas contra a capacidade que resta na sprint.' },
-  { type: 'team:overloaded', group: 'pessoas', size: 'P', label: 'Pessoas acima da capacidade', description: 'Quem tem mais horas abertas que capacidade, para conversar cedo.' },
-  { type: 'team:blocks', group: 'pessoas', size: 'P', label: 'Bloqueios ativos', description: 'Quantos bloqueios há, com que gravidade e há quanto tempo.' },
-  { type: 'team:delivered', group: 'pessoas', size: 'P', label: 'Entregas na sprint', description: 'O que o time entregou até agora, contra o comprometido.' },
-  { type: 'pulse:recent', group: 'acontecendo', size: 'P', label: 'Entregas recentes', description: 'Entregas por dia nos últimos 7 dias, contra os 7 anteriores.' },
-  { type: 'pulse:feed', group: 'acontecendo', size: 'M', label: 'Acontecendo agora', description: 'O que foi entregue, bloqueado ou entrou na sprint nas últimas 48 horas.' },
-  { type: 'pulse:due', group: 'acontecendo', size: 'P', label: 'Vencendo em 7 dias', description: 'Itens com prazo na próxima semana e os que já venceram.' },
-  { type: 'sprint:elapsed', group: 'boards', size: 'M', label: 'Sprint em curso', description: 'Quanto da sprint já passou e quanto já foi concluído, por board.' },
-  { type: 'kanban:boards', group: 'boards', size: 'M', label: 'Boards kanban', description: 'Vazão da semana e itens em risco, por board kanban acompanhado.' },
-  { type: 'boards', group: 'boards', size: 'G', label: 'Tabela de boards', description: 'Uma linha por board: progresso, risco, vazão, tendência e coleta.' },
-  { type: 'saude:pontos', group: 'sistema', size: 'P', label: 'Saúde dos dados', description: 'Pontos de atenção de higiene nos boards acompanhados: itens sem estimativa, pouco histórico concluído e afins.' },
+  entry('kpi:risk', 'indicadores', 'P'),
+  entry('kpi:throughput', 'indicadores', 'P'),
+  entry('kpi:progress', 'indicadores', 'P'),
+  entry('kpi:adherence', 'indicadores', 'P'),
+  entry('sprint:scope', 'indicadores', 'P'),
+  entry('team:load', 'pessoas', 'P'),
+  entry('team:overloaded', 'pessoas', 'P'),
+  entry('team:blocks', 'pessoas', 'P'),
+  entry('team:delivered', 'pessoas', 'P'),
+  entry('pulse:recent', 'acontecendo', 'P'),
+  entry('pulse:feed', 'acontecendo', 'M'),
+  entry('pulse:due', 'acontecendo', 'P'),
+  entry('sprint:elapsed', 'boards', 'M'),
+  entry('kanban:boards', 'boards', 'M'),
+  entry('boards', 'boards', 'G'),
+  entry('saude:pontos', 'sistema', 'P'),
 ];
 
 export const entryOf = (type: string): CatalogEntry | undefined => CATALOG.find((e) => e.type === type);

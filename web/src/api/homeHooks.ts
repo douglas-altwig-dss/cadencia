@@ -2,6 +2,7 @@ import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { t } from '../i18n';
 import { defaultMosaic, normalize, type LegacyLayout, type Mosaic } from '../lib/mosaic';
 import { api } from './client';
 import type { HomeLayoutResponse, Pulse } from './types';
@@ -37,7 +38,7 @@ export function useMosaic() {
   const put = useMutation({
     mutationFn: (next: Mosaic) => api.put<HomeLayoutResponse>('/home/layout', next),
     onError: (error: Error) => {
-      notifications.show({ color: 'red', title: 'Painel não salvo', message: error.message });
+      notifications.show({ color: 'red', title: t().shell.api.homeNotSaved, message: error.message });
       void client.invalidateQueries({ queryKey: LAYOUT });
     },
   });

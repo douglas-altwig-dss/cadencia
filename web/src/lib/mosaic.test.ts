@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import { setLocaleForTests } from '../i18n';
+
 import {
   CATALOG,
   DEFAULT_TYPES,
+  GROUP_LABELS,
+  SIZES,
   defaultMosaic,
   moveTile,
   normalize,
@@ -43,6 +47,20 @@ describe('the catalogue and the default', () => {
     const types = CATALOG.map((e) => e.type);
     expect(new Set(types).size).toBe(types.length);
     for (const entry of CATALOG) expect(entry.label && entry.description).toBeTruthy();
+  });
+
+  it('reads its words in the language current when they are read, not when the module loaded', () => {
+    const risk = CATALOG.find((e) => e.type === 'kpi:risk')!;
+    const english = risk.label;
+    const previous = setLocaleForTests('pt-BR');
+    try {
+      expect(risk.label).toBe('Itens em risco');
+      expect(GROUP_LABELS.pessoas).toBe('Pessoas');
+      expect(SIZES[0].hint).toBe('Pequeno: um quarto da largura');
+    } finally {
+      setLocaleForTests(previous);
+    }
+    expect(risk.label).toBe(english);
   });
 
   it('only defaults to tiles that exist', () => {

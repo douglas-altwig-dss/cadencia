@@ -31,6 +31,7 @@ export const openPalette = () => window.dispatchEvent(new Event('cadencia:palett
 
 /** RF-80: the palette's visible door, for people who never learn Ctrl+K. */
 export function SearchButton() {
+  const t = useT();
   return (
     <Button
       variant="default"
@@ -38,20 +39,21 @@ export function SearchButton() {
       rightSection={<Kbd size="xs">Ctrl K</Kbd>}
       onClick={openPalette}
       visibleFrom="md"
-      aria-label="Buscar (Ctrl+K)"
+      aria-label={t.shell.header.searchShortcut}
       className="search-trigger"
       fw={400}
       styles={{ inner: { justifyContent: 'space-between' }, label: { flex: 1, color: 'var(--text-muted)' } }}
     >
-      Buscar boards, sprints e itens…
+      {t.shell.header.searchPlaceholder}
     </Button>
   );
 }
 
 /** M18: a phone has no Ctrl+K, so the same palette opens from an icon there. */
 export function SearchIconButton() {
+  const t = useT();
   return (
-    <ActionIcon variant="default" size="lg" onClick={openPalette} hiddenFrom="md" aria-label="Buscar boards, sprints e itens">
+    <ActionIcon variant="default" size="lg" onClick={openPalette} hiddenFrom="md" aria-label={t.shell.header.searchShort}>
       <IconSearch size={18} />
     </ActionIcon>
   );
@@ -62,6 +64,7 @@ export function SearchIconButton() {
  * at the top lists the saved views too, so one can be opened, unpinned or deleted from any screen.
  */
 export function SaveViewButton() {
+  const t = useT();
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -78,21 +81,21 @@ export function SaveViewButton() {
         onSuccess: () => {
           setOpened(false);
           setName('');
-          notifications.show({ title: 'Visão salva', message: pinned ? 'Ela aparece no menu lateral.' : 'Ela aparece na busca (Ctrl+K).' });
+          notifications.show({ title: t.shell.header.viewSaved, message: pinned ? t.shell.header.viewSavedPinned : t.shell.header.viewSavedSearch });
         },
       },
     );
   // M23: a deleted view is one click to bring back, so the confirmation is the only guard.
   const removeView = async (view: SavedView) => {
     const ok = await confirm({
-      title: `Excluir a visão ${view.name}?`,
-      body: 'Ela sai do menu e da busca (Ctrl+K).',
-      confirmLabel: 'Excluir visão',
+      title: t.shell.header.deleteViewTitle(view.name),
+      body: t.shell.header.deleteViewBody,
+      confirmLabel: t.shell.header.deleteViewConfirm,
     });
     if (!ok) return;
     remove.mutate(view.id, {
       onSuccess: () =>
-        notifyUndo(`Visão ${view.name} excluída`, () =>
+        notifyUndo(t.shell.header.viewDeleted(view.name), () =>
           save.mutate({ name: view.name, path: view.path, query: view.query, pinned: view.pinned }),
         ),
     });
@@ -101,15 +104,15 @@ export function SaveViewButton() {
     <>
       <Menu opened={menuOpen} onChange={setMenuOpen} position="bottom-end" width={300} withinPortal>
         <Menu.Target>
-          <Tooltip label="Visões salvas">
-            <ActionIcon variant="default" size="lg" aria-label="Visões salvas">
+          <Tooltip label={t.shell.header.savedViews}>
+            <ActionIcon variant="default" size="lg" aria-label={t.shell.header.savedViews}>
               <IconBookmark size={18} />
             </ActionIcon>
           </Tooltip>
         </Menu.Target>
         <Menu.Dropdown>
           <Menu.Item leftSection={<IconBookmarkPlus size={14} />} onClick={() => setOpened(true)}>
-            Salvar esta visão…
+            {t.shell.header.saveThisView}
           </Menu.Item>
           <Menu.Divider />
           <SavedViewsList
@@ -121,20 +124,20 @@ export function SaveViewButton() {
           />
         </Menu.Dropdown>
       </Menu>
-      <Modal opened={opened} onClose={() => setOpened(false)} title="Salvar esta visão">
+      <Modal opened={opened} onClose={() => setOpened(false)} title={t.shell.header.saveThisViewTitle}>
         <Stack gap="sm">
           <Text size="sm" c="dimmed">
-            Guarda a tela atual com os filtros escolhidos: <span className="mono">{location.pathname + location.search}</span>
+            {t.shell.header.saveThisViewBody} <span className="mono">{location.pathname + location.search}</span>
           </Text>
           <TextInput
-            label="Nome"
-            placeholder="ex.: Riscos do time Plataforma"
+            label={t.shell.header.name}
+            placeholder={t.shell.header.namePlaceholder}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             data-autofocus
             onKeyDown={(event) => event.key === 'Enter' && name.trim() && submit()}
           />
-          <Checkbox label="Fixar no menu lateral" checked={pinned} onChange={(event) => setPinned(event.currentTarget.checked)} />
+          <Checkbox label={t.shell.header.pinToSidebar} checked={pinned} onChange={(event) => setPinned(event.currentTarget.checked)} />
           {save.error && (
             <Text size="sm" c="red">
               {save.error.message}
@@ -142,7 +145,7 @@ export function SaveViewButton() {
           )}
           <Group justify="flex-end">
             <Button onClick={submit} disabled={!name.trim()} loading={save.isPending}>
-              Salvar
+              {t.shell.header.save}
             </Button>
           </Group>
         </Stack>
@@ -154,13 +157,14 @@ export function SaveViewButton() {
 
 /** Saved views as a menu section, pinned first; each can be pinned, unpinned or deleted in place. */
 export function SavedViewsList({ onOpen, onDelete }: { onOpen: (url: string) => void; onDelete: (view: SavedView) => void }) {
+  const t = useT();
   const views = useViews();
   const save = useSaveView();
   const items = views.data?.items ?? [];
   if (!items.length) {
     return (
       <Text size="xs" c="dimmed" p="xs">
-        Nenhuma visão salva. Use “Salvar esta visão” para guardar a tela atual com os filtros.
+        {t.shell.header.noViews}
       </Text>
     );
   }
@@ -171,15 +175,15 @@ export function SavedViewsList({ onOpen, onDelete }: { onOpen: (url: string) => 
           <Button variant="subtle" size="compact-sm" onClick={() => onOpen(view.url)} style={{ flex: 1 }} justify="flex-start">
             {view.name}
           </Button>
-          <Tooltip label={view.pinned ? 'Desafixar do menu' : 'Fixar no menu'}>
+          <Tooltip label={view.pinned ? t.shell.header.unpin : t.shell.header.pin}>
             <Checkbox
               size="xs"
               checked={view.pinned}
-              aria-label={`Fixar ${view.name} no menu`}
+              aria-label={t.shell.header.pinNamed(view.name)}
               onChange={() => save.mutate({ ...view, pinned: !view.pinned })}
             />
           </Tooltip>
-          <ActionIcon size="sm" variant="subtle" color="red" aria-label={`Excluir a visão ${view.name}`} onClick={() => onDelete(view)}>
+          <ActionIcon size="sm" variant="subtle" color="red" aria-label={t.shell.header.deleteNamed(view.name)} onClick={() => onDelete(view)}>
             <IconTrash size={14} />
           </ActionIcon>
         </Group>

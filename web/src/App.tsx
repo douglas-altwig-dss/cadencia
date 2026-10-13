@@ -31,7 +31,8 @@ import { Empty } from './components/common';
 import { PreferencesMenu, SaveViewButton, SearchButton, SearchIconButton } from './components/HeaderTools';
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { FetchBar } from './components/FetchBar';
-import { NAV } from './lib/navigation';
+import { useT } from './i18n';
+import { nav } from './lib/navigation';
 import { useApplyPreferences } from './lib/preferences';
 import { useScrollHints } from './lib/scrollHints';
 import { AudienceView } from './pages/AudienceView';
@@ -59,6 +60,7 @@ const NAV_RAIL = 64;
  * there is no room for the words, so ``compact`` keeps the coloured dot and its label for screen readers.
  */
 function CollectionPill({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const status = useStatus();
   const data = status.data;
   if (!data) return null;
@@ -67,7 +69,7 @@ function CollectionPill({ compact = false }: { compact?: boolean }) {
   const failed = data.boards.some((b) => b.last_run?.status === 'failed');
   const partial = data.boards.some((b) => b.last_run?.status === 'partial');
   const color = failed ? 'red' : partial ? 'yellow' : oldest ? 'teal' : 'gray';
-  const label = data.collecting ? 'Coletando…' : oldest ? `Coletado ${fromNow(oldest)}` : 'Nunca coletado';
+  const label = data.collecting ? t.shell.pill.collecting : oldest ? t.shell.pill.collected(fromNow(oldest)) : t.shell.pill.neverCollected;
   const dot = data.collecting ? (
     <Loader size={10} />
   ) : (
@@ -75,7 +77,7 @@ function CollectionPill({ compact = false }: { compact?: boolean }) {
   );
   if (compact) {
     return (
-      <UnstyledButton component={Link} to="/status" hiddenFrom="sm" aria-label={`${label}. Ver status da coleta`}>
+      <UnstyledButton component={Link} to="/status" hiddenFrom="sm" aria-label={t.shell.pill.openStatus(label)}>
         <Group justify="center" w={36} h={36} style={{ border: '1px solid var(--border-soft)', borderRadius: 99, background: 'var(--surface-sunken)' }}>
           {dot}
         </Group>
@@ -86,15 +88,17 @@ function CollectionPill({ compact = false }: { compact?: boolean }) {
     <Tooltip
       label={
         data.collecting
-          ? 'Uma coleta está em andamento.'
+          ? t.shell.pill.tipCollecting
           : oldest
-            ? `Coleta mais antiga entre os boards: ${fmtDateTime(oldest)}${failed ? '. Algum board falhou na última coleta.' : ''}`
-            : 'Nenhum board foi coletado ainda.'
+            ? failed
+              ? t.shell.pill.tipOldestFailed(fmtDateTime(oldest))
+              : t.shell.pill.tipOldest(fmtDateTime(oldest))
+            : t.shell.pill.tipNever
       }
       multiline
       w={260}
     >
-      <UnstyledButton component={Link} to="/status" visibleFrom="sm" aria-label={`${label}. Ver status da coleta`}>
+      <UnstyledButton component={Link} to="/status" visibleFrom="sm" aria-label={t.shell.pill.openStatus(label)}>
         <Group gap={6} px="sm" py={6} style={{ border: '1px solid var(--border-soft)', borderRadius: 99, background: 'var(--surface-sunken)' }}>
           {dot}
           <Text size="xs" fw={500}>
@@ -108,6 +112,7 @@ function CollectionPill({ compact = false }: { compact?: boolean }) {
 
 /** When a background collection finishes, every view is refreshed. */
 function useCollectionWatcher() {
+  const t = useT();
   const status = useStatus();
   const client = useQueryClient();
   const previous = useRef(false);
@@ -115,11 +120,11 @@ function useCollectionWatcher() {
   useEffect(() => {
     if (previous.current && !collecting) {
       client.invalidateQueries();
-      notifications.show({ title: 'Coleta concluída', message: 'Os painéis foram recalculados com os dados novos.' });
-      announce('Coleta concluída. Os painéis foram recalculados.');
+      notifications.show({ title: t.shell.app.collectionDoneTitle, message: t.shell.app.collectionDoneMessage });
+      announce(t.shell.app.collectionDoneAnnounce);
     }
     previous.current = collecting;
-  }, [collecting, client]);
+  }, [collecting, client, t]);
 }
 
 export function App() {
@@ -141,13 +146,14 @@ export function App() {
 
 /** RF-75: views someone pinned, under the main navigation. */
 function PinnedViews({ rail }: { rail: boolean }) {
+  const t = useT();
   const views = useViews();
   const location = useLocation();
   const pinned = (views.data?.items ?? []).filter((v) => v.pinned);
   if (!pinned.length) return null;
   return (
     <>
-      {!rail && <div className="nav-section">Visões salvas</div>}
+      {!rail && <div className="nav-section">{t.shell.app.savedViews}</div>}
       {pinned.map((view) => {
         const active = location.pathname + location.search === view.url;
         const link = (
@@ -175,6 +181,7 @@ function PinnedViews({ rail }: { rail: boolean }) {
 }
 
 function Shell() {
+  const t = useT();
   const [opened, { toggle, close }] = useDisclosure();
   // Remembered per browser: a rail is a working preference, not something to re-choose every visit.
   const [collapsed, setCollapsed] = useLocalStorage({ key: 'cadencia-nav-collapsed', defaultValue: false });
@@ -192,7 +199,7 @@ function Shell() {
   return (
     <>
       <a href="#conteudo" className="skip-link">
-        Pular para o conteúdo
+        {t.shell.app.skipToContent}
       </a>
       <FetchBar />
       <AppShell
@@ -203,22 +210,22 @@ function Shell() {
         <AppShell.Header className="app-header">
           <Group h="100%" px="md" justify="space-between" wrap="nowrap" gap="md">
             <Group gap="sm" wrap="nowrap">
-              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="Abrir navegação" />
-              <Tooltip label={collapsed ? 'Expandir o menu' : 'Recolher o menu'}>
+              <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label={t.shell.app.openNavigation} />
+              <Tooltip label={collapsed ? t.shell.app.expandMenu : t.shell.app.collapseMenu}>
                 <ActionIcon
                   variant="subtle"
                   color="gray"
                   size="lg"
                   visibleFrom="sm"
                   onClick={() => setCollapsed((value) => !value)}
-                  aria-label={collapsed ? 'Expandir o menu lateral' : 'Recolher o menu lateral'}
+                  aria-label={collapsed ? t.shell.app.expandSidebar : t.shell.app.collapseSidebar}
                   aria-expanded={!collapsed}
                   aria-controls="menu-lateral"
                 >
                   {collapsed ? <IconLayoutSidebarLeftExpand size={18} /> : <IconLayoutSidebarLeftCollapse size={18} />}
                 </ActionIcon>
               </Tooltip>
-              <UnstyledButton component={Link} to="/" aria-label="Cadência, ir para o painel">
+              <UnstyledButton component={Link} to="/" aria-label={t.shell.app.brandHome}>
                 <Group gap={8} wrap="nowrap">
                   <span className="brand-mark" aria-hidden>
                     <IconWaveSine size={18} stroke={2.2} />
@@ -239,8 +246,8 @@ function Shell() {
             </Group>
           </Group>
         </AppShell.Header>
-        <AppShell.Navbar p="xs" id="menu-lateral" aria-label="Navegação principal" className="app-nav">
-          {NAV.map((group, index) => (
+        <AppShell.Navbar p="xs" id="menu-lateral" aria-label={t.shell.app.mainNavigation} className="app-nav">
+          {nav().map((group, index) => (
             <Box key={group.section} mt={index === 0 ? 0 : rail ? 'sm' : 0}>
               {!rail && <div className="nav-section">{group.section}</div>}
               {group.items.map((item) => {
@@ -282,7 +289,7 @@ function Shell() {
           <PinnedViews rail={rail} />
           {wide && !rail && (
             <Text size="xs" c="dimmed" mt="auto" px="sm" pb="xs">
-              Pressione <b>?</b> para ver os atalhos.
+              {t.shell.app.pressForShortcuts(<b key="key">?</b>)}
             </Text>
           )}
         </AppShell.Navbar>
@@ -304,7 +311,7 @@ function Shell() {
               <Route path="/timeline-foco" element={<TimelineFocusPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/configuracao" element={<SettingsPage />} />
-              <Route path="*" element={<Empty title="Página não encontrada">Use a navegação ao lado.</Empty>} />
+              <Route path="*" element={<Empty title={t.shell.app.notFoundTitle}>{t.shell.app.notFoundBody}</Empty>} />
             </Routes>
           </div>
         </AppShell.Main>

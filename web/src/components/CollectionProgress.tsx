@@ -3,19 +3,13 @@ import { IconPlayerStop } from '@tabler/icons-react';
 
 import { useCancelCollection } from '../api/featureHooks';
 import { useStatus } from '../api/hooks';
+import { t as messages, useT } from '../i18n';
 import { fromNow } from '../lib/format';
-
-const PHASES: Record<string, string> = {
-  configuracao: 'lendo a configuração do board',
-  itens: 'buscando os itens',
-  historico: 'lendo o histórico dos itens',
-  gravando: 'gravando e congelando checkpoints',
-};
 
 function eta(seconds: number | null) {
   if (seconds == null) return null;
-  if (seconds < 60) return 'menos de 1 min';
-  return `~${Math.round(seconds / 60)} min`;
+  if (seconds < 60) return messages().shell.progress.underAMinute;
+  return messages().shell.progress.minutes(Math.round(seconds / 60));
 }
 
 /**
@@ -24,21 +18,22 @@ function eta(seconds: number | null) {
  * single "coletando" flag for minutes on end.
  */
 export function CollectionProgress({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const status = useStatus();
   const cancel = useCancelCollection();
   const current = status.data?.current;
   if (!current) return null;
-  const mode = current.mode === 'full' ? 'reconciliação completa' : 'coleta incremental';
+  const mode = current.mode === 'full' ? t.shell.progress.full : t.shell.progress.incremental;
   return (
-    <Paper withBorder p="sm" role="region" aria-label="Coleta em andamento">
+    <Paper withBorder p="sm" role="region" aria-label={t.shell.progress.region}>
       <Stack gap="xs">
         <Group justify="space-between" wrap="wrap">
           <Group gap="xs">
             <Badge variant="light" color="petrol">
-              coletando
+              {t.shell.progress.collecting}
             </Badge>
             <Text size="sm">
-              {mode} · começou {fromNow(current.started_at)}
+              {t.shell.progress.started(mode, fromNow(current.started_at))}
             </Text>
           </Group>
           <Button
@@ -50,7 +45,7 @@ export function CollectionProgress({ compact = false }: { compact?: boolean }) {
             loading={cancel.isPending}
             onClick={() => cancel.mutate()}
           >
-            {current.cancel_requested ? 'cancelando no próximo passo…' : 'Cancelar'}
+            {current.cancel_requested ? t.shell.progress.cancelling : t.shell.progress.cancel}
           </Button>
         </Group>
         {!compact &&
@@ -65,14 +60,14 @@ export function CollectionProgress({ compact = false }: { compact?: boolean }) {
                   </Text>
                   <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
                     {running
-                      ? [PHASES[board.phase ?? ''] ?? 'começando', board.total ? `${board.done ?? 0}/${board.total}` : null, eta(board.eta_seconds)]
+                      ? [t.shell.progress.phases[board.phase ?? ''] ?? t.shell.progress.starting, board.total ? `${board.done ?? 0}/${board.total}` : null, eta(board.eta_seconds)]
                           .filter(Boolean)
                           .join(' · ')
                       : board.status === 'success'
-                        ? 'concluído'
+                        ? t.shell.progress.done
                         : board.status === 'cancelled'
-                          ? 'cancelado'
-                          : 'falhou'}
+                          ? t.shell.progress.cancelled
+                          : t.shell.progress.failed}
                   </Text>
                 </Group>
                 <Progress
@@ -80,7 +75,7 @@ export function CollectionProgress({ compact = false }: { compact?: boolean }) {
                   value={running ? (ratio ?? 0.05) * 100 : 100}
                   animated={running && ratio === null}
                   color={board.status === 'failed' ? 'red' : board.status === 'cancelled' ? 'gray' : undefined}
-                  aria-label={`Progresso de ${board.name}`}
+                  aria-label={t.shell.progress.boardProgress(board.name)}
                 />
               </Stack>
             );

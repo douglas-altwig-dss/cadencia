@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router';
 
 import type { TreeNode } from '../api/types';
+import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { fmtNum } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
@@ -16,6 +17,7 @@ const helper = createColumnHelper<typeof features, TreeNode>();
 
 /** RF-32: groupable tree (epic → item → subtask) with done / remaining / accumulated estimate. */
 export function TreeTable({ nodes, boardId, sprintId }: { nodes: TreeNode[]; boardId: number; sprintId?: number }) {
+  const t = useT();
   const { carry } = useFilters();
 
   const columns = useMemo(
@@ -23,7 +25,7 @@ export function TreeTable({ nodes, boardId, sprintId }: { nodes: TreeNode[]; boa
       helper.columns([
         helper.accessor('label', {
           id: 'item',
-          header: 'Item',
+          header: t.shell.tree.item,
           cell: ({ row }) => {
             const node = row.original;
             const epic = node.issue && node.issue.level >= 1;
@@ -34,7 +36,7 @@ export function TreeTable({ nodes, boardId, sprintId }: { nodes: TreeNode[]; boa
                     variant="subtle"
                     size="sm"
                     onClick={row.getToggleExpandedHandler()}
-                    aria-label={row.getIsExpanded() ? `Recolher ${node.label}` : `Expandir ${node.label}`}
+                    aria-label={row.getIsExpanded() ? t.shell.tree.collapse(node.label) : t.shell.tree.expand(node.label)}
                     aria-expanded={row.getIsExpanded()}
                   >
                     {row.getIsExpanded() ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
@@ -67,26 +69,26 @@ export function TreeTable({ nodes, boardId, sprintId }: { nodes: TreeNode[]; boa
             );
           },
         }),
-        helper.accessor((n) => n.issue?.type ?? '', { id: 'type', header: 'Tipo' }),
-        helper.accessor((n) => n.issue?.status ?? '', { id: 'status', header: 'Status' }),
-        helper.accessor((n) => n.issue?.assignee ?? '', { id: 'assignee', header: 'Responsável' }),
+        helper.accessor((n) => n.issue?.type ?? '', { id: 'type', header: t.shell.tree.type }),
+        helper.accessor((n) => n.issue?.status ?? '', { id: 'status', header: t.shell.tree.status }),
+        helper.accessor((n) => n.issue?.assignee ?? '', { id: 'assignee', header: t.shell.tree.assignee }),
         helper.display({
           id: 'risk',
-          header: 'Situação',
+          header: t.shell.tree.situation,
           cell: ({ row }) => (row.original.risk ? <RiskBadge situation={row.original.risk.situation} size="xs" /> : null),
         }),
         helper.display({
           id: 'progress',
-          header: () => <Tipped help={HELP['tree:done']}>Concluído / restante</Tipped>,
+          header: () => <Tipped help={HELP['tree:done']}>{t.shell.tree.doneRemaining}</Tipped>,
           cell: ({ row }) => (row.original.children.length ? <ProgressBars progress={row.original.progress} compact /> : null),
         }),
         helper.accessor((n) => n.estimate_rollup, {
           id: 'estimate',
-          header: () => <Tipped help={HELP['tree:estimate']}>Estimativa acumulada</Tipped>,
+          header: () => <Tipped help={HELP['tree:estimate']}>{t.shell.tree.estimateRollup}</Tipped>,
           cell: (info) => <Text size="sm" className="num">{fmtNum(info.getValue())}</Text>,
         }),
       ]),
-    [boardId, sprintId, carry],
+    [boardId, sprintId, carry, t],
   );
 
   const expanded = useMemo(() => Object.fromEntries(nodes.map((n) => [n.key, true])), [nodes]);
