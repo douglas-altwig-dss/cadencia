@@ -2,12 +2,15 @@ import { Alert, Badge, Group, Paper, SimpleGrid, Stack, Table, Text, Title, Tool
 import { IconAlertTriangle } from '@tabler/icons-react';
 
 import type { EpicPlanView } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtNum, fmtPct } from '../../lib/format';
 import { Note } from '../common';
 import { MemberSelection } from './MemberSelection';
-import { FloatingMark, hours, plural, RoleChip, roleIndex, TIPS } from './shared';
+import { FloatingMark, hours, rich, RoleChip, roleIndex } from './shared';
 
 export function CapacitySection({ view }: { view: EpicPlanView }) {
+  const t = useT();
+  const m = t.epicPlan.capacity;
   const roles = roleIndex(view);
   const members = new Map(view.membros.map((m) => [m.id, m]));
   const capacity = view.capacidade;
@@ -21,17 +24,17 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
         <MemberSelection view={view} layout="chips" />
       </Paper>
       {uncovered.length > 0 && (
-        <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} title="Papel sem ninguém selecionado">
+        <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} title={m.uncoveredTitle}>
           {uncovered.map((r) => (
             <Text size="sm" key={r.papel_id}>
-              <b>{roles.get(r.papel_id)?.nome}</b>: {r.subtarefas_afetadas.join(', ')} ficam sem quem as faça.
+              {rich(m.uncovered(roles.get(r.papel_id)?.nome ?? '', r.subtarefas_afetadas.join(', ')))}
             </Text>
           ))}
         </Alert>
       )}
 
       <Title order={4} mt="xs">
-        Por papel
+        {m.byRole}
       </Title>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         {capacity.por_papel.map((entry) => {
@@ -47,10 +50,10 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
                   {role.descricao}
                 </Text>
                 <Text fw={700} fz="lg">
-                  {fmtNum(entry.potencial)}h/semana
+                  {m.perWeek(fmtNum(entry.potencial))}
                 </Text>
                 <Text size="xs" c="dimmed">
-                  {plural(entry.membros.length, 'pessoa neste papel', 'pessoas neste papel')}
+                  {m.peopleInRole(entry.membros.length)}
                 </Text>
                 <Group gap={4}>
                   {entry.membros.map((id) => (
@@ -65,21 +68,22 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
         })}
       </SimpleGrid>
       {capacity.flutuantes.length > 0 && (
-        <Note title="Capacidade flutuante">
-          {capacity.flutuantes
-            .map((id) => {
-              const m = members.get(id);
-              return m ? `${m.nome} (${m.papeis.map((p) => roles.get(p.papel_id)?.nome).join(' + ')})` : id;
-            })
-            .join(', ')}{' '}
-          cobrem mais de um papel, por isso aparecem com ⇄ em cada um. {TIPS.floating} A capacidade real (
-          {fmtNum(capacity.real)}h/semana) conta cada pessoa uma vez; os cards por papel mostram o máximo que cada área
-          receberia se toda a capacidade dessas pessoas fosse para ela.
+        <Note title={m.floatingTitle}>
+          {m.floatingNote(
+            capacity.flutuantes
+              .map((id) => {
+                const member = members.get(id);
+                return member ? `${member.nome} (${member.papeis.map((p) => roles.get(p.papel_id)?.nome).join(' + ')})` : id;
+              })
+              .join(', '),
+            t.epicPlan.tips.floating,
+            fmtNum(capacity.real),
+          )}
         </Note>
       )}
 
       <Title order={4} mt="xs">
-        Por membro
+        {m.byMember}
       </Title>
       {view.plano ? (
         <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
@@ -87,12 +91,12 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Membro</Table.Th>
-                <Table.Th>Papéis</Table.Th>
-                <Table.Th className="num">Capacidade</Table.Th>
+                <Table.Th>{m.member}</Table.Th>
+                <Table.Th>{m.roles}</Table.Th>
+                <Table.Th className="num">{m.capacity}</Table.Th>
                 {weeks.map((w) => (
                   <Table.Th key={w.indice} className="num">
-                    Semana {w.semana}
+                    {m.week(w.semana)}
                   </Table.Th>
                 ))}
               </Table.Tr>
@@ -112,17 +116,17 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
                         })}
                       </Group>
                     </Table.Td>
-                    <Table.Td className="num">{hours(row.capacidade_semanal)}/sem</Table.Td>
+                    <Table.Td className="num">{m.perWeekShort(hours(row.capacidade_semanal))}</Table.Td>
                     {weeks.map((w) => {
                       const cell = load.get(w.semana);
                       const over = (cell?.ocupacao ?? 0) > 1;
                       return (
                         <Table.Td key={w.indice} className="num">
                           {cell ? (
-                            <Tooltip label={`${hours(cell.horas)} de ${hours(row.capacidade_semanal)}`} withArrow>
+                            <Tooltip label={m.loadTooltip(hours(cell.horas), hours(row.capacidade_semanal))} withArrow>
                               {over ? (
                                 <Badge color="red" variant="light" leftSection={<IconAlertTriangle size={12} />} tt="none">
-                                  {fmtPct(cell.ocupacao)} · acima de 100%
+                                  {m.over(fmtPct(cell.ocupacao))}
                                 </Badge>
                               ) : (
                                 <Text size="sm" span>
@@ -147,12 +151,11 @@ export function CapacitySection({ view }: { view: EpicPlanView }) {
         </Paper>
       ) : (
         <Text size="sm" c="dimmed">
-          A ocupação por semana aparece quando houver um plano — veja os bloqueios na seção Planejamento.
+          {m.noPlan}
         </Text>
       )}
       <Text size="xs" c="dimmed">
-        Ocupação calculada pelo {view.plano?.origem === 'armazenado' ? 'último plano gerado' : 'plano guloso da seleção atual'}. Alocação
-        teórica por heurística ou solver: é uma base para conversa, não uma verdade.
+        {m.footer(view.plano?.origem === 'armazenado')}
       </Text>
     </Stack>
   );

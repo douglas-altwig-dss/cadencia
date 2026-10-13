@@ -4,6 +4,7 @@ import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 import { useState, type CSSProperties, type ReactNode } from 'react';
 
 import type { PlanWeek } from '../../api/types';
+import { useT } from '../../i18n';
 import { onColor } from './shared';
 
 export interface GanttBar {
@@ -34,7 +35,6 @@ export interface GanttGroup {
   lanes: GanttLane[];
 }
 
-const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'];
 const LABEL_WIDTH = 220;
 
 /**
@@ -54,6 +54,9 @@ export function WeeklyGantt({
   workday: number;
   caption: string;
 }) {
+  const t = useT();
+  const m = t.epicPlan.gantt;
+  const DAYS = m.weekdays;
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [scale, setScale] = useState<string>('ajustar');
   const { ref, width: available } = useElementSize();
@@ -89,11 +92,11 @@ export function WeeklyGantt({
         size="xs"
         value={scale}
         onChange={setScale}
-        aria-label="Escala do cronograma"
+        aria-label={m.scaleAria}
         data={[
-          { value: 'ajustar', label: 'Ajustar' },
-          { value: 'dias', label: 'Dias' },
-          { value: 'horas', label: 'Horas' },
+          { value: 'ajustar', label: m.fit },
+          { value: 'dias', label: m.days },
+          { value: 'horas', label: m.hours },
         ]}
       />
     </Group>
@@ -103,8 +106,7 @@ export function WeeklyGantt({
           <div className="gantt-label" />
           {weeks.map((week) => (
             <div key={week.indice} className={week.planejamento ? 'gantt-week is-planning' : 'gantt-week'} style={{ width: weekWidth }}>
-              Semana {week.semana}
-              {week.planejamento ? ' · planejamento' : ''}
+              {week.planejamento ? m.weekPlanning(week.semana) : m.week(week.semana)}
             </div>
           ))}
         </div>

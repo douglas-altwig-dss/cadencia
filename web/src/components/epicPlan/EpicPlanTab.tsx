@@ -2,7 +2,7 @@ import { Alert, Box, Grid, NavLink, Select, Stack, Text } from '@mantine/core';
 import { IconAlertTriangle, IconCircleCheck, IconInfoCircle } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import { plural } from '../../lib/format';
+import { useT } from '../../i18n';
 import { useEpicPlan } from '../../api/planHooks';
 import type { PlanProblem } from '../../api/types';
 import { Empty, ErrorState, Loading } from '../common';
@@ -18,34 +18,16 @@ import { SubtaskRolesPanel } from './SubtaskRolesPanel';
 import { PlanSection } from './shared';
 import { TaskCards, TaskModal, type TaskFocus } from './TaskCards';
 
-// The answers first, the configuration that produces them last.
+// The answers first, the configuration that produces them last. Labels come from the catalogue.
 const INDEX = [
   {
-    group: 'Plano',
-    items: [
-      ['plano-resumo', 'Resumo'],
-      ['plano-capacidade', 'Disponibilidade de horas'],
-      ['plano-estimativa', 'Estimativa por papel'],
-      ['plano-pipeline', 'Pipeline de dependências'],
-      ['plano-cronograma', 'Cronograma semanal'],
-      ['plano-planejamento', 'Planejamento'],
-      ['plano-cards', 'Cards detalhados'],
-    ],
+    group: 'plan',
+    items: ['plano-resumo', 'plano-capacidade', 'plano-estimativa', 'plano-pipeline', 'plano-cronograma', 'plano-planejamento', 'plano-cards'],
   },
-  {
-    group: 'Configuração',
-    items: [
-      ['plano-subtarefas', 'Papéis das subtarefas'],
-      ['plano-dados', 'Dados do Jira'],
-      ['plano-parametros', 'Parâmetros'],
-    ],
-  },
+  { group: 'config', items: ['plano-subtarefas', 'plano-dados', 'plano-parametros'] },
 ] as const;
 
-const IDS = INDEX.flatMap((g) => g.items.map(([id]) => id));
-
-/** The same index for a screen too narrow for the side one: a jump list, grouped the same way. */
-const JUMP = INDEX.map((g) => ({ group: g.group, items: g.items.map(([id, label]) => ({ value: id, label })) }));
+const IDS = INDEX.flatMap((g) => [...g.items]);
 
 /** The section being read: the last one whose top has passed under the header. */
 function useActiveSection(ready: boolean) {
@@ -71,10 +53,11 @@ function useActiveSection(ready: boolean) {
 }
 
 function Problems({ problems }: { problems: PlanProblem[] }) {
+  const t = useT();
   if (!problems.length) {
     return (
-      <Alert color="teal" variant="light" icon={<IconCircleCheck size={18} />} title="Nenhum problema nos dados do épico">
-        Todas as subtarefas têm papel e estimativa, e as dependências formam um fluxo sem ciclos.
+      <Alert color="teal" variant="light" icon={<IconCircleCheck size={18} />} title={t.epicPlan.tab.noProblemsTitle}>
+        {t.epicPlan.tab.noProblemsBody}
       </Alert>
     );
   }
@@ -83,7 +66,7 @@ function Problems({ problems }: { problems: PlanProblem[] }) {
   return (
     <Stack gap="xs">
       {errors.length > 0 && (
-        <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />} title={`${errors.length === 1 ? '1 erro impede' : `${errors.length} erros impedem`} o cronograma e o planejamento`}>
+        <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />} title={t.epicPlan.tab.errorsTitle(errors.length)}>
           {errors.map((p) => (
             <Text size="sm" key={p.codigo + p.mensagem}>
               {p.mensagem}
@@ -92,7 +75,7 @@ function Problems({ problems }: { problems: PlanProblem[] }) {
         </Alert>
       )}
       {warnings.length > 0 && (
-        <Alert color="yellow" variant="light" icon={<IconInfoCircle size={18} />} title={plural(warnings.length, 'aviso', 'avisos')}>
+        <Alert color="yellow" variant="light" icon={<IconInfoCircle size={18} />} title={t.epicPlan.count.warnings(warnings.length)}>
           {warnings.map((p) => (
             <Text size="sm" key={p.codigo + p.mensagem}>
               {p.mensagem}
@@ -109,6 +92,7 @@ function Problems({ problems }: { problems: PlanProblem[] }) {
  * generated plan and the task cards — every number from ``GET /epics/{key}/plano``.
  */
 export function EpicPlanTab({ epicKey }: { epicKey: string }) {
+  const t = useT();
   const plan = useEpicPlan(epicKey);
   const [focus, setFocus] = useState<TaskFocus | null>(null);
   const active = useActiveSection(!!plan.data);
@@ -117,22 +101,27 @@ export function EpicPlanTab({ epicKey }: { epicKey: string }) {
   const view = plan.data;
   if (!view) return null;
 
+  const tab = t.epicPlan.tab;
+  const sections = tab.sections;
+  const groupLabel = (group: (typeof INDEX)[number]['group']) => (group === 'plan' ? tab.groupPlan : tab.groupConfig);
+  /** The same index for a screen too narrow for the side one: a jump list, grouped the same way. */
+  const jump = INDEX.map((g) => ({ group: groupLabel(g.group), items: g.items.map((id) => ({ value: id, label: tab.index[id] })) }));
   const go = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <Grid gap="xl">
       <Grid.Col span={{ base: 12, lg: 2 }} visibleFrom="lg">
-        <Box component="nav" aria-label="Índice do plano" className="plan-index">
+        <Box component="nav" aria-label={tab.indexAria} className="plan-index">
           {INDEX.map((group) => (
             <Box key={group.group} mb="md">
               <Text className="kpi-label" mb={6} px={8}>
-                {group.group}
+                {groupLabel(group.group)}
               </Text>
-              {group.items.map(([id, label]) => (
+              {group.items.map((id) => (
                 <NavLink
                   key={id}
                   href={`#${id}`}
-                  label={label}
+                  label={tab.index[id]}
                   active={active === id}
                   aria-current={active === id ? 'location' : undefined}
                   className="plan-index-link"
@@ -149,61 +138,50 @@ export function EpicPlanTab({ epicKey }: { epicKey: string }) {
       <Grid.Col span={{ base: 12, lg: 10 }}>
         <Box hiddenFrom="lg" className="plan-jump">
           <Select
-            label="Ir para a seção"
-            data={JUMP}
+            label={tab.jump}
+            data={jump}
             value={active}
             onChange={(id) => id && go(id)}
             allowDeselect={false}
-            aria-label="Ir para a seção do plano"
+            aria-label={tab.jumpAria}
           />
         </Box>
         {view.tarefas.length === 0 && (
           <Box mb="lg">
-            <Empty title="Este épico não tem tarefas coletadas.">
-              O plano lê as tarefas filhas do épico e as subtarefas delas, com as horas da fonte escolhida nos parâmetros (estimativa
-              original ou campo de estimativa).
-            </Empty>
+            <Empty title={tab.emptyTitle}>{tab.emptyBody}</Empty>
           </Box>
         )}
-        <PlanSection id="plano-resumo" title="Resumo" description="Quanto o épico custa, quanto dura e quanto o planejamento ganha sobre uma pessoa por papel.">
+        <PlanSection id="plano-resumo" title={sections.summary.title} description={sections.summary.description}>
           <Stack gap="md">
             {!planReady(view) && <PlanReadiness view={view} onGo={go} />}
             <PlanSummary view={view} />
           </Stack>
         </PlanSection>
-        <PlanSection
-          id="plano-capacidade"
-          title="Disponibilidade de horas"
-          description="Quem está disponível para este épico e quanto cada papel poderia receber."
-        >
+        <PlanSection id="plano-capacidade" title={sections.capacity.title} description={sections.capacity.description}>
           <CapacitySection view={view} />
         </PlanSection>
-        <PlanSection id="plano-estimativa" title="Estimativa de horas por papel" description="Horas de planejamento e execução, overheads e o peso de cada papel.">
+        <PlanSection id="plano-estimativa" title={sections.estimate.title} description={sections.estimate.description}>
           <EstimateSection view={view} />
         </PlanSection>
-        <PlanSection id="plano-pipeline" title="Pipeline de dependências" description="O que bloqueia o quê, da esquerda para a direita.">
+        <PlanSection id="plano-pipeline" title={sections.pipeline.title} description={sections.pipeline.description}>
           <PipelineSection view={view} onOpen={setFocus} />
         </PlanSection>
-        <PlanSection id="plano-cronograma" title="Cronograma semanal" description="O cronograma base: uma pessoa por papel, sem otimizar a alocação.">
+        <PlanSection id="plano-cronograma" title={sections.schedule.title} description={sections.schedule.description}>
           <ScheduleSection view={view} onOpen={setFocus} onGo={go} />
         </PlanSection>
-        <PlanSection id="plano-planejamento" title="Planejamento" description="A equipe real, alocada por um algoritmo, contra o cronograma base.">
+        <PlanSection id="plano-planejamento" title={sections.planning.title} description={sections.planning.description}>
           <PlanningSection view={view} onOpen={setFocus} onGo={go} />
         </PlanSection>
-        <PlanSection id="plano-cards" title="Cards detalhados" description="Cada tarefa com seu contexto de negócio, técnico e as subtarefas.">
+        <PlanSection id="plano-cards" title={sections.cards.title} description={sections.cards.description}>
           <TaskCards view={view} />
         </PlanSection>
-        <PlanSection
-          id="plano-subtarefas"
-          title="Papéis das subtarefas"
-          description="De onde veio o papel de cada subtarefa, e a escolha manual quando nada no Jira responde."
-        >
+        <PlanSection id="plano-subtarefas" title={sections.subtasks.title} description={sections.subtasks.description}>
           <SubtaskRolesPanel view={view} />
         </PlanSection>
-        <PlanSection id="plano-dados" title="Dados do Jira" description="O que a leitura do épico encontrou de estranho.">
+        <PlanSection id="plano-dados" title={sections.data.title} description={sections.data.description}>
           <Problems problems={view.problemas} />
         </PlanSection>
-        <PlanSection id="plano-parametros" title="Parâmetros" description="Jornada, overheads, granularidade e como as labels do Jira viram plano — vale para todos os épicos, e se edita em Configuração.">
+        <PlanSection id="plano-parametros" title={sections.parameters.title} description={sections.parameters.description}>
           <ParametersSummary parameters={view.parametros} />
         </PlanSection>
         <TaskModal view={view} focus={focus} onClose={() => setFocus(null)} />

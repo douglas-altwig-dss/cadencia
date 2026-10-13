@@ -2,12 +2,15 @@ import { Button, Checkbox, Chip, Group, Stack, Text } from '@mantine/core';
 
 import { useSetSelection } from '../../api/planHooks';
 import type { EpicPlanView } from '../../api/types';
+import { useT } from '../../i18n';
 
 /**
  * Who is available for this epic. One selection, stored on the server and shared by the capacity
  * and planning sections: unticking someone in either changes both.
  */
 export function MemberSelection({ view, layout }: { view: EpicPlanView; layout: 'chips' | 'list' }) {
+  const t = useT();
+  const m = t.epicPlan.members;
   const setSelection = useSetSelection(view.epico.key);
   const available = view.membros.filter((m) => m.ativo && m.papeis.length > 0);
   const hidden = view.membros.length - available.length;
@@ -18,18 +21,18 @@ export function MemberSelection({ view, layout }: { view: EpicPlanView; layout: 
     <Group justify="space-between" gap="xs">
       <div>
         <Text size="xs" fw={700} tt="uppercase">
-          Equipe disponível para este épico
+          {m.title}
         </Text>
         <Text size="xs" c="dimmed">
-          Desmarque quem estiver alocado em outro projeto ou épico no momento.
+          {m.hint}
         </Text>
       </div>
       <Group gap={4}>
         <Button size="compact-xs" variant="subtle" onClick={() => change(available.map((m) => m.id))}>
-          Todos
+          {m.all}
         </Button>
         <Button size="compact-xs" variant="subtle" onClick={() => change([])}>
-          Nenhum
+          {m.none}
         </Button>
       </Group>
     </Group>
@@ -37,14 +40,14 @@ export function MemberSelection({ view, layout }: { view: EpicPlanView; layout: 
   const footer =
     hidden > 0 ? (
       <Text size="xs" c="dimmed">
-        {hidden === 1 ? '1 pessoa inativa ou sem papel não aparece aqui.' : `${hidden} pessoas inativas ou sem papel não aparecem aqui.`}
+        {m.hidden(hidden)}
       </Text>
     ) : null;
 
   if (available.length === 0) {
     return (
       <Text size="sm" c="dimmed">
-        Ninguém tem papel atribuído ainda. Atribua papéis às pessoas na seção Papéis.
+        {m.nobody}
       </Text>
     );
   }

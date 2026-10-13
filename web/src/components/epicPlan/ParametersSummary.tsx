@@ -3,6 +3,7 @@ import { IconSettings } from '@tabler/icons-react';
 import { Link } from 'react-router';
 
 import type { PlanParameters } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtNum } from '../../lib/format';
 
 /**
@@ -11,14 +12,16 @@ import { fmtNum } from '../../lib/format';
  * place that edits them — Configuração — rather than repeating the editor once per epic.
  */
 export function ParametersSummary({ parameters }: { parameters: PlanParameters }) {
+  const t = useT();
+  const m = t.epicPlan.parametersSummary;
   const summary = [
-    `horas do ${parameters.fonte_horas === 'campo_estimativa' ? 'campo de estimativa' : 'estimativa original'}`,
-    `jornada ${fmtNum(parameters.jornada_h)} h/dia`,
-    `Jira ${fmtNum(parameters.overhead_jira_h)} h/subtarefa`,
-    `code review ${fmtNum(parameters.code_review_h)} h`,
-    `cadastro ${fmtNum(parameters.cadastro_card_min)} min/card`,
-    `agenda em ${fmtNum(parameters.granularidade_h, 2)} h`,
-    `solvers até ${fmtNum(parameters.limite_solver_s)} s`,
+    parameters.fonte_horas === 'campo_estimativa' ? m.hoursFromField : m.hoursFromOriginal,
+    m.workday(fmtNum(parameters.jornada_h)),
+    m.jira(fmtNum(parameters.overhead_jira_h)),
+    m.codeReview(fmtNum(parameters.code_review_h)),
+    m.cardCreation(fmtNum(parameters.cadastro_card_min)),
+    m.granularity(fmtNum(parameters.granularidade_h, 2)),
+    m.solverLimit(fmtNum(parameters.limite_solver_s)),
   ];
   return (
     <Group justify="space-between" wrap="nowrap" align="flex-start">
@@ -26,18 +29,18 @@ export function ParametersSummary({ parameters }: { parameters: PlanParameters }
         <Text size="sm">{summary.join(' · ')}</Text>
         <Group gap={6}>
           <Text size="xs" c="dimmed">
-            Labels:
+            {m.labels}
           </Text>
           {[parameters.rotulo_code_review, parameters.rotulo_cadastro_jira, parameters.rotulo_planejamento, parameters.rotulo_sem_codigo].map((label) => (
             <Code key={label}>{label}</Code>
           ))}
         </Group>
         <Text size="xs" c="dimmed">
-          Vale para todos os épicos, não só este.
+          {m.appliesToAll}
         </Text>
       </Stack>
       <Button component={Link} to="/configuracao?tab=plano-epico" variant="default" leftSection={<IconSettings size={16} />}>
-        Editar em Configuração
+        {m.edit}
       </Button>
     </Group>
   );

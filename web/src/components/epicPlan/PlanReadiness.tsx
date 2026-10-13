@@ -6,24 +6,15 @@ import { Link } from 'react-router';
 
 import { useSavePlanParameters } from '../../api/planHooks';
 import type { EpicPlanView, HoursSource } from '../../api/types';
-import { plural } from './shared';
-
-const SOURCE_LABEL: Record<HoursSource, string> = {
-  estimativa_original: 'estimativa original',
-  campo_estimativa: 'campo de estimativa',
-};
-/** "na estimativa original" / "no campo de estimativa": the article follows the noun. */
-const IN_SOURCE: Record<HoursSource, string> = {
-  estimativa_original: 'na estimativa original',
-  campo_estimativa: 'no campo de estimativa',
-};
+import { useT } from '../../i18n';
 
 type State = 'ok' | 'warn' | 'missing';
 
 function Step({ state, title, children, action }: { state: State; title: string; children: ReactNode; action?: ReactNode }) {
+  const t = useT();
   const icon = state === 'ok' ? <IconCheck size={16} /> : state === 'warn' ? <IconAlertTriangle size={16} /> : <IconX size={16} />;
   const color = state === 'ok' ? 'teal' : state === 'warn' ? 'yellow' : 'red';
-  const word = state === 'ok' ? 'pronto' : state === 'warn' ? 'atenção' : 'falta';
+  const word = t.epicPlan.readiness.state[state];
   return (
     <Group wrap="nowrap" align="flex-start" gap="sm">
       <ThemeIcon color={color} variant="light" radius="xl" size={28} aria-label={word}>
@@ -50,6 +41,8 @@ export function planReady(view: EpicPlanView): boolean {
 }
 
 export function PlanReadiness({ view, onGo, title }: { view: EpicPlanView; onGo: (id: string) => void; title?: string }) {
+  const t = useT();
+  const m = t.epicPlan.readiness;
   const save = useSavePlanParameters();
   const d = view.diagnostico;
   const total = d.subtarefas;
@@ -63,70 +56,70 @@ export function PlanReadiness({ view, onGo, title }: { view: EpicPlanView; onGo:
     save.mutate(
       { fonte_horas: other },
       {
-        onSuccess: () => notifications.show({ title: 'Fonte das horas alterada', message: `As horas agora vêm ${other === 'campo_estimativa' ? 'do' : 'da'} ${SOURCE_LABEL[other]}.` }),
-        onError: (error) => notifications.show({ color: 'red', title: 'Não foi possível alterar', message: error.message }),
+        onSuccess: () => notifications.show({ title: m.switched, message: m.switchedTo[other] }),
+        onError: (error) => notifications.show({ color: 'red', title: m.switchFailed, message: error.message }),
       },
     );
 
   return (
     <Paper withBorder p="lg">
       <Text fw={700} mb={4}>
-        {title ?? 'O que falta para montar o cronograma'}
+        {title ?? m.title}
       </Text>
       <Text size="sm" c="dimmed" mb="md">
-        O cronograma precisa de horas e de um papel em cada subtarefa, e de pessoas que cubram esses papéis.
+        {m.intro}
       </Text>
       <Stack gap="md">
         <Step
           state={hoursState}
-          title="Horas das subtarefas"
+          title={m.hoursStep}
           action={
             hoursState !== 'ok' && foundOther > found ? (
               <Button size="xs" onClick={switchSource} loading={save.isPending}>
-                Usar {other === 'campo_estimativa' ? 'o' : 'a'} {SOURCE_LABEL[other]}
+                {m.use[other]}
               </Button>
             ) : undefined
           }
         >
           {total === 0
-            ? 'O épico não tem subtarefas coletadas.'
-            : `${found} de ${plural(total, 'subtarefa', 'subtarefas')} têm horas ${IN_SOURCE[d.fonte_horas]} do Jira.`}
-          {hoursState !== 'ok' && foundOther > found && ` ${other === 'campo_estimativa' ? 'O' : 'A'} ${SOURCE_LABEL[other]} tem valor em ${foundOther}.`}
+            ? m.noSubtasks
+            : m.hoursFound(found, total, d.fonte_horas === 'campo_estimativa')}
+          {hoursState !== 'ok' && foundOther > found && m.otherHas(other === 'campo_estimativa', foundOther)}
         </Step>
         <Step
           state={d.sem_papel.length === 0 && total > 0 ? 'ok' : 'missing'}
-          title="Papel de cada subtarefa"
+          title={m.roleStep}
           action={
             d.sem_papel.length > 0 ? (
               <Button size="xs" variant="default" onClick={() => onGo('plano-subtarefas')}>
-                Atribuir papéis
+                {m.assignRoles}
               </Button>
             ) : undefined
           }
         >
           {d.sem_papel.length === 0
-            ? `Todas têm papel: ${d.papel_por_origem.rotulo} por label, ${d.papel_por_origem.responsavel} pelo responsável, ${d.papel_por_origem.tarefa} pela tarefa, ${d.papel_por_origem.manual} escolhidos aqui.`
-            : `${plural(d.sem_papel.length, 'subtarefa não tem', 'subtarefas não têm')} papel. Atribuir a função de cada pessoa (em Pessoas) resolve as que têm responsável; as demais se escolhem aqui.`}
+            ? m.allHaveRole(d.papel_por_origem.rotulo, d.papel_por_origem.responsavel, d.papel_por_origem.tarefa, d.papel_por_origem.manual)
+            : m.missingRole(d.sem_papel.length)}
         </Step>
         <Step
           state={d.membros_com_papel === 0 ? 'missing' : teamGap.length ? 'missing' : 'ok'}
-          title="Equipe com papéis"
+          title={m.teamStep}
           action={
             d.membros_com_papel === 0 || teamGap.length ? (
               <Button size="xs" variant="default" component={Link} to="/pessoas?funcoes=1">
-                Cadastrar funções em Pessoas
+                {m.registerRoles}
               </Button>
             ) : undefined
           }
         >
           {d.membros_com_papel === 0
-            ? 'Ninguém tem papel ainda. As pessoas já vieram do Jira; falta dizer o papel de cada uma.'
+            ? m.nobodyRole
             : teamGap.length
               ? teamGap.map((p) => p.mensagem).join(' ')
-              : `${plural(d.membros_com_papel, 'pessoa', 'pessoas')} com papel; ${plural(view.selecao.length, 'selecionada', 'selecionadas')} para este épico.`}
+              : m.teamOk(d.membros_com_papel, view.selecao.length)}
         </Step>
         {cycles.length > 0 && (
-          <Step state="missing" title="Dependências sem ciclo">
+          <Step state="missing" title={m.cyclesStep}>
             {cycles.map((p) => p.mensagem).join(' ')}
           </Step>
         )}

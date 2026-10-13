@@ -4,21 +4,18 @@ import { IconArrowBackUp } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import { useSetSubtaskRoles } from '../../api/planHooks';
-import type { EpicPlanView, RoleOrigin } from '../../api/types';
+import type { EpicPlanView } from '../../api/types';
+import { useT } from '../../i18n';
 import { hours } from './shared';
-
-const ORIGIN: Record<RoleOrigin, { label: string; tip: string }> = {
-  manual: { label: 'escolhido aqui', tip: 'Alguém escolheu o papel nesta tela. Vale mais que labels e responsável.' },
-  rotulo: { label: 'label do Jira', tip: 'Uma label ou componente da subtarefa corresponde a um papel.' },
-  responsavel: { label: 'responsável', tip: 'O papel da pessoa responsável pela subtarefa, cadastrado na página dela em Pessoas.' },
-  tarefa: { label: 'tarefa', tip: 'Herdado da tarefa, que corresponde a um papel só.' },
-};
 
 /**
  * The role of each subtask, and where it came from. Choosing one here is stored in Cadência (Jira
  * stays read-only) and wins over labels and the assignee; clearing it returns to the automatic answer.
  */
 export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
+  const t = useT();
+  const m = t.epicPlan.subtaskRoles;
+  const ORIGIN = m.origin;
   const setRoles = useSetSubtaskRoles();
   const missing = view.subtarefas.filter((s) => s.papeis.length === 0);
   const [filter, setFilter] = useState<string>(missing.length ? 'sem' : 'todas');
@@ -29,7 +26,7 @@ export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
   const save = (key: string, roles: number[]) =>
     setRoles.mutate(
       { key, roles },
-      { onError: (error) => notifications.show({ color: 'red', title: `Papel de ${key} não salvo`, message: error.message }) },
+      { onError: (error) => notifications.show({ color: 'red', title: m.saveFailed(key), message: error.message }) },
     );
 
   return (
@@ -40,17 +37,17 @@ export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
           value={filter}
           onChange={setFilter}
           data={[
-            { value: 'sem', label: `Sem papel · ${missing.length}` },
-            { value: 'todas', label: `Todas · ${view.subtarefas.length}` },
+            { value: 'sem', label: m.filterMissing(missing.length) },
+            { value: 'todas', label: m.filterAll(view.subtarefas.length) },
           ]}
         />
         <Text size="xs" c="dimmed">
-          Um papel, ou dois para uma subtarefa composta (“A + B”). Fica guardado no Cadência; o Jira não muda.
+          {m.hint}
         </Text>
       </Group>
       {rows.length === 0 ? (
         <Text size="sm" c="dimmed">
-          Todas as subtarefas têm papel.
+          {m.allHaveRole}
         </Text>
       ) : (
         <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
@@ -58,11 +55,11 @@ export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
             <Table>
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Subtarefa</Table.Th>
-                  <Table.Th>Responsável</Table.Th>
-                  <Table.Th className="num">Horas</Table.Th>
-                  <Table.Th w={280}>Papel</Table.Th>
-                  <Table.Th>Origem</Table.Th>
+                  <Table.Th>{m.columns.subtask}</Table.Th>
+                  <Table.Th>{m.columns.assignee}</Table.Th>
+                  <Table.Th className="num">{m.columns.hours}</Table.Th>
+                  <Table.Th w={280}>{m.columns.role}</Table.Th>
+                  <Table.Th>{m.columns.origin}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -98,8 +95,8 @@ export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
                     <Table.Td>
                       <MultiSelect
                         size="xs"
-                        aria-label={`Papel de ${s.id}`}
-                        placeholder={s.papeis.length ? undefined : 'Escolher papel'}
+                        aria-label={m.roleAria(s.id)}
+                        placeholder={s.papeis.length ? undefined : m.choose}
                         data={options}
                         value={s.papeis.map(String)}
                         maxValues={2}
@@ -117,12 +114,12 @@ export function SubtaskRolesPanel({ view }: { view: EpicPlanView }) {
                           </Tooltip>
                         ) : (
                           <Badge color="red" variant="light">
-                            sem papel
+                            {m.noRole}
                           </Badge>
                         )}
                         {s.origem_papel === 'manual' && (
-                          <Tooltip label="Voltar ao papel automático (label, responsável ou tarefa)">
-                            <ActionIcon variant="subtle" size="sm" aria-label={`Voltar ${s.id} ao papel automático`} onClick={() => save(s.id, [])}>
+                          <Tooltip label={m.revertTip}>
+                            <ActionIcon variant="subtle" size="sm" aria-label={m.revertAria(s.id)} onClick={() => save(s.id, [])}>
                               <IconArrowBackUp size={14} />
                             </ActionIcon>
                           </Tooltip>

@@ -2,6 +2,7 @@ import { Box, Group, Stack, Tabs, Text } from '@mantine/core';
 import { useMemo, useState } from 'react';
 
 import type { EpicPlanView, PlanGraph } from '../../api/types';
+import { useT } from '../../i18n';
 import { Note } from '../common';
 import { hours, roleIndex } from './shared';
 import type { TaskFocus } from './TaskCards';
@@ -70,6 +71,7 @@ function Diagram({
   onOpen: (focus: TaskFocus) => void;
   label: string;
 }) {
+  const t = useT();
   const roles = roleIndex(view);
   const { position, width, height } = useMemo(() => layout(graph, size), [graph, size]);
   return (
@@ -114,7 +116,7 @@ function Diagram({
               className="pipeline-node"
               style={{ left: at.x, top: at.y, width: size.width, height: size.height }}
               onClick={() => onOpen({ taskId: node.taskId, subtasks: node.id === node.taskId ? [] : [node.id] })}
-              aria-label={`${node.title}, ${hours(node.hours)}. Abrir detalhes`}
+              aria-label={t.epicPlan.pipeline.openDetails(node.title, hours(node.hours))}
             >
               <Box style={{ display: 'flex', flexDirection: 'column', width: 6, flex: '0 0 6px' }} aria-hidden>
                 {nodeRoles.map((role) => (
@@ -124,7 +126,7 @@ function Diagram({
               <Stack gap={0} p={6} style={{ minWidth: 0, flex: 1 }}>
                 <Group justify="space-between" wrap="nowrap" gap={4}>
                   <Text size="10px" tt="uppercase" c="dimmed" lineClamp={1}>
-                    {nodeRoles.map((r) => r!.nome).join(' + ') || 'sem papel'}
+                    {nodeRoles.map((r) => r!.nome).join(' + ') || t.epicPlan.pipeline.noRole}
                   </Text>
                   <Text size="10px" fw={700} className="num">
                     {hours(node.hours)}
@@ -151,6 +153,8 @@ const TASK_SIZE = { width: 210, height: 78 };
 const SUBTASK_SIZE = { width: 190, height: 66 };
 
 export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: (focus: TaskFocus) => void }) {
+  const t = useT();
+  const m = t.epicPlan.pipeline;
   const [tab, setTab] = useState<string | null>('tarefas');
   const taskNodes = useMemo(
     () =>
@@ -173,8 +177,8 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
     <Stack gap="sm">
       <Tabs value={tab} onChange={setTab} variant="pills">
         <Tabs.List mb="sm">
-          <Tabs.Tab value="tarefas">Tarefas</Tabs.Tab>
-          <Tabs.Tab value="subtarefas">Subtarefas</Tabs.Tab>
+          <Tabs.Tab value="tarefas">{m.tasks}</Tabs.Tab>
+          <Tabs.Tab value="subtarefas">{m.subtasks}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="tarefas">
           <Diagram
@@ -183,7 +187,7 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
             size={TASK_SIZE}
             view={view}
             onOpen={onOpen}
-            label="Pipeline de dependências entre tarefas"
+            label={m.tasksAria}
           />
         </Tabs.Panel>
         <Tabs.Panel value="subtarefas">
@@ -193,7 +197,7 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
             size={SUBTASK_SIZE}
             view={view}
             onOpen={onOpen}
-            label="Pipeline de dependências entre subtarefas"
+            label={m.subtasksAria}
           />
         </Tabs.Panel>
       </Tabs>
@@ -201,15 +205,15 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
         <Group gap={6}>
           <Box w={24} h={2} bg="var(--mantine-primary-color-filled)" />
           <Text size="xs" c="dimmed">
-            dependência bloqueante
+            {m.edge}
           </Text>
         </Group>
         <Text size="xs" c="dimmed">
-          Clique num card para ver os detalhes completos da tarefa.
+          {m.clickHint}
         </Text>
       </Group>
       {view.pipeline.notas.length > 0 && (
-        <Note title="Observações de dependência">
+        <Note title={m.notesTitle}>
           {view.pipeline.notas.map((note) => (
             <span key={note.tarefa_id} style={{ display: 'block' }}>
               <b>{note.titulo}:</b> {note.texto}

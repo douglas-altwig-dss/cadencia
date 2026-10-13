@@ -3,20 +3,8 @@ import { IconExternalLink } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import type { EpicPlanView, PlanSubtask, PlanTask } from '../../api/types';
+import { useT } from '../../i18n';
 import { hours, RoleChip, roleIndex, type RoleIndex } from './shared';
-
-const ORIGIN_WORD: Record<NonNullable<PlanSubtask['origem_papel']>, string> = {
-  manual: 'escolha manual',
-  rotulo: 'label do Jira',
-  responsavel: 'responsável',
-  tarefa: 'tarefa',
-};
-
-const KIND: Record<PlanSubtask['tipo'], string> = {
-  execucao: 'execução',
-  code_review: 'code review',
-  cadastro_jira: 'cadastro no Jira',
-};
 
 function Stripes({ task, roles }: { task: PlanTask; roles: RoleIndex }) {
   const colors = task.papeis.map((id) => roles.get(id)?.cor).filter((c): c is string => !!c);
@@ -44,6 +32,8 @@ function SubtaskRow({
   highlighted: boolean;
   onToggle: () => void;
 }) {
+  const t = useT();
+  const m = t.epicPlan.taskCards;
   const first = roles.get(subtask.papeis[0]);
   const titles = new Map(view.subtarefas.map((s) => [s.id, s.titulo]));
   return (
@@ -71,16 +61,16 @@ function SubtaskRow({
               {subtask.id}
             </Text>
             {subtask.url && (
-              <Anchor href={subtask.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${subtask.id} no Jira`} c="dimmed">
+              <Anchor href={subtask.url} target="_blank" rel="noreferrer" aria-label={m.openInJira(subtask.id)} c="dimmed">
                 <IconExternalLink size={12} />
               </Anchor>
             )}
             <Badge size="xs" variant="default" tt="none">
-              {KIND[subtask.tipo]}
+              {m.kind[subtask.tipo]}
             </Badge>
             {subtask.composta && (
               <Badge size="xs" variant="default" tt="none">
-                composta
+                {m.composite}
               </Badge>
             )}
             <Badge size="xs" variant="default" tt="none">
@@ -91,15 +81,17 @@ function SubtaskRow({
             {subtask.papeis.map((id) => roles.get(id)).map((role) => role && <RoleChip key={role.id} role={role} />)}
           </Group>
           <Text size="xs">
-            {subtask.rotulo_horas}
-            {subtask.responsavel ? ` · responsável: ${subtask.responsavel}` : ''}
-            {subtask.origem_papel ? ` · papel por ${ORIGIN_WORD[subtask.origem_papel]}` : ' · sem papel'}
+            {[
+              subtask.rotulo_horas,
+              ...(subtask.responsavel ? [m.assignee(subtask.responsavel)] : []),
+              subtask.origem_papel ? m.roleBy(m.originWord[subtask.origem_papel]) : m.noRole,
+            ].join(' · ')}
           </Text>
           <Text size="xs" c="dimmed">
-            Pré-requisitos:{' '}
+            {m.prerequisites}{' '}
             {subtask.prerequisitos.length
               ? subtask.prerequisitos.map((id) => `${id} (${titles.get(id) ?? '?'})`).join(', ')
-              : 'nenhum'}
+              : m.none}
           </Text>
         </Stack>
       </Collapse>
@@ -108,6 +100,8 @@ function SubtaskRow({
 }
 
 export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view: EpicPlanView; highlight?: string[] }) {
+  const t = useT();
+  const m = t.epicPlan.taskCards;
   const roles = roleIndex(view);
   const subtasks = new Map(view.subtarefas.map((s) => [s.id, s]));
   const tasks = new Map(view.tarefas.map((t) => [t.id, t]));
@@ -127,12 +121,12 @@ export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view:
           <Group gap={6} wrap="nowrap">
             <Text fw={700}>{task.titulo}</Text>
             {task.url && (
-              <Anchor href={task.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${task.id} no Jira`} c="dimmed">
+              <Anchor href={task.url} target="_blank" rel="noreferrer" aria-label={m.openInJira(task.id)} c="dimmed">
                 <IconExternalLink size={14} />
               </Anchor>
             )}
           </Group>
-          <Tooltip label={task.horas_code_review ? 'execução + code review' : 'horas da tarefa'} withArrow>
+          <Tooltip label={task.horas_code_review ? m.hoursWithReview : m.taskHours} withArrow>
             <Badge variant="light" tt="none" style={{ cursor: 'help', flex: '0 0 auto' }}>
               {task.rotulo_horas}
             </Badge>
@@ -145,21 +139,21 @@ export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view:
           {task.papeis.map((id) => roles.get(id)).map((role) => role && <RoleChip key={role.id} role={role} />)}
           {task.fase === 'planejamento' && (
             <Badge size="sm" variant="default" tt="none">
-              planejamento
+              {m.planningPhase}
             </Badge>
           )}
         </Group>
         <Text size="sm">
           <Text span c="dimmed">
-            Depende de:{' '}
+            {m.dependsOn}{' '}
           </Text>
-          <b>{task.depende_de.length ? task.depende_de.map((id) => tasks.get(id)?.titulo ?? id).join(', ') : 'nada — início do pipeline'}</b>
+          <b>{task.depende_de.length ? task.depende_de.map((id) => tasks.get(id)?.titulo ?? id).join(', ') : m.nothing}</b>
           {task.observacao_dependencia && <Text span> — {task.observacao_dependencia}</Text>}
         </Text>
         {task.negocio && (
           <div>
             <Text size="xs" fw={700} tt="uppercase">
-              Negócio
+              {m.business}
             </Text>
             <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
               {task.negocio}
@@ -169,7 +163,7 @@ export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view:
         {task.tecnico && (
           <div>
             <Text size="xs" fw={700} tt="uppercase">
-              Técnico
+              {m.technical}
             </Text>
             <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
               {task.tecnico}
@@ -177,9 +171,9 @@ export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view:
           </div>
         )}
         <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-          Subtarefas{' '}
+          {m.subtasks}{' '}
           <Text span size="xs" fw={400}>
-            (clique para detalhes)
+            {m.clickHint}
           </Text>
         </Text>
         <Stack gap={4}>
@@ -201,7 +195,7 @@ export function TaskCard({ task, view, highlight = [] }: { task: PlanTask; view:
           })}
           {task.subtarefas.length === 0 && (
             <Text size="sm" c="dimmed">
-              Sem subtarefas no Jira.
+              {m.noSubtasks}
             </Text>
           )}
         </Stack>
@@ -227,9 +221,10 @@ export interface TaskFocus {
 }
 
 export function TaskModal({ view, focus, onClose }: { view: EpicPlanView; focus: TaskFocus | null; onClose: () => void }) {
+  const t = useT();
   const task = focus ? view.tarefas.find((t) => t.id === focus.taskId) : undefined;
   return (
-    <Modal opened={!!task} onClose={onClose} size="lg" title={task ? `${task.id} · detalhes da tarefa` : ''}>
+    <Modal opened={!!task} onClose={onClose} size="lg" title={task ? t.epicPlan.taskCards.modalTitle(task.id) : ''}>
       {task && focus && <TaskCard key={`${task.id}-${focus.subtasks.join()}`} task={task} view={view} highlight={focus.subtasks} />}
     </Modal>
   );

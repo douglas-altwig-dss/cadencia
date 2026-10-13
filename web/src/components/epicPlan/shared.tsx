@@ -3,21 +3,20 @@ import { IconArrowsExchange } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
 import type { EpicPlanView, PlanRole, PlanStatus } from '../../api/types';
+import { t as messages, useT } from '../../i18n';
 import { bestText } from '../../lib/contrast';
 import { InfoTip } from '../common';
-import { fmtNum, plural } from '../../lib/format';
+import { fmtNum } from '../../lib/format';
 
-/** Section 8's texts that belong to the page; the algorithm ones come from the API's registry. */
-export const TIPS = {
-  floating: 'Esta pessoa cobre mais de um papel. Suas horas aparecem em cada papel, mas só podem ser gastas uma vez.',
-  personHours:
-    'Subtarefas compostas somam a hora cheia para cada papel envolvido, por isso a soma por papel é maior que o total do épico.',
-  baseline: 'Considera uma pessoa por papel, sem otimizar a alocação. Serve de referência para medir o ganho do planejamento.',
-} as const;
+// Section 8's texts that belong to the page live in the `epicPlan.tips` catalogue; the algorithm
+// ones come from the API's registry.
+
+/** A catalogue sentence with `**bold**` parts, drawn with the bold kept inside the one sentence. */
+export function rich(text: string): ReactNode {
+  return text.split('**').map((part, index) => (index % 2 ? <b key={index}>{part}</b> : part));
+}
 
 export const hours = (value: number | null | undefined) => `${fmtNum(value, 2)}h`;
-
-export { plural };
 
 export type RoleIndex = Map<number, PlanRole>;
 
@@ -76,9 +75,10 @@ export function RoleChip({
 }
 
 export function FloatingMark() {
+  const t = useT();
   return (
-    <Tooltip label={TIPS.floating} multiline w={280} withArrow>
-      <span aria-label="Capacidade flutuante" style={{ display: 'inline-flex', cursor: 'help' }}>
+    <Tooltip label={t.epicPlan.tips.floating} multiline w={280} withArrow>
+      <span aria-label={t.epicPlan.floatingAria} style={{ display: 'inline-flex', cursor: 'help' }}>
         <IconArrowsExchange size={12} />
       </span>
     </Tooltip>
@@ -121,29 +121,31 @@ export function PlanSection({
   );
 }
 
-const STATUS: Record<PlanStatus, { label: string; color: string }> = {
-  otimo: { label: 'Ótimo', color: 'teal' },
-  viavel: { label: 'Viável', color: 'yellow' },
-  sem_solucao: { label: 'Sem solução no limite de tempo', color: 'red' },
-  heuristico: { label: 'Heurística', color: 'gray' },
-  invalido: { label: 'Plano inválido', color: 'red' },
+const STATUS_COLOR: Record<PlanStatus, string> = {
+  otimo: 'teal',
+  viavel: 'yellow',
+  sem_solucao: 'red',
+  heuristico: 'gray',
+  invalido: 'red',
 };
 
 /** Status of a generated plan. "Ótimo" means optimality was proven; "Viável" carries its gap. */
 export function StatusBadge({ status, gap }: { status: PlanStatus; gap: number | null }) {
-  const meta = STATUS[status];
-  const text = status === 'viavel' && gap !== null ? `${meta.label} — gap ${fmtNum(gap * 100, 1)}%` : meta.label;
+  const t = useT();
+  const label = t.epicPlan.status[status];
+  const text = status === 'viavel' && gap !== null ? t.epicPlan.statusWithGap(label, fmtNum(gap * 100, 1)) : label;
   return (
-    <Badge variant="light" color={meta.color} tt="none">
+    <Badge variant="light" color={STATUS_COLOR[status]} tt="none">
       {text}
     </Badge>
   );
 }
 
 export function gainText(days: number): { text: string; good: boolean } {
-  if (days > 0) return { text: `⭐ ${plural(days, 'dia', 'dias')} mais rápido`, good: true };
-  if (days === 0) return { text: 'mesma duração do cronograma base', good: false };
-  return { text: `${plural(-days, 'dia', 'dias')} mais lento que o cronograma base`, good: false };
+  const gain = messages().epicPlan.gain;
+  if (days > 0) return { text: gain.faster(days), good: true };
+  if (days === 0) return { text: gain.same, good: false };
+  return { text: gain.slower(-days), good: false };
 }
 
 export function Dimmed({ children }: { children: ReactNode }) {

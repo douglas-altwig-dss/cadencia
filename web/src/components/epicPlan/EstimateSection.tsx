@@ -2,10 +2,11 @@ import { Badge, Group, Paper, Progress, SimpleGrid, Stack, Text } from '@mantine
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import type { EpicPlanView } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtNum, fmtPct } from '../../lib/format';
 import { HELP } from '../../lib/indicatorHelp';
 import { KpiCard, Note, Tipped } from '../common';
-import { hours, InfoTip, plural, roleIndex, TIPS } from './shared';
+import { hours, InfoTip, rich, roleIndex } from './shared';
 
 function Figure({ label, value, hint, help }: { label: string; value: string; hint?: string; help?: string }) {
   return (
@@ -16,6 +17,8 @@ function Figure({ label, value, hint, help }: { label: string; value: string; hi
 }
 
 export function EstimateSection({ view }: { view: EpicPlanView }) {
+  const t = useT();
+  const m = t.epicPlan.estimate;
   const roles = roleIndex(view);
   const h = view.horas;
   const rec = view.reconciliacao;
@@ -24,29 +27,29 @@ export function EstimateSection({ view }: { view: EpicPlanView }) {
   return (
     <Stack gap="md">
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
-        <Figure label="Planejamento" value={hours(h.planejamento)} help={HELP['plan:planning_hours']} />
-        <Figure label="Execução" value={hours(h.execucao)} hint="inclui code review" help={HELP['plan:execution_hours']} />
+        <Figure label={m.planning} value={hours(h.planejamento)} help={HELP['plan:planning_hours']} />
+        <Figure label={m.execution} value={hours(h.execucao)} hint={m.includesReview} help={HELP['plan:execution_hours']} />
         <Paper withBorder p="md">
           <Text className="kpi-label" mb={6}>
-            <Tipped help={HELP['plan:overhead']}>Overhead</Tipped>
+            <Tipped help={HELP['plan:overhead']}>{m.overhead}</Tipped>
           </Text>
           <Group justify="space-between">
-            <Text size="sm">Jira</Text>
+            <Text size="sm">{m.jira}</Text>
             <Text size="sm" fw={700} className="num">
               {hours(h.jira)}
             </Text>
           </Group>
           <Text size="xs" c="dimmed">
-            {plural(h.jira_subtarefas, 'subtarefa', 'subtarefas')} × {hours(params.overhead_jira_h)}; custo do épico, fora dos papéis
+            {m.jiraHint(h.jira_subtarefas, hours(params.overhead_jira_h))}
           </Text>
           <Group justify="space-between">
-            <Text size="sm">Code review</Text>
+            <Text size="sm">{m.codeReview}</Text>
             <Text size="sm" fw={700} className="num">
               {hours(h.code_review)}
             </Text>
           </Group>
           <Text size="xs" c="dimmed">
-            subconjunto da execução
+            {m.reviewHint}
           </Text>
         </Paper>
       </SimpleGrid>
@@ -68,28 +71,23 @@ export function EstimateSection({ view }: { view: EpicPlanView }) {
                 color={role.cor}
                 size="sm"
                 my={4}
-                aria-label={`${role.nome}: ${fmtPct(entry.percentual)} das horas-pessoa`}
+                aria-label={m.shareAria(role.nome, fmtPct(entry.percentual))}
               />
               <Group gap={4} wrap="nowrap">
                 <Text size="xs" c="dimmed">
-                  {fmtPct(entry.percentual)} das horas-pessoa
+                  {m.share(fmtPct(entry.percentual))}
                 </Text>
-                <InfoTip label={TIPS.personHours} width={260} />
+                <InfoTip label={t.epicPlan.tips.personHours} width={260} />
               </Group>
               <Text size="xs" c="dimmed">
-                {plural(entry.subtarefas, 'subtarefa', 'subtarefas')}
+                {t.epicPlan.count.subtasks(entry.subtarefas)}
               </Text>
             </Paper>
           );
         })}
       </SimpleGrid>
 
-      <Note title="Como as horas-pessoa somam">
-        Calculado a partir das horas de cada subtarefa no Jira. Quando uma subtarefa é composta (“A + B”, por exemplo uma
-        integração conjunta), cada papel envolvido soma a hora <b>cheia</b>, não a metade: as duas pessoas trabalham ao mesmo
-        tempo. Por isso a soma por papel é maior que as horas do épico. O overhead de Jira é custo do épico como um todo e não
-        entra em nenhum papel.
-      </Note>
+      <Note title={m.noteTitle}>{rich(m.noteBody)}</Note>
       <Group gap="xs" wrap="wrap">
         <Badge
           color={rec.fecha ? 'teal' : 'red'}
@@ -97,13 +95,18 @@ export function EstimateSection({ view }: { view: EpicPlanView }) {
           tt="none"
           leftSection={rec.fecha ? <IconCheck size={12} /> : <IconX size={12} />}
         >
-          {rec.fecha ? 'reconciliação fecha' : 'reconciliação não fecha'}
+          {rec.fecha ? m.reconciles : m.doesNotReconcile}
         </Badge>
         <Text size="sm">
-          Σ horas-pessoa {hours(rec.horas_pessoa)} − {hours(rec.horas_compostas)} em subtarefas compostas ={' '}
-          {hours(rec.horas_pessoa - rec.horas_compostas)} = planejamento {hours(rec.horas_planejamento)} + execução{' '}
-          {hours(rec.horas_execucao)} ({fmtNum(rec.horas_planejamento + rec.horas_execucao, 2)}h)
-          {!rec.fecha && ' — há subtarefas sem papel; veja os problemas nos dados.'}
+          {m.reconciliation(
+            hours(rec.horas_pessoa),
+            hours(rec.horas_compostas),
+            hours(rec.horas_pessoa - rec.horas_compostas),
+            hours(rec.horas_planejamento),
+            hours(rec.horas_execucao),
+            fmtNum(rec.horas_planejamento + rec.horas_execucao, 2),
+          )}
+          {!rec.fecha && m.reconciliationGap}
         </Text>
       </Group>
     </Stack>

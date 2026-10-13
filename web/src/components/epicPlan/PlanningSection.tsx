@@ -5,35 +5,36 @@ import { useState } from 'react';
 import { ApiError } from '../../api/client';
 import { useAlgorithms, useGeneratePlan } from '../../api/planHooks';
 import type { EpicPlanView, PlanResult } from '../../api/types';
-import { collator } from '../../i18n';
+import { collator, useT } from '../../i18n';
 import { fmtDateTime, fmtNum } from '../../lib/format';
 import { Note } from '../common';
 import { MemberSelection } from './MemberSelection';
 import { PlanReadiness } from './PlanReadiness';
 import { ScheduleHeader } from './ScheduleSection';
-import { gainText, InfoTip, plural, roleIndex, StatusBadge, TIPS } from './shared';
+import { gainText, InfoTip, roleIndex, StatusBadge } from './shared';
 import type { TaskFocus } from './TaskCards';
 import { WeeklyGantt, type GanttBar, type GanttGroup } from './WeeklyGantt';
 
 function Outcome({ result }: { result: PlanResult }) {
+  const t = useT();
+  const m = t.epicPlan.planning;
   if (result.status === 'sem_solucao') {
     return (
-      <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} title="Sem solução no limite de tempo">
-        O algoritmo não encontrou um plano em {fmtNum(result.tempo_s)} s. O plano anterior foi mantido; aumente o limite de tempo nos
-        parâmetros ou use outro algoritmo.
+      <Alert color="orange" variant="light" icon={<IconAlertTriangle size={18} />} title={m.noSolutionTitle}>
+        {m.noSolutionBody(fmtNum(result.tempo_s))}
       </Alert>
     );
   }
   if (result.status === 'invalido') {
     return (
-      <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />} title="O plano devolvido não passou na validação">
+      <Alert color="red" variant="light" icon={<IconAlertTriangle size={18} />} title={m.invalidTitle}>
         {result.violacoes.slice(0, 8).map((v) => (
           <Text size="sm" key={v}>
             {v}
           </Text>
         ))}
         <Text size="sm" mt={4}>
-          Ele foi descartado; o plano anterior foi mantido.
+          {m.invalidKept}
         </Text>
       </Alert>
     );
@@ -50,6 +51,8 @@ export function PlanningSection({
   onOpen: (focus: TaskFocus) => void;
   onGo: (id: string) => void;
 }) {
+  const t = useT();
+  const m = t.epicPlan.planning;
   const algorithms = useAlgorithms();
   const generate = useGeneratePlan();
   const items = algorithms.data?.items ?? [];
@@ -73,7 +76,7 @@ export function PlanningSection({
           id: `p${role.id}`,
           label: role.nome,
           color: role.cor,
-          count: plural(plan.alocacoes.filter((a) => a.papel_id === role.id).length, 'subtarefa', 'subtarefas'),
+          count: t.epicPlan.count.subtasks(plan.alocacoes.filter((a) => a.papel_id === role.id).length),
           lanes: view.selecao
             .map((id) => members.get(id))
             .filter((m) => m && m.papeis.some((p) => p.papel_id === role.id))
@@ -112,7 +115,7 @@ export function PlanningSection({
         <Grid.Col span={{ base: 12, md: 8 }}>
           <Paper withBorder p="md" h="100%">
             <Stack gap="md">
-              <Radio.Group value={algorithm} onChange={setChosen} label="Algoritmo" labelProps={{ mb: 'xs' }}>
+              <Radio.Group value={algorithm} onChange={setChosen} label={m.algorithm} labelProps={{ mb: 'xs' }}>
                 <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
                   {items.map((a) => (
                     <Radio.Card key={a.id} value={a.id} p="sm" radius="md" className="algo-card">
@@ -126,7 +129,7 @@ export function PlanningSection({
                             <InfoTip label={a.descricao} width={300} nested />
                           </Group>
                           <Text size="xs" c="dimmed">
-                            {a.exato ? `exato, até ${fmtNum(limit)} s` : 'responde na hora'}
+                            {a.exato ? m.exact(fmtNum(limit)) : m.instant}
                           </Text>
                         </Stack>
                       </Group>
@@ -141,11 +144,11 @@ export function PlanningSection({
                   loading={generate.isPending}
                   disabled={!view.selecao.length || view.bloqueios_plano.length > 0 || view.bloqueios_base.length > 0}
                 >
-                  Gerar plano
+                  {m.generate}
                 </Button>
                 {generate.isPending && current?.exato && (
                   <Text size="sm" c="dimmed">
-                    Resolvendo… até {fmtNum(limit)} s.
+                    {m.solving(fmtNum(limit))}
                   </Text>
                 )}
               </Group>
@@ -154,7 +157,7 @@ export function PlanningSection({
                   {error.message}
                   {error.action && <Text size="sm">{error.action}</Text>}
                   <Text size="sm" mt={4}>
-                    O plano anterior foi mantido; o algoritmo guloso continua disponível.
+                    {m.errorKept}
                   </Text>
                 </Alert>
               )}
@@ -163,26 +166,26 @@ export function PlanningSection({
                 <Stack gap="xs">
                   <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="xs">
                     <Paper p="sm" radius="md" bg="var(--surface-sunken)">
-                      <Text className="kpi-label">Plano gerado</Text>
-                      <Text className="kpi-value">{plural(plan.duracao.total_dias, 'dia', 'dias')}</Text>
+                      <Text className="kpi-label">{m.generated}</Text>
+                      <Text className="kpi-value">{t.epicPlan.count.days(plan.duracao.total_dias)}</Text>
                       <Text size="xs" c="dimmed" lineClamp={1}>
                         {plan.algoritmo_nome}
                       </Text>
                     </Paper>
                     <Paper p="sm" radius="md" bg="var(--surface-sunken)">
                       <Group gap={4}>
-                        <Text className="kpi-label">Cronograma base</Text>
-                        <InfoTip label={TIPS.baseline} width={260} />
+                        <Text className="kpi-label">{m.baseline}</Text>
+                        <InfoTip label={t.epicPlan.tips.baseline} width={260} />
                       </Group>
-                      <Text className="kpi-value">{plural(base.duracao.total_dias, 'dia', 'dias')}</Text>
+                      <Text className="kpi-value">{t.epicPlan.count.days(base.duracao.total_dias)}</Text>
                       <Text size="xs" c="dimmed">
-                        1 pessoa por papel
+                        {m.onePerRole}
                       </Text>
                     </Paper>
                     <Paper p="sm" radius="md" bg="var(--surface-sunken)">
-                      <Text className="kpi-label">Ganho</Text>
+                      <Text className="kpi-label">{m.gain}</Text>
                       <Text className="kpi-value" c={gain?.good ? 'teal.8' : undefined}>
-                        {plan.ganho_dias !== undefined ? `${plan.ganho_dias > 0 ? '−' : plan.ganho_dias < 0 ? '+' : ''}${plural(Math.abs(plan.ganho_dias), 'dia', 'dias')}` : '—'}
+                        {plan.ganho_dias !== undefined ? `${plan.ganho_dias > 0 ? '−' : plan.ganho_dias < 0 ? '+' : ''}${t.epicPlan.count.days(Math.abs(plan.ganho_dias))}` : '—'}
                       </Text>
                       <Text size="xs" c={gain?.good ? 'teal.8' : 'dimmed'} fw={gain?.good ? 600 : undefined}>
                         {gain?.text ?? ''}
@@ -193,8 +196,10 @@ export function PlanningSection({
                     {plan.status !== 'heuristico' && <StatusBadge status={plan.status} gap={plan.gap} />}
                     <Text size="xs" c="dimmed">
                       {plan.origem === 'armazenado'
-                        ? `Gerado em ${fmtDateTime(plan.gerado_em)}${plan.status === 'heuristico' ? '' : `, resolvido em ${plan.tempo_s < 0.1 ? 'menos de 0,1' : fmtNum(plan.tempo_s, 1)} s`}.`
-                        : 'Plano guloso calculado na hora para a seleção atual. Use “Gerar plano” para registrá-lo como o último plano.'}
+                        ? plan.status === 'heuristico'
+                          ? m.generatedAt(fmtDateTime(plan.gerado_em))
+                          : m.generatedAtSolved(fmtDateTime(plan.gerado_em), plan.tempo_s < 0.1 ? m.lessThanTenth : fmtNum(plan.tempo_s, 1))
+                        : m.greedyNow}
                     </Text>
                   </Group>
                 </Stack>
@@ -204,25 +209,17 @@ export function PlanningSection({
         </Grid.Col>
       </Grid>
 
-      {!plan && <PlanReadiness view={view} onGo={onGo} title="Ainda não há plano para esta equipe" />}
+      {!plan && <PlanReadiness view={view} onGo={onGo} title={m.noPlanTitle} />}
 
       {plan && (
         <>
           <ScheduleHeader view={view} duration={plan.duracao.rotulo} weeks={plan.semanas} />
-          <WeeklyGantt groups={groups} bars={bars} weeks={plan.semanas} workday={view.parametros.jornada_h} caption="Plano gerado por papel e membro" />
-          <Note>
-            Cada subtarefa é alocada a um especialista disponível — considerando quem cobre mais de um papel — respeitando sempre os
-            pré-requisitos. Subtarefas compostas (“A + B”) reservam duas pessoas diferentes ao mesmo tempo. Um membro com vários
-            papéis aparece em cada grupo, mas cada subtarefa só aparece na linha do papel em que foi alocada. O ganho de tempo vem de
-            rodar em paralelo subtarefas independentes do mesmo papel; cadeias que dependem umas das outras continuam sequenciais, não
-            importa quantas pessoas estejam disponíveis.
-          </Note>
+          <WeeklyGantt groups={groups} bars={bars} weeks={plan.semanas} workday={view.parametros.jornada_h} caption={m.ganttCaption} />
+          <Note>{m.note}</Note>
         </>
       )}
       <Text size="xs" c="dimmed">
-        Todos os algoritmos rodam no backend e todo plano passa pelo validador antes de ser mostrado. Se o solver de MILP ou CP-SAT
-        estiver indisponível, essas opções mostram o erro e o guloso continua funcionando. Novas estratégias entram no seletor sem
-        mudar esta tela.
+        {m.footer}
       </Text>
     </Stack>
   );

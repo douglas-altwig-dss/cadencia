@@ -2,11 +2,12 @@ import { Group, Stack, Tabs, Text } from '@mantine/core';
 import { useState } from 'react';
 
 import type { EpicPlanView, PlanWeek } from '../../api/types';
+import { t as messages, useT } from '../../i18n';
 import { fmtNum } from '../../lib/format';
 import { Note } from '../common';
 import { PlanReadiness } from './PlanReadiness';
 import type { TaskFocus } from './TaskCards';
-import { InfoTip, plural, roleIndex, TIPS } from './shared';
+import { InfoTip, rich, roleIndex } from './shared';
 import { WeeklyGantt, type GanttBar, type GanttGroup } from './WeeklyGantt';
 
 /** "Semanas -2 e -1: planejamento — trabalham PM/PO e Arquiteto", read off the schedule. */
@@ -14,21 +15,22 @@ export function planningWeeksText(weeks: PlanWeek[]): string | null {
   const planning = weeks.filter((w) => w.planejamento);
   if (!planning.length) return null;
   const labels = planning.map((w) => String(w.semana));
-  const list = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} e ${labels.at(-1)}` : labels[0];
   const roles = [...new Set(planning.flatMap((w) => w.papeis))];
-  return `${labels.length > 1 ? 'Semanas' : 'Semana'} ${list}: planejamento${roles.length ? ` — trabalham ${roles.join(', ')}` : ''}`;
+  return messages().epicPlan.schedule.planningWeeks(labels, roles);
 }
 
 export function ScheduleHeader({ view, duration, weeks }: { view: EpicPlanView; duration: string; weeks: PlanWeek[] }) {
+  const t = useT();
+  const m = t.epicPlan.schedule;
   const params = view.parametros;
   const planning = planningWeeksText(weeks);
   return (
     <Group gap="lg" wrap="wrap">
       <Text size="sm">
-        <b>{fmtNum(params.horas_semana)}h úteis/semana</b> (5 dias × {fmtNum(params.jornada_h)}h, segunda a sexta)
+        {rich(m.hoursPerWeek(fmtNum(params.horas_semana), fmtNum(params.jornada_h)))}
       </Text>
       <Text size="sm">
-        <b>Duração total:</b> {duration}
+        {rich(m.totalDuration(duration))}
       </Text>
       {planning && <Text size="sm">{planning}</Text>}
     </Group>
@@ -44,20 +46,23 @@ export function ScheduleSection({
   onOpen: (focus: TaskFocus) => void;
   onGo: (id: string) => void;
 }) {
+  const t = useT();
+  const m = t.epicPlan.schedule;
+  const count = t.epicPlan.count;
   const [tab, setTab] = useState<string | null>('tarefa');
   const base = view.base;
-  if (!base) return <PlanReadiness view={view} onGo={onGo} title="Ainda não há cronograma base" />;
+  if (!base) return <PlanReadiness view={view} onGo={onGo} title={m.noBaseline} />;
   const roles = roleIndex(view);
   const subtasks = new Map(view.subtarefas.map((s) => [s.id, s]));
   const tasks = new Map(view.tarefas.map((t) => [t.id, t]));
   const used = view.papeis.filter((r) => base.alocacoes.some((a) => a.papel_id === r.id));
-  const lanes = (roleId: number) => [{ id: `r${roleId}`, label: <Text size="xs" c="dimmed">1 pessoa (referência)</Text> }];
+  const lanes = (roleId: number) => [{ id: `r${roleId}`, label: <Text size="xs" c="dimmed">{m.reference}</Text> }];
 
   const bySubtask: GanttGroup[] = used.map((role) => ({
     id: `s${role.id}`,
     label: role.nome,
     color: role.cor,
-    count: plural(base.alocacoes.filter((a) => a.papel_id === role.id).length, 'subtarefa', 'subtarefas'),
+    count: count.subtasks(base.alocacoes.filter((a) => a.papel_id === role.id).length),
     lanes: lanes(role.id),
   }));
   const subtaskBars: GanttBar[] = base.alocacoes
@@ -83,7 +88,7 @@ export function ScheduleSection({
     id: `t${role.id}`,
     label: role.nome,
     color: role.cor,
-    count: plural(new Set(base.segmentos_tarefa.filter((s) => s.papel_id === role.id).map((s) => s.tarefa_id)).size, 'tarefa', 'tarefas'),
+    count: count.tasks(new Set(base.segmentos_tarefa.filter((s) => s.papel_id === role.id).map((s) => s.tarefa_id)).size),
     lanes: lanes(role.id),
   }));
   const taskBars: GanttBar[] = base.segmentos_tarefa.map((segment) => {
@@ -106,15 +111,15 @@ export function ScheduleSection({
     <Stack gap="sm">
       <Group gap={6}>
         <Text size="sm" c="dimmed">
-          Cronograma base
+          {m.baseline}
         </Text>
-        <InfoTip label={TIPS.baseline} />
+        <InfoTip label={t.epicPlan.tips.baseline} />
       </Group>
       <ScheduleHeader view={view} duration={base.duracao.rotulo} weeks={base.semanas} />
       <Tabs value={tab} onChange={setTab} variant="pills">
         <Tabs.List mb="sm">
-          <Tabs.Tab value="tarefa">Por tarefa</Tabs.Tab>
-          <Tabs.Tab value="subtarefa">Por subtarefa</Tabs.Tab>
+          <Tabs.Tab value="tarefa">{m.byTask}</Tabs.Tab>
+          <Tabs.Tab value="subtarefa">{m.bySubtask}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="tarefa">
           <WeeklyGantt
@@ -122,7 +127,7 @@ export function ScheduleSection({
             bars={taskBars}
             weeks={base.semanas}
             workday={view.parametros.jornada_h}
-            caption="Cronograma base por tarefa"
+            caption={m.byTaskCaption}
           />
         </Tabs.Panel>
         <Tabs.Panel value="subtarefa">
@@ -131,17 +136,11 @@ export function ScheduleSection({
             bars={subtaskBars}
             weeks={base.semanas}
             workday={view.parametros.jornada_h}
-            caption="Cronograma base por subtarefa"
+            caption={m.bySubtaskCaption}
           />
         </Tabs.Panel>
       </Tabs>
-      <Note>
-        As duas abas usam o mesmo cronograma base — uma pessoa por papel — e por isso a duração total é sempre a mesma. Em{' '}
-        <b>Por tarefa</b>, uma tarefa com subtarefas de mais de um papel aparece numa barra em cada linha de papel envolvido, e
-        cada barra só tem as horas daquele papel; subtarefas compostas (“A + B”) somam a hora cheia em cada barra. Se há um vão
-        de tempo entre as subtarefas de um papel na mesma tarefa, a barra é dividida em partes em vez de esticar por cima do vão,
-        para que o comprimento mostre tempo trabalhado. Clique numa barra para ver a tarefa e as subtarefas daquele intervalo.
-      </Note>
+      <Note>{rich(m.note)}</Note>
     </Stack>
   );
 }
