@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { type Locale, setLocaleForTests } from '../i18n';
 
 import {
   addDias,
@@ -156,6 +158,15 @@ describe('signals are filtered apart from themes', () => {
 });
 
 describe('labels', () => {
+  // The labels are asserted in pt-BR, the wording they were written in.
+  let previous: Locale;
+  beforeEach(() => {
+    previous = setLocaleForTests('pt-BR');
+  });
+  afterEach(() => {
+    setLocaleForTests(previous);
+  });
+
   it('names the column and the month jump', () => {
     expect(rotuloBucket('2026-10-01', 'dia')).toEqual({ titulo: '01/10', sub: 'Qui' });
     expect(rotuloBucket('2026-09-28', 'semana')).toEqual({ titulo: '28/09 - 04/10', sub: 'Semana' });
@@ -163,6 +174,12 @@ describe('labels', () => {
       { mes: '2026-09', rotulo: 'Set / 26', qtd: 1 },
       { mes: '2026-10', rotulo: 'Out / 26', qtd: 2 },
     ]);
+  });
+
+  it('follows the current language', () => {
+    setLocaleForTests('en-US');
+    expect(rotuloBucket('2026-10-01', 'dia')).toEqual({ titulo: '01/10', sub: 'Thu' });
+    expect(mesesDe(['2026-09-28'])[0].rotulo).toBe('Sep / 26');
   });
 });
 

@@ -2,7 +2,8 @@ import { ActionIcon, Badge, Group, Text } from '@mantine/core';
 import { IconFlag, IconPencil } from '@tabler/icons-react';
 import type { DragEvent } from 'react';
 
-import { corDoSinal, corDoTema, type Documento, type EstiloLinha } from '../../lib/focusLog';
+import { useT } from '../../i18n';
+import { corDoSinal, corDoTema, type Documento, type EstiloLinha, rotuloTema } from '../../lib/focusLog';
 
 /** An ordinary line of the log: its text, the themes and signals it was filed under, and an edit button. */
 export function TarefaCard({
@@ -22,13 +23,14 @@ export function TarefaCard({
   draggable?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>) => void;
 }) {
+  const t = useT();
   return (
     <article className="tf-card" draggable={draggable} onDragStart={onDragStart}>
       <Group justify="space-between" align="flex-start" wrap="nowrap" gap={4}>
         <Text size="sm" className="tf-card-text">
           {texto}
         </Text>
-        <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Editar atividade" onClick={onEdit}>
+        <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t.people.focus.cards.editActivity} onClick={onEdit}>
           <IconPencil size={13} />
         </ActionIcon>
       </Group>
@@ -55,7 +57,7 @@ export function TarefaCard({
               variant="outline"
               leftSection={<IconFlag size={10} stroke={2} aria-hidden />}
               styles={{ root: { textTransform: 'none', borderStyle: 'dashed', borderColor: corDoSinal(documento, tag), color: 'var(--mantine-color-text)' } }}
-              aria-label={`Sinal: ${tag}`}
+              aria-label={t.people.focus.cards.signalAria(tag)}
             >
               {tag}
             </Badge>
@@ -88,6 +90,7 @@ export function TrocaCard({
   draggable?: boolean;
   onDragStart?: (event: DragEvent<HTMLElement>) => void;
 }) {
+  const t = useT();
   return (
     <article className={`tf-card tf-shift ${estilo}`} style={{ ['--shift-c' as string]: cor }} draggable={draggable} onDragStart={onDragStart}>
       <Group justify="space-between" wrap="nowrap" gap={4}>
@@ -96,22 +99,22 @@ export function TrocaCard({
             {icone}
           </span>
           <Badge size="xs" variant="filled" style={{ background: cor }}>
-            Troca de foco
+            {t.people.focus.page.shift}
           </Badge>
         </Group>
         {onEdit && (
-          <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Editar troca de foco" onClick={onEdit}>
+          <ActionIcon variant="subtle" color="gray" size="sm" aria-label={t.people.focus.cards.editShift} onClick={onEdit}>
             <IconPencil size={13} />
           </ActionIcon>
         )}
       </Group>
       <div className="tf-shift-route">
         <span>
-          <b>De:</b> {de}
+          <b>{t.people.focus.cards.from}</b> {rotuloTema(de)}
         </span>
         <span aria-hidden>➔</span>
         <span>
-          <b>Para:</b> {para}
+          <b>{t.people.focus.cards.to}</b> {rotuloTema(para)}
         </span>
       </div>
       {texto && (

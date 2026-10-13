@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { usePersonAvailability, useSaveAvailability } from '../../api/hooks';
 import type { CapacitySprint } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtNum } from '../../lib/format';
 import { ErrorState, Loading, Note } from '../common';
 import { axisStyle, EChart } from '../EChart';
@@ -11,6 +12,8 @@ import { AbsenceEditor } from './AbsenceEditor';
 
 /** Time this person gives to the tracked boards: their own day length and share, then absences. */
 function Availability({ accountId }: { accountId: string }) {
+  const t = useT();
+  const tc = t.people.capacity;
   const availability = usePersonAvailability(accountId);
   const save = useSaveAvailability(accountId);
   const [hours, setHours] = useState<number | string>('');
@@ -25,15 +28,17 @@ function Availability({ accountId }: { accountId: string }) {
   if (availability.error) return <ErrorState error={availability.error} />;
   const data = availability.data!;
   const perDay = (hours === '' ? data.board_hours_per_day : Number(hours)) * data.board_focus_factor * (allocation / 100);
+  const shownHours = fmtNum(hours === '' ? data.board_hours_per_day : Number(hours));
+  const [yieldsBefore, yieldsAfter] = tc.yields(shownHours, data.board_focus_factor, allocation).split('{amount}');
   const dirty = (hours === '' ? null : Number(hours)) !== data.hours_per_day || allocation !== data.allocation;
   return (
     <Paper withBorder p="md">
       <Stack gap="sm">
-        <Title order={5}>Disponibilidade de tempo</Title>
+        <Title order={5}>{tc.availabilityTitle}</Title>
         <Group align="flex-start" wrap="wrap" gap="lg">
           <NumberInput
-            label="Horas por dia"
-            description={`vazio: ${fmtNum(data.board_hours_per_day)} h, do board`}
+            label={tc.hoursPerDay}
+            description={tc.hoursEmpty(fmtNum(data.board_hours_per_day))}
             placeholder={`${data.board_hours_per_day}`}
             value={hours}
             onChange={setHours}
@@ -45,7 +50,7 @@ function Availability({ accountId }: { accountId: string }) {
           />
           <Stack gap={4} style={{ flex: 1, minWidth: 220 }}>
             <Text size="sm" fw={500}>
-              Dedicação a estes boards: {allocation}%
+              {tc.allocation(allocation)}
             </Text>
             <Slider
               value={allocation}
@@ -54,18 +59,19 @@ function Availability({ accountId }: { accountId: string }) {
               max={100}
               step={5}
               marks={[{ value: 0 }, { value: 50 }, { value: 100 }]}
-              aria-label="Dedicação em porcentagem"
+              aria-label={tc.allocationAria}
             />
             <Text size="xs" c="dimmed">
-              A parte do tempo da pessoa que vai para os boards acompanhados; o resto é de outro time ou de outra frente.
+              {tc.allocationHint}
             </Text>
           </Stack>
         </Group>
         <Text size="sm" c="dimmed">
-          Rende cerca de <b className="num">{fmtNum(perDay)} h</b> de trabalho por dia útil ({fmtNum(hours === '' ? data.board_hours_per_day : Number(hours))} h × foco{' '}
-          {data.board_focus_factor} × {allocation}%).
+          {yieldsBefore}
+          <b className="num">{fmtNum(perDay)} h</b>
+          {yieldsAfter}
         </Text>
-        {save.error && <ErrorState error={save.error} title="Disponibilidade não salva" />}
+        {save.error && <ErrorState error={save.error} title={tc.notSaved} />}
         <Group justify="flex-end">
           <Button
             variant="default"
@@ -76,7 +82,7 @@ function Availability({ accountId }: { accountId: string }) {
               save.mutate({ hours_per_day: null, allocation: 100 });
             }}
           >
-            Voltar ao padrão
+            {tc.reset}
           </Button>
           <Button
             disabled={!dirty}
@@ -84,11 +90,11 @@ function Availability({ accountId }: { accountId: string }) {
             onClick={() =>
               save.mutate(
                 { hours_per_day: hours === '' ? null : Number(hours), allocation },
-                { onSuccess: () => notifications.show({ title: 'Disponibilidade salva', message: 'A capacidade já usa os novos valores.' }) },
+                { onSuccess: () => notifications.show({ title: tc.savedTitle, message: tc.savedMessage }) },
               )
             }
           >
-            Salvar
+            {t.people.common.save}
           </Button>
         </Group>
       </Stack>
@@ -97,30 +103,34 @@ function Availability({ accountId }: { accountId: string }) {
 }
 
 function SprintChart({ sprints }: { sprints: CapacitySprint[] }) {
+  const t = useT();
+  const tc = t.people.capacity;
   if (!sprints.length) {
     return (
       <Text size="sm" c="dimmed">
-        A pessoa ainda não tem sprints com itens nos boards acompanhados.
+        {tc.noSprints}
       </Text>
     );
   }
   const names = sprints.map((s) => s.sprint.name);
   return (
     <EChart
-      label={`Capacidade, comprometido e entregue por sprint, em horas: ${sprints
-        .map((s) => `${s.sprint.name}: capacidade ${fmtNum(s.capacity_hours)}, comprometido ${fmtNum(s.committed_hours)}, entregue ${fmtNum(s.delivered_hours)}`)
-        .join('; ')}`}
+      label={tc.chartLabel(
+        sprints
+          .map((s) => tc.chartPoint(s.sprint.name, fmtNum(s.capacity_hours), fmtNum(s.committed_hours), fmtNum(s.delivered_hours)))
+          .join('; '),
+      )}
       deps={[sprints]}
       height={280}
       build={(p) => ({
         tooltip: { trigger: 'axis', valueFormatter: (v) => `${fmtNum(Number(v))} h` },
         legend: { top: 0, textStyle: { color: p.text } },
         xAxis: { type: 'category', data: names, ...axisStyle(p) },
-        yAxis: { type: 'value', name: 'horas', ...axisStyle(p) },
+        yAxis: { type: 'value', name: tc.axisHours, ...axisStyle(p) },
         series: [
-          { name: 'Capacidade', type: 'bar', itemStyle: { color: p.todo }, data: sprints.map((s) => s.capacity_hours) },
-          { name: 'Comprometido', type: 'bar', itemStyle: { color: p.added }, data: sprints.map((s) => s.committed_hours) },
-          { name: 'Entregue', type: 'bar', itemStyle: { color: p.done }, data: sprints.map((s) => s.delivered_hours) },
+          { name: t.people.common.capacity, type: 'bar', itemStyle: { color: p.todo }, data: sprints.map((s) => s.capacity_hours) },
+          { name: t.people.common.committed, type: 'bar', itemStyle: { color: p.added }, data: sprints.map((s) => s.committed_hours) },
+          { name: t.people.common.delivered, type: 'bar', itemStyle: { color: p.done }, data: sprints.map((s) => s.delivered_hours) },
         ],
       })}
     />
@@ -129,29 +139,29 @@ function SprintChart({ sprints }: { sprints: CapacitySprint[] }) {
 
 /** Capacity per sprint against what was committed, and the two things that change it: availability and absences. */
 export function PersonCapacity({ accountId, sprints }: { accountId: string; sprints: CapacitySprint[] }) {
+  const t = useT();
   return (
     <Stack gap="lg">
       <Paper withBorder p="md">
         <Title order={5} mb="xs">
-          Capacidade por sprint
+          {t.people.capacity.perSprintTitle}
         </Title>
         <SprintChart sprints={sprints} />
         <Text size="xs" c="dimmed" mt="xs">
-          Capacidade = dias úteis × horas × foco × dedicação, menos as ausências. Comprometido e entregue vêm das estimativas convertidas em horas pelo
-          board; a disponibilidade de hoje vale para as sprints passadas também.
+          {t.people.capacity.formula}
         </Text>
       </Paper>
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Availability accountId={accountId} />
         <Paper withBorder p="md">
           <Title order={5} mb="sm">
-            Ausências
+            {t.people.list.absences}
           </Title>
           <AbsenceEditor accountId={accountId} />
         </Paper>
       </SimpleGrid>
       <Note>
-        A disponibilidade também entra na capacidade das telas de sprint e de alocação. As ausências de todo o time ficam no botão Ausências, em Pessoas.
+        {t.people.capacity.footNote}
       </Note>
     </Stack>
   );

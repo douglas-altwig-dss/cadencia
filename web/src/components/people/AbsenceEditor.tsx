@@ -4,7 +4,7 @@ import { IconTrash } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
 import { useAbsences, useAddAbsence, useDeleteAbsence, usePeople } from '../../api/hooks';
-import { collator } from '../../i18n';
+import { collator, useT } from '../../i18n';
 import { fmtDay } from '../../lib/format';
 import { ErrorState, notifyUndo } from '../common';
 
@@ -14,6 +14,7 @@ import { ErrorState, notifyUndo } from '../common';
  * person (``accountId``: only that person's absences, on her own Capacidade tab).
  */
 export function AbsenceEditor({ accountId }: { accountId?: string }) {
+  const t = useT();
   const absences = useAbsences(accountId);
   const people = usePeople();
   const add = useAddAbsence();
@@ -34,22 +35,22 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
   return (
     <Stack gap="sm">
       <Text size="sm" c="dimmed">
-        Férias, folgas e eventos: cada dia útil de ausência sai da capacidade da sprint.
+        {t.people.absences.intro}
       </Text>
       <Group align="flex-end" wrap="wrap">
         {!accountId && (
           <Select
-            label="Pessoa"
+            label={t.people.common.person}
             data={options}
             value={picked}
             onChange={setPicked}
             searchable
             w={240}
-            nothingFoundMessage="Ninguém com esse nome nos boards acompanhados"
+            nothingFoundMessage={t.people.common.nobodyNamed}
           />
         )}
-        <DatePickerInput type="range" label="Período" value={range} onChange={setRange} valueFormat="DD/MM/YYYY" w={260} />
-        <TextInput label="Observação" value={note} onChange={(e) => setNote(e.currentTarget.value)} w={200} />
+        <DatePickerInput type="range" label={t.people.common.period} value={range} onChange={setRange} valueFormat={t.people.absences.dateFormat} w={260} />
+        <TextInput label={t.people.absences.note} value={note} onChange={(e) => setNote(e.currentTarget.value)} w={200} />
         <Button
           disabled={!who || !range[0] || !range[1]}
           loading={add.isPending}
@@ -66,7 +67,7 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
             );
           }}
         >
-          Adicionar
+          {t.people.common.add}
         </Button>
       </Group>
       {add.error && <ErrorState error={add.error} />}
@@ -75,11 +76,11 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
         <Table>
           <Table.Thead>
             <Table.Tr>
-              {!accountId && <Table.Th>Pessoa</Table.Th>}
-              <Table.Th>De</Table.Th>
-              <Table.Th>Até</Table.Th>
-              <Table.Th>Observação</Table.Th>
-              <Table.Th aria-label="Ações" />
+              {!accountId && <Table.Th>{t.people.common.person}</Table.Th>}
+              <Table.Th>{t.people.absences.from}</Table.Th>
+              <Table.Th>{t.people.absences.until}</Table.Th>
+              <Table.Th>{t.people.absences.note}</Table.Th>
+              <Table.Th aria-label={t.people.absences.actions} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -87,7 +88,7 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
               <Table.Tr>
                 <Table.Td colSpan={columns}>
                   <Text size="sm" c="dimmed">
-                    Nenhuma ausência cadastrada.
+                    {t.people.absences.empty}
                   </Text>
                 </Table.Td>
               </Table.Tr>
@@ -102,12 +103,12 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
                   <ActionIcon
                     variant="subtle"
                     color="red"
-                    aria-label={`Remover ausência de ${a.name}, de ${fmtDay(a.start)}`}
+                    aria-label={t.people.absences.removeLabel(a.name, fmtDay(a.start))}
                     onClick={() =>
                       remove.mutate(a.id, {
                         // Removed at once, with a way back: an absence is cheap to re-enter.
                         onSuccess: () =>
-                          notifyUndo(`Ausência de ${a.name} removida`, () =>
+                          notifyUndo(t.people.absences.removed(a.name), () =>
                             add.mutate({ account_id: a.account_id, start: a.start, end: a.end, note: a.note ?? undefined }),
                           ),
                       })

@@ -3,38 +3,41 @@ import { IconAlertTriangle, IconCheck, IconEye } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 
 import type { PersonDetail, PersonItem, WeekSignal, WeekStatus } from '../../api/types';
-import { fmtDate, plural } from '../../lib/format';
+import { t as catalog, useT } from '../../i18n';
+import { fmtDate } from '../../lib/format';
 import { HELP } from '../../lib/indicatorHelp';
 import { type Severity } from '../../lib/people';
 import { InfoTip, IssueLink, KpiCard } from '../common';
 import { RiskBadge } from '../risk';
 import { loadPercent, SeverityBadge } from './indicators';
 
-const STATUS: Record<WeekStatus, { label: string; color: string; icon: React.ReactNode; text: string }> = {
-  ok: { label: 'Semana em ordem', color: 'teal', icon: <IconCheck size={16} />, text: 'Nenhum sinal de dificuldade nos itens abertos.' },
-  atencao: { label: 'Pede atenção', color: 'yellow', icon: <IconEye size={16} />, text: 'Há sinais que vale olhar antes que virem problema.' },
-  dificuldades: { label: 'Com dificuldades', color: 'red', icon: <IconAlertTriangle size={16} />, text: 'Há sinais fortes: uma conversa costuma ajudar mais que um número.' },
+/** Each status's colour and icon; its words come from the catalogue (`people.week.status`). */
+const STATUS: Record<WeekStatus, { color: string; icon: React.ReactNode }> = {
+  ok: { color: 'teal', icon: <IconCheck size={16} /> },
+  atencao: { color: 'yellow', icon: <IconEye size={16} /> },
+  dificuldades: { color: 'red', icon: <IconAlertTriangle size={16} /> },
 };
 
 export function signalText(signal: WeekSignal): string {
   const n = signal.count ?? 0;
+  const tw = catalog().people.week;
   switch (signal.kind) {
     case 'sobrecarga':
-      return `Carga em ${loadPercent(signal.ratio ?? null)} da capacidade que resta.`;
+      return tw.overload(loadPercent(signal.ratio ?? null));
     case 'bloqueios': {
       const parts = [
-        signal.alta ? `${signal.alta} de gravidade alta` : '',
-        signal.media ? `${signal.media} média` : '',
-        signal.baixa ? `${signal.baixa} baixa` : '',
+        signal.alta ? tw.blocksHigh(signal.alta) : '',
+        signal.media ? tw.blocksMedium(signal.media) : '',
+        signal.baixa ? tw.blocksLow(signal.baixa) : '',
       ].filter(Boolean);
-      return `${plural(n, 'bloqueio aberto', 'bloqueios abertos')} (${parts.join(', ')}).`;
+      return tw.blocks(n, parts.join(', '));
     }
     case 'atrasados':
-      return `${plural(n, 'item com prazo vencido', 'itens com prazo vencido')}.`;
+      return tw.overdue(n);
     case 'parados':
-      return `${plural(n, 'item parado', 'itens parados')} há mais de um checkpoint, sem estar bloqueado.`;
+      return tw.stalled(n);
     case 'vencendo':
-      return `${plural(n, 'item vence', 'itens vencem')} nos próximos 7 dias.`;
+      return tw.dueSoon(n);
   }
 }
 
@@ -43,17 +46,18 @@ export function signalText(signal: WeekSignal): string {
  * rules for each signal (analytics/person_detail._week), so a signal's count and its list agree.
  */
 type ItemSignal = Exclude<WeekSignal['kind'], 'sobrecarga'>;
-const SIGNAL_ITEMS: Record<ItemSignal, { label: string; match: (i: PersonItem) => boolean }> = {
-  bloqueios: { label: 'bloqueados', match: (i) => i.open && Boolean(i.blocked) },
-  atrasados: { label: 'com prazo vencido', match: (i) => i.open && i.due_in_days != null && i.due_in_days < 0 },
-  parados: { label: 'parados', match: (i) => i.open && !i.blocked && Boolean(i.risk?.evidence.some((e) => e.rule === 'estagnacao')) },
-  vencendo: { label: 'vencendo em 7 dias', match: (i) => i.open && i.due_in_days != null && i.due_in_days >= 0 && i.due_in_days <= 7 },
+const SIGNAL_ITEMS: Record<ItemSignal, { match: (i: PersonItem) => boolean }> = {
+  bloqueios: { match: (i) => i.open && Boolean(i.blocked) },
+  atrasados: { match: (i) => i.open && i.due_in_days != null && i.due_in_days < 0 },
+  parados: { match: (i) => i.open && !i.blocked && Boolean(i.risk?.evidence.some((e) => e.rule === 'estagnacao')) },
+  vencendo: { match: (i) => i.open && i.due_in_days != null && i.due_in_days >= 0 && i.due_in_days <= 7 },
 };
 
 /** A signal's level read on the one severity palette the blocks use (M28). */
 const LEVEL_SEVERITY: Record<'alto' | 'medio' | 'baixo', Severity> = { alto: 'alta', medio: 'media', baixo: 'baixa' };
 
 function ItemRows({ items, empty }: { items: PersonItem[]; empty: string }) {
+  const t = useT();
   if (!items.length) {
     return (
       <Text size="sm" c="dimmed">
@@ -70,7 +74,7 @@ function ItemRows({ items, empty }: { items: PersonItem[]; empty: string }) {
               <IssueLink issue={item} />
             </Table.Td>
             <Table.Td w={140}>
-              {item.open && item.risk ? <RiskBadge situation={item.risk.situation} size="xs" /> : <Badge variant="light" color="teal" size="xs">concluído</Badge>}
+              {item.open && item.risk ? <RiskBadge situation={item.risk.situation} size="xs" /> : <Badge variant="light" color="teal" size="xs">{t.people.common.done}</Badge>}
             </Table.Td>
           </Table.Tr>
         ))}
@@ -81,6 +85,8 @@ function ItemRows({ items, empty }: { items: PersonItem[]; empty: string }) {
 
 /** How the week is going: the signals first, in words; then what needs a look and what got done. */
 export function PersonWeek({ detail }: { detail: PersonDetail }) {
+  const t = useT();
+  const tw = t.people.week;
   const { week, items } = detail;
   const status = STATUS[week.status];
   const monday = new Date(week.week_start);
@@ -104,13 +110,13 @@ export function PersonWeek({ detail }: { detail: PersonDetail }) {
         icon={status.icon}
         title={
           <>
-            {status.label} · semana de {fmtDate(week.week_start)}
-            <InfoTip label={HELP['week:status']} about="classificação da semana" />
+            {tw.alertTitle(tw.status[week.status].label, fmtDate(week.week_start))}
+            <InfoTip label={HELP['week:status']} about={tw.statusAbout} />
           </>
         }
       >
         <Stack gap={6}>
-          <Text size="sm">{status.text}</Text>
+          <Text size="sm">{tw.status[week.status].text}</Text>
           {week.signals.map((item) => (
             <Group key={item.kind} gap="xs" wrap="nowrap" align="flex-start">
               {/* Filled, not light: a light badge on this light alert is red on pink and hard to read. */}
@@ -118,7 +124,7 @@ export function PersonWeek({ detail }: { detail: PersonDetail }) {
               {item.kind === 'sobrecarga' ? (
                 <Text size="sm">{signalText(item)}</Text>
               ) : (
-                <Button variant="subtle" size="compact-sm" fw="normal" c="inherit" justify="flex-start" onClick={() => pick(item.kind as ItemSignal)} aria-label={`${signalText(item)} Ver na lista`}>
+                <Button variant="subtle" size="compact-sm" fw="normal" c="inherit" justify="flex-start" onClick={() => pick(item.kind as ItemSignal)} aria-label={tw.seeInList(signalText(item))}>
                   {signalText(item)}
                 </Button>
               )}
@@ -128,34 +134,34 @@ export function PersonWeek({ detail }: { detail: PersonDetail }) {
       </Alert>
       {/* The due dates are in the signals above and in the list below, so they are not counted again here. */}
       <SimpleGrid cols={2}>
-        <KpiCard label="Em andamento" value={week.counts.in_progress} help={HELP['week:in_progress']}>
-          de {plural(week.counts.open, 'item aberto', 'itens abertos')}
+        <KpiCard label={tw.inProgress} value={week.counts.in_progress} help={HELP['week:in_progress']}>
+          {tw.ofOpen(week.counts.open)}
         </KpiCard>
-        <KpiCard label="Concluídos na semana" value={week.counts.finished} help={HELP['week:finished']} />
+        <KpiCard label={tw.finishedWeek} value={week.counts.finished} help={HELP['week:finished']} />
       </SimpleGrid>
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Stack gap="xs" ref={attentionRef} style={{ scrollMarginTop: 76 }}>
           <Group gap="xs" justify="space-between">
-            <Title order={5}>Pedem um olhar</Title>
+            <Title order={5}>{tw.needLook}</Title>
             {signal && (
               <Button variant="subtle" size="compact-xs" onClick={() => setSignal(null)}>
-                Mostrar todos
+                {tw.showAll}
               </Button>
             )}
           </Group>
           {signal && (
             <Text size="xs" c="dimmed">
-              Só os itens {SIGNAL_ITEMS[signal].label}
+              {tw.onlyItems[signal]}
             </Text>
           )}
           <ItemRows
             items={shown.slice(0, 12)}
-            empty={signal ? 'Nenhum item neste sinal.' : 'Nada bloqueado, atrasado ou vencendo.'}
+            empty={signal ? tw.emptySignal : tw.emptyAttention}
           />
         </Stack>
         <Stack gap="xs">
-          <Title order={5}>Concluídos nesta semana</Title>
-          <ItemRows items={finished.slice(0, 12)} empty="Nada concluído ainda nesta semana." />
+          <Title order={5}>{tw.finishedTitle}</Title>
+          <ItemRows items={finished.slice(0, 12)} empty={tw.emptyFinished} />
         </Stack>
       </SimpleGrid>
     </Stack>

@@ -3,13 +3,15 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
 import type { PersonDetail, TimelineBar } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtDate } from '../../lib/format';
 
-const STATE: Record<TimelineBar['state'], { label: string; color: string }> = {
-  concluido: { label: 'concluído', color: 'var(--mantine-color-teal-6)' },
-  andamento: { label: 'em andamento', color: 'var(--mantine-color-blue-6)' },
-  bloqueado: { label: 'bloqueado', color: 'var(--mantine-color-red-6)' },
-  aberto: { label: 'aberto', color: 'var(--mantine-color-gray-5)' },
+/** Each state's colour; its word comes from the catalogue (`people.timeline.state`). */
+const STATE: Record<TimelineBar['state'], { color: string }> = {
+  concluido: { color: 'var(--mantine-color-teal-6)' },
+  andamento: { color: 'var(--mantine-color-blue-6)' },
+  bloqueado: { color: 'var(--mantine-color-red-6)' },
+  aberto: { color: 'var(--mantine-color-gray-5)' },
 };
 
 const DAY = 86_400_000;
@@ -20,6 +22,8 @@ const DAY = 86_400_000;
  * A blocked item's bar is striped as well as red: state is never told by colour alone.
  */
 export function PersonTimeline({ timeline }: { timeline: PersonDetail['timeline'] }) {
+  const t = useT();
+  const tt = t.people.timeline;
   const standard = timeline.items.filter((b) => b.level === 0);
   // Teams that estimate and finish subtasks would see an empty chart if only stories counted.
   const [withSubtasks, setWithSubtasks] = useState(standard.length === 0);
@@ -42,7 +46,7 @@ export function PersonTimeline({ timeline }: { timeline: PersonDetail['timeline'
   if (!timeline.items.length) {
     return (
       <Text size="sm" c="dimmed">
-        Nenhum item desta pessoa entrou em andamento nas últimas semanas.
+        {tt.empty}
       </Text>
     );
   }
@@ -53,13 +57,13 @@ export function PersonTimeline({ timeline }: { timeline: PersonDetail['timeline'
           {(Object.keys(STATE) as TimelineBar['state'][]).map((state) => (
             <Group key={state} gap={6} wrap="nowrap">
               <span className={`tl-swatch${state === 'bloqueado' ? ' is-striped' : ''}`} style={{ background: STATE[state].color }} aria-hidden />
-              <Text size="xs">{STATE[state].label}</Text>
+              <Text size="xs">{tt.state[state]}</Text>
             </Group>
           ))}
         </Group>
-        <Switch size="xs" label="Incluir subtarefas" checked={withSubtasks} onChange={(e) => setWithSubtasks(e.currentTarget.checked)} disabled={standard.length === 0 && withSubtasks} />
+        <Switch size="xs" label={tt.withSubtasks} checked={withSubtasks} onChange={(e) => setWithSubtasks(e.currentTarget.checked)} disabled={standard.length === 0 && withSubtasks} />
       </Group>
-      <div className="tl" role="list" aria-label="Itens da pessoa ao longo do tempo">
+      <div className="tl" role="list" aria-label={tt.listAria}>
         <div className="tl-row tl-head">
           <span />
           <div className="tl-track">
@@ -76,7 +80,7 @@ export function PersonTimeline({ timeline }: { timeline: PersonDetail['timeline'
           const left = pct(from);
           const width = Math.max(pct(to) - left, 0.8);
           const clipped = new Date(bar.began).getTime() < start;
-          const description = `${bar.key}, ${STATE[bar.state].label}, de ${fmtDate(bar.began, true)} a ${bar.state === 'concluido' ? fmtDate(bar.end, true) : 'hoje'}`;
+          const description = tt.bar(bar.key, tt.state[bar.state], fmtDate(bar.began, true), bar.state === 'concluido' ? fmtDate(bar.end, true) : tt.today);
           return (
             <div key={bar.key} className="tl-row" role="listitem">
               <Anchor component={Link} to={`/issues/${bar.key}`} size="sm" lineClamp={1} title={`${bar.key} ${bar.summary}`}>
@@ -100,12 +104,12 @@ export function PersonTimeline({ timeline }: { timeline: PersonDetail['timeline'
         <div className="tl-row tl-foot" aria-hidden>
           <span />
           <div className="tl-track">
-            <span className="tl-today" style={{ left: '100%' }}>hoje</span>
+            <span className="tl-today" style={{ left: '100%' }}>{tt.today}</span>
           </div>
         </div>
       </div>
       <Text size="xs" c="dimmed" mt="xs">
-        Da primeira entrada em andamento até a conclusão. Últimas 8 semanas; uma ponta cortada à esquerda começou antes.
+        {tt.foot}
       </Text>
     </div>
   );

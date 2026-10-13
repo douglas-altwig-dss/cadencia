@@ -21,7 +21,8 @@ import { PersonWork } from '../components/people/PersonWork';
 import { RolesCatalog } from '../components/people/RolesCatalog';
 import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
-import { fmtNum, plural } from '../lib/format';
+import { useT } from '../i18n';
+import { fmtNum } from '../lib/format';
 import { visiblePeople } from '../lib/people';
 
 function PersonCards({ people, indicators, loading }: { people: Person[]; indicators: ReadonlyMap<string, PersonIndicators>; loading: boolean }) {
@@ -76,6 +77,8 @@ function useParamDrawer(key: string) {
 /** RF-23: people under the space (team) they work in. Someone who works in two teams is listed
  *  under both — the repetition is what makes a shared person visible as shared. */
 export function PeoplePage() {
+  const t = useT();
+  const tl = t.people.list;
   const { get } = useFilters();
   // ?tab=minha-semana (the palette's "Minha semana") is the same flow as the header button, started at once.
   const startMyWeek = get('tab') === 'minha-semana';
@@ -113,30 +116,30 @@ export function PeoplePage() {
   return (
     <>
       <PageHeader
-        title="Pessoas"
-        subtitle="Agrupadas pelo time (espaço) em que trabalham. Visão individual com contexto, para conversas — não para avaliação."
+        title={tl.title}
+        subtitle={tl.subtitle}
         actions={
           <Group gap="xs">
             <MyWeekButton startOpen={startMyWeek} />
             <Button variant="default" size="xs" leftSection={<IconCalendarOff size={14} />} onClick={() => setAbsences(true)}>
-              Ausências
+              {tl.absences}
             </Button>
             <Button variant="default" size="xs" leftSection={<IconUserCog size={14} />} onClick={() => setCatalog(true)}>
-              Funções e equipe
+              {tl.rolesAndTeam}
             </Button>
           </Group>
         }
       />
-      <Drawer opened={catalog} onClose={() => setCatalog(false)} position="right" size="xl" title="Funções e equipe">
+      <Drawer opened={catalog} onClose={() => setCatalog(false)} position="right" size="xl" title={tl.rolesAndTeam}>
         <RolesCatalog />
       </Drawer>
-      <Drawer opened={absences} onClose={() => setAbsences(false)} position="right" size="xl" title="Ausências do time">
+      <Drawer opened={absences} onClose={() => setAbsences(false)} position="right" size="xl" title={tl.teamAbsences}>
         <AbsenceEditor />
       </Drawer>
         <Group align="flex-end" gap="lg" mb="md" wrap="wrap">
           <TextInput
-            placeholder="Buscar pessoa pelo nome"
-            aria-label="Buscar pessoa"
+            placeholder={tl.searchPlaceholder}
+            aria-label={tl.searchLabel}
             leftSection={<IconSearch size={16} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
@@ -145,29 +148,29 @@ export function PeoplePage() {
           />
           <Group gap="xs" wrap="nowrap" mb={6}>
             <Switch
-              label="Só quem tem atividade na sprint"
+              label={tl.onlyActive}
               checked={onlyActive}
               onChange={(e) => setOnlyActive(e.currentTarget.checked)}
             />
-            <InfoTip label={HELP['people:active']} about="filtro de atividade na sprint" />
+            <InfoTip label={HELP['people:active']} about={tl.onlyActiveAbout} />
           </Group>
           {filtering && hidden > 0 && (
             <Text size="sm" c="dimmed" mb={6} aria-live="polite">
-              {plural(hidden, 'pessoa oculta', 'pessoas ocultas')} sem atividade na sprint
+              {tl.hidden(hidden)}
             </Text>
           )}
         </Group>
         <Text size="sm" c="dimmed" mb="lg">
-          Números para conversar, não para avaliar: estimativas imprecisas e horas fora do Jira distorcem qualquer um. Toque no i de cada número para ver a conta.
+          {tl.note}
         </Text>
         {(isLoading || waiting) && <Loading />}
         {error && <ErrorState error={error} />}
         {data && !waiting && !found && hidden > 0 && (
-          <Empty title="Ninguém com atividade na sprint" action={{ label: 'Mostrar todo o time', onClick: () => setOnlyActive(false) }}>
-            {plural(hidden, 'pessoa está oculta', 'pessoas estão ocultas')} por não ter itens abertos, entregas nem compromisso na sprint.
+          <Empty title={tl.noActiveTitle} action={{ label: tl.showWholeTeam, onClick: () => setOnlyActive(false) }}>
+            {tl.noActiveBody(hidden)}
           </Empty>
         )}
-        {data && !waiting && !found && hidden === 0 && <Empty title="Ninguém encontrado" action={{ label: 'Ver os boards acompanhados', to: '/configuracao?tab=boards' }}>As pessoas vêm dos responsáveis pelos itens dos boards acompanhados.</Empty>}
+        {data && !waiting && !found && hidden === 0 && <Empty title={tl.noneFoundTitle} action={{ label: tl.seeBoards, to: '/configuracao?tab=boards' }}>{tl.noneFoundBody}</Empty>}
         <Stack gap="lg">
           {groups.map((g) => (
             <Stack key={g.space.key ?? '__sem_espaco__'} gap="sm">
@@ -179,7 +182,7 @@ export function PeoplePage() {
                   </Badge>
                 )}
                 <Text size="sm" c="dimmed">
-                  {plural(g.people.length, 'pessoa')}
+                  {tl.count(g.people.length)}
                 </Text>
               </Group>
               <PersonCards people={g.people} indicators={indicators} loading={overview.isLoading} />
@@ -187,9 +190,9 @@ export function PeoplePage() {
           ))}
           {unassigned.length > 0 && (
             <Stack gap={6}>
-              <Title order={4}>Sem time identificado</Title>
+              <Title order={4}>{tl.noTeam}</Title>
               <Text size="xs" c="dimmed">
-                Ninguém lhes atribuiu itens nos boards acompanhados, então não há espaço a que associá-las.
+                {tl.noTeamBody}
               </Text>
               <PersonCards people={unassigned} indicators={indicators} loading={overview.isLoading} />
             </Stack>
@@ -201,6 +204,8 @@ export function PeoplePage() {
 
 /** RF-23: trend, items at risk, work composition and comparison with the median of the boards. */
 function PersonHistory({ accountId }: { accountId: string }) {
+  const t = useT();
+  const th = t.people.history;
   const [weeks, setWeeks] = useState('12');
   const { data, isLoading, error } = usePerson(accountId, Number(weeks));
   if (isLoading) return <Loading rows={6} />;
@@ -211,77 +216,77 @@ function PersonHistory({ accountId }: { accountId: string }) {
     <Stack gap="lg">
       <Group justify="space-between" wrap="wrap">
         <Text size="sm" c="dimmed">
-          Últimas {data.period.weeks} semanas
+          {th.lastWeeks(data.period.weeks)}
         </Text>
         <SegmentedControl
-          aria-label="Período"
+          aria-label={t.people.common.period}
           value={weeks}
           onChange={setWeeks}
           data={[
-            { value: '6', label: '6 sem' },
-            { value: '12', label: '12 sem' },
-            { value: '26', label: '26 sem' },
+            { value: '6', label: th.weeksShort(6) },
+            { value: '12', label: th.weeksShort(12) },
+            { value: '26', label: th.weeksShort(26) },
           ]}
         />
       </Group>
-      <Note title="Contexto antes do número">{data.note}</Note>
+      <Note title={th.contextNote}>{data.note}</Note>
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
         <Stat
-          label="Itens concluídos"
+          label={th.completed}
           help={HELP['history:completed']}
           value={data.summary.completed}
-          hint={reference.median_completed_per_person != null ? `mediana dos boards: ${fmtNum(reference.median_completed_per_person)} por pessoa` : undefined}
+          hint={reference.median_completed_per_person != null ? th.boardsMedian(fmtNum(reference.median_completed_per_person)) : undefined}
         />
         <KpiCard
-          label="Cycle time · P85"
+          label={th.cycleP85}
           help={HELP['history:cycle']}
-          value={data.summary.cycle_time.n ? `${fmtNum(data.summary.cycle_time.p85)} d` : '—'}
+          value={data.summary.cycle_time.n ? t.people.common.days(fmtNum(data.summary.cycle_time.p85)) : '—'}
         >
           <Percentiles dist={data.summary.cycle_time} />
-          Boards: P50 {fmtNum(reference.cycle_time.p50)} d (n={reference.cycle_time.n})
+          {th.boardsCycle(fmtNum(reference.cycle_time.p50), reference.cycle_time.n)}
         </KpiCard>
         <KpiCard
-          label="Lead time · P85"
+          label={th.leadP85}
           help={HELP['history:lead']}
-          value={data.summary.lead_time.n ? `${fmtNum(data.summary.lead_time.p85)} d` : '—'}
+          value={data.summary.lead_time.n ? t.people.common.days(fmtNum(data.summary.lead_time.p85)) : '—'}
         >
           <Percentiles dist={data.summary.lead_time} />
-          Boards: P50 {fmtNum(reference.lead_time.p50)} d
+          {th.boardsLead(fmtNum(reference.lead_time.p50))}
         </KpiCard>
-        <Stat label="Trabalho não planejado" help={HELP['history:unplanned']} value={data.composition.unplanned_items} hint="itens que entraram na sprint depois do início" />
+        <Stat label={th.unplanned} help={HELP['history:unplanned']} value={data.composition.unplanned_items} hint={th.unplannedHint} />
       </SimpleGrid>
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         <Paper withBorder p="md">
-          <Title order={4}>Tendência por sprint</Title>
+          <Title order={4}>{th.trendTitle}</Title>
           {data.trend.length ? (
             <EChart
-              label={`Por sprint: ${data.trend.map((t) => `${t.sprint.name} ${t.delivered} de ${t.committed}`).join('; ')}`}
+              label={th.trendLabel(data.trend.map((s) => th.trendPoint(s.sprint.name, s.delivered, s.committed)).join('; '))}
               deps={[data]}
               height={260}
               build={(p) => ({
                 tooltip: { trigger: 'axis' },
                 legend: { top: 0, textStyle: { color: p.text } },
-                xAxis: { type: 'category', data: data.trend.map((t) => t.sprint.name), ...axisStyle(p) },
+                xAxis: { type: 'category', data: data.trend.map((s) => s.sprint.name), ...axisStyle(p) },
                 yAxis: [
                   { type: 'value', minInterval: 1, ...axisStyle(p) },
-                  { type: 'value', name: 'dias', ...axisStyle(p), splitLine: { show: false } },
+                  { type: 'value', name: th.axisDays, ...axisStyle(p), splitLine: { show: false } },
                 ],
                 series: [
-                  { name: 'Comprometido', type: 'bar', itemStyle: { color: p.todo }, data: data.trend.map((t) => t.committed) },
-                  { name: 'Entregue', type: 'bar', itemStyle: { color: p.done }, data: data.trend.map((t) => t.delivered) },
-                  { name: 'Não planejado', type: 'bar', itemStyle: { color: p.added }, data: data.trend.map((t) => t.added) },
-                  { name: 'Cycle time P50', type: 'line', yAxisIndex: 1, itemStyle: { color: p.warn }, data: data.trend.map((t) => t.cycle_time.p50) },
+                  { name: t.people.common.committed, type: 'bar', itemStyle: { color: p.todo }, data: data.trend.map((s) => s.committed) },
+                  { name: t.people.common.delivered, type: 'bar', itemStyle: { color: p.done }, data: data.trend.map((s) => s.delivered) },
+                  { name: th.unplannedSeries, type: 'bar', itemStyle: { color: p.added }, data: data.trend.map((s) => s.added) },
+                  { name: th.cycleP50, type: 'line', yAxisIndex: 1, itemStyle: { color: p.warn }, data: data.trend.map((s) => s.cycle_time.p50) },
                 ],
               })}
             />
           ) : (
             <Text size="sm" c="dimmed">
-              Sem sprints com itens desta pessoa.
+              {th.noSprints}
             </Text>
           )}
         </Paper>
         <Paper withBorder p="md">
-          <Title order={4}>Composição do trabalho concluído</Title>
+          <Title order={4}>{th.mixTitle}</Title>
           <Table mt="xs">
             <Table.Tbody>
               {Object.entries(data.composition.work_mix).map(([type, count]) => (
@@ -299,23 +304,18 @@ function PersonHistory({ accountId }: { accountId: string }) {
 }
 
 /** The four groups a card shows, at a glance, above the person's tabs. */
-const TABS = [
-  ['semana', 'Semana'],
-  ['timeline', 'Timeline'],
-  ['capacidade', 'Capacidade'],
-  ['historico', 'Histórico'],
-  ['funcao', 'Função'],
-] as const;
+const TABS = ['semana', 'timeline', 'capacidade', 'historico', 'funcao'] as const;
 
 /** A person: the numbers of their card, then their week (and their open/recent work — RF-85's
  *  "Minha semana" is this same tab, not a second implementation), timeline, capacity, history and role. */
 export function PersonPage() {
+  const t = useT();
   const accountId = useParams().accountId!;
   const { get, set } = useFilters();
   const [catalog, setCatalog] = useState(false);
   const detail = usePersonDetail(accountId);
   const [me, setMe] = useLocalStorage<string | null>({ key: ME_KEY, defaultValue: null, getInitialValueInEffect: false });
-  const tab = TABS.some(([id]) => id === get('tab')) ? get('tab')! : 'semana';
+  const tab = TABS.some((id) => id === get('tab')) ? get('tab')! : 'semana';
 
   if (detail.isLoading) return <Loading rows={8} />;
   if (detail.error) return <ErrorState error={detail.error} />;
@@ -327,29 +327,29 @@ export function PersonPage() {
     <>
       <PageHeader
         title={name}
-        subtitle={data.indicators?.boards.map((b) => b.name).join(' · ') || 'Sem itens nos boards acompanhados'}
-        crumbs={[{ label: 'Pessoas', to: '/pessoas' }, { label: name }]}
+        subtitle={data.indicators?.boards.map((b) => b.name).join(' · ') || t.people.page.noBoards}
+        crumbs={[{ label: t.people.list.title, to: '/pessoas' }, { label: name }]}
         actions={
           // "Sou eu" is how "Minha semana" learns who you are, from the one page that knows the account id.
           me === accountId ? (
-            <Badge variant="light">Esta é você</Badge>
+            <Badge variant="light">{t.people.page.thisIsYou}</Badge>
           ) : (
             <Button variant="subtle" size="xs" onClick={() => setMe(accountId)}>
-              Sou eu
+              {t.people.page.itsMe}
             </Button>
           )
         }
       />
-      <Drawer opened={catalog} onClose={() => setCatalog(false)} position="right" size="xl" title="Funções e equipe">
+      <Drawer opened={catalog} onClose={() => setCatalog(false)} position="right" size="xl" title={t.people.list.rolesAndTeam}>
         <RolesCatalog />
       </Drawer>
       <Stack gap="lg">
         {data.indicators && <PersonSummary indicators={data.indicators} />}
         <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
           <Tabs.List mb="md" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
-            {TABS.map(([id, label]) => (
+            {TABS.map((id) => (
               <Tabs.Tab key={id} value={id}>
-                {label}
+                {t.people.page.tabs[id]}
               </Tabs.Tab>
             ))}
           </Tabs.List>

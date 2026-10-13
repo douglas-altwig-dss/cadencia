@@ -6,7 +6,7 @@
  * ISO `aaaa-mm-dd` strings in UTC, so no timezone can move an entry to another day.
  */
 
-import { collator } from '../i18n';
+import { collator, t } from '../i18n';
 
 export type Gran = 'dia' | 'semana' | 'mes';
 export type Preset = '14d' | '30d' | '90d' | 'all';
@@ -94,14 +94,24 @@ export const GESTOR = 'Douglas';
 export const PALETA_PESSOAS = ['#0B7A75', '#B4463C', '#7B5EA7', '#B07A12', '#3A6EA5', '#6B7D2A', '#EC4899', '#10B981'];
 export const PALETA_DESTAQUE = ['#6366F1', '#2563EB', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6'];
 export const ICONES_TROCA = ['🔀', '🎯', '🚀', '🔄', '⚡', '🛡️', '🛑', '💡'];
-export const ESTILOS_LINHA: { value: EstiloLinha; label: string }[] = [
-  { value: 'borda-gradiente', label: 'Gradiente neon' },
-  { value: 'borda-tracejada', label: 'Tracejado tático' },
-  { value: 'borda-dupla', label: 'Dupla linha' },
-  { value: 'borda-solida', label: 'Sólido com destaque' },
-];
-/** A change of focus can leave a theme for "Outro / Pausa", which is not a theme of the log. */
+const ESTILOS: EstiloLinha[] = ['borda-gradiente', 'borda-tracejada', 'borda-dupla', 'borda-solida'];
+/** The border styles a change of focus can take, labelled in the current language. */
+export const estilosLinha = (): { value: EstiloLinha; label: string }[] =>
+  ESTILOS.map((value) => ({ value, label: t().people.focus.borders[value] }));
+/**
+ * A change of focus can leave a theme for "Outro / Pausa", which is not a theme of the log. The value is
+ * stored in the document as is (data, not text to translate); `rotuloTema` shows it in the current language.
+ */
 export const PAUSA = 'Outro / Pausa';
+/** A theme name as shown: the stored pause value in the current language, any other theme as the team wrote it. */
+export const rotuloTema = (nome: string) => (nome === PAUSA ? t().people.focus.page.pause : nome);
+/**
+ * The lane of manager lines that name nobody. A key the grid and the filters compare against, not text:
+ * `rotuloPessoa` shows it in the current language.
+ */
+export const GERAL = 'Geral';
+/** A lane name as shown: "Geral" in the current language, any person as the team wrote them. */
+export const rotuloPessoa = (nome: string) => (nome === GERAL ? t().people.focus.page.general : nome);
 
 /** The team's starting signals: the four that were fixed in the code, and five more for the usual conditions. */
 export const SINAIS_PADRAO: Sinal[] = [
@@ -258,8 +268,6 @@ export const DOCUMENTO_INICIAL: Documento = {
   ],
 };
 
-const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-export const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 export const norm = (s: string) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
@@ -297,7 +305,7 @@ export const segunda = (iso: string) => {
   return addDias(iso, -dow);
 };
 export const mesIso = (iso: string) => `${iso.slice(0, 7)}-01`;
-export const diaSemana = (iso: string) => DIAS[new Date(`${iso}T00:00:00Z`).getUTCDay()];
+export const diaSemana = (iso: string) => t().people.focus.weekdays[new Date(`${iso}T00:00:00Z`).getUTCDay()];
 export const isFimDeSemana = (iso: string) => {
   const dow = new Date(`${iso}T00:00:00Z`).getUTCDay();
   return dow === 0 || dow === 6;
@@ -361,8 +369,8 @@ export function montarEntradas(documento: Documento): Entrada[] {
         dataIso,
         texto: txt,
         tipo: 'troca',
-        deTema: r.deTema || 'Anterior',
-        paraTema: r.paraTema || 'Novo foco',
+        deTema: r.deTema || t().people.focus.page.previous,
+        paraTema: r.paraTema || t().people.focus.page.newFocus,
         icone: r.icone || '🔀',
         corDestaque: r.corDestaque || '#6366F1',
         estiloLinha: r.estiloLinha || 'borda-gradiente',
@@ -400,7 +408,7 @@ export function montarEntradas(documento: Documento): Entrada[] {
     if (!mencoes.length) {
       entradas.push({
         uid: r.uid,
-        pessoa: 'Geral',
+        pessoa: GERAL,
         dataIso,
         texto: txt,
         tipo: 'tarefa',
@@ -443,7 +451,7 @@ export function filtrar(entradas: Entrada[], filtros: Filtros, hoje: string) {
 
   const visiveis = entradas.filter((e) => {
     if (e.dataIso < minIso) return false;
-    if (!pessoas.has(e.pessoa) && e.pessoa !== 'Geral') return false;
+    if (!pessoas.has(e.pessoa) && e.pessoa !== GERAL) return false;
     if (filtros.apenasTrocas && e.tipo !== 'troca') return false;
     if (q && !norm(`${e.texto} ${e.pessoa} ${e.deTema ?? ''} ${e.paraTema ?? ''}`).includes(q)) return false;
     if (temas.size && !e.temas.some((t) => temas.has(t))) return false;
@@ -469,9 +477,9 @@ export function rotuloBucket(bucket: string, gran: Gran): { titulo: string; sub:
   if (gran === 'semana')
     return {
       titulo: `${fmtCurto(bucket)} - ${fmtCurto(addDias(bucket, 6))}`,
-      sub: 'Semana',
+      sub: t().people.focus.page.week,
     };
-  if (gran === 'mes') return { titulo: bucket.slice(0, 7), sub: 'Mês' };
+  if (gran === 'mes') return { titulo: bucket.slice(0, 7), sub: t().people.focus.page.month };
   return { titulo: fmtCurto(bucket), sub: diaSemana(bucket) };
 }
 
@@ -484,7 +492,7 @@ export function mesesDe(buckets: string[]): { mes: string; rotulo: string; qtd: 
   });
   return [...meses.entries()].map(([mes, qtd]) => {
     const [ano, m] = mes.split('-');
-    return { mes, rotulo: `${MESES[+m - 1]} / ${ano.slice(2)}`, qtd };
+    return { mes, rotulo: `${t().people.focus.months[+m - 1]} / ${ano.slice(2)}`, qtd };
   });
 }
 
@@ -516,13 +524,10 @@ export interface Ordem {
   direcao: DirecaoOrdem;
 }
 
-export const CRITERIOS_ORDEM: { value: CriterioOrdem; label: string }[] = [
-  { value: 'ordem', label: 'Ordem de registro' },
-  { value: 'data', label: 'Data' },
-  { value: 'pessoa', label: 'Pessoa' },
-  { value: 'tipo', label: 'Tipo' },
-  { value: 'texto', label: 'Descrição' },
-];
+const CRITERIOS: CriterioOrdem[] = ['ordem', 'data', 'pessoa', 'tipo', 'texto'];
+/** What the records can be ordered by, labelled in the current language. */
+export const criteriosOrdem = (): { value: CriterioOrdem; label: string }[] =>
+  CRITERIOS.map((value) => ({ value, label: t().people.focus.sort[value] }));
 
 /**
  * The records in the order asked for. Ties keep the order they were written in, so sorting by one column

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client';
 import { saveFocusLog, useFocusLogDocument } from '../api/focusLogHooks';
 import type { FocusLogDocument } from '../api/types';
+import { t } from '../i18n';
 import { brDeIso, type Documento, type Registro, isoDeBr } from './focusLog';
 
 /** How long the log waits after the last change before it saves, so typing is not a request per key. */
@@ -99,14 +100,14 @@ export function useFocusLog() {
           setEstado((s) => ({ ...s, conflito: true }));
           notifications.show({
             color: 'orange',
-            title: 'A timeline mudou em outro lugar',
-            message: 'Recarregue a página para pegar a versão atual. Suas últimas mudanças ainda não foram salvas.',
+            title: t().people.focus.store.conflictTitle,
+            message: t().people.focus.store.conflictMessage,
           });
         } else {
           notifications.show({
             color: 'red',
-            title: 'Não foi possível salvar',
-            message: error instanceof ApiError ? error.reason : 'Tente de novo em instantes.',
+            title: t().people.focus.store.saveFailed,
+            message: error instanceof ApiError ? error.reason : t().people.focus.store.tryAgain,
           });
         }
       } finally {

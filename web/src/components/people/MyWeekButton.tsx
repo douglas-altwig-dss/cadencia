@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { usePeople } from '../../api/hooks';
+import { collator, useT } from '../../i18n';
 import { useFilters } from '../../lib/filters';
 
 /** The key under which this browser remembers who "me" is. */
@@ -16,6 +17,7 @@ export const ME_KEY = 'cadencia-minha-pessoa';
  * ``startOpen`` is for ``?tab=minha-semana`` links: the same flow, started at once.
  */
 export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
+  const t = useT();
   const navigate = useNavigate();
   const { carry } = useFilters();
   const people = usePeople();
@@ -23,7 +25,7 @@ export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
   const [picking, setPicking] = useState(false);
   const options = (people.data?.items ?? [])
     .map((p) => ({ value: p.account_id, label: p.name }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    .sort((a, b) => collator().compare(a.label, b.label));
 
   const openWeek = (accountId: string) => navigate(carry(`/pessoas/${encodeURIComponent(accountId)}?tab=semana`));
   const press = () => (me ? openWeek(me) : setPicking(true));
@@ -37,15 +39,15 @@ export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
     <Popover opened={picking} onChange={setPicking} position="bottom-end" withArrow shadow="md" trapFocus>
       <Popover.Target>
         <Button variant="default" size="xs" leftSection={<IconCalendarWeek size={14} />} onClick={press} aria-haspopup="dialog">
-          Minha semana
+          {t.people.myWeek.button}
         </Button>
       </Popover.Target>
       <Popover.Dropdown>
         <Stack gap="xs">
           <Select
-            label="Quem é você?"
-            description="A escolha fica guardada neste navegador."
-            placeholder="Buscar pelo nome"
+            label={t.people.myWeek.who}
+            description={t.people.myWeek.whoHint}
+            placeholder={t.people.myWeek.searchByName}
             data={options}
             value={me}
             onChange={(value) => {
@@ -56,9 +58,9 @@ export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
             }}
             searchable
             w={260}
-            nothingFoundMessage="Ninguém com esse nome nos boards acompanhados"
+            nothingFoundMessage={t.people.common.nobodyNamed}
           />
-          {!options.length && <Text size="xs" c="dimmed">A lista vem dos responsáveis pelos itens dos boards acompanhados.</Text>}
+          {!options.length && <Text size="xs" c="dimmed">{t.people.myWeek.listSource}</Text>}
         </Stack>
       </Popover.Dropdown>
     </Popover>

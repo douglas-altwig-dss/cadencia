@@ -6,7 +6,7 @@ import { Empty, ErrorState, Loading, PageHeader } from '../components/common';
 import { AtividadeModal, EquipeDrawer, SinaisDrawer, TemasDrawer, TrocaModal } from '../components/focuslog/FocusDialogs';
 import { RegistrosLista } from '../components/focuslog/RegistrosLista';
 import { TarefaCard, TrocaCard } from '../components/focuslog/FocusCards';
-import { plural } from '../lib/format';
+import { useT } from '../i18n';
 import {
   bucketOf,
   contagemPorPessoa,
@@ -25,7 +25,8 @@ import {
   type Registro,
   rotuloBucket,
   brDeIso,
-  CRITERIOS_ORDEM,
+  criteriosOrdem,
+  GERAL,
   type CriterioOrdem,
   type Ordem,
   ordenar,
@@ -40,27 +41,30 @@ type Dialogo =
   | { tipo: 'atividade'; registro: Registro | null; pessoa?: string }
   | null;
 
-const PRESETS: { value: Preset; label: string }[] = [
-  { value: '14d', label: '14 dias' },
-  { value: '30d', label: '30 dias' },
-  { value: '90d', label: '90 dias' },
-  { value: 'all', label: 'Tudo' },
-];
 
 /**
  * The team's focus over time: one lane per person, one column per day, week or month, with each line
  * as a card and each change of focus as a highlighted card. Edits are kept in this browser, with undo.
  */
 export function TimelineFocusPage() {
+  const t = useT();
   const log = useFocusLog();
   if (!log.doc) {
-    return log.error ? <ErrorState error={log.error} title="Não foi possível carregar a timeline de foco" /> : <Loading rows={6} />;
+    return log.error ? <ErrorState error={log.error} title={t.people.focus.page.loadError} /> : <Loading rows={6} />;
   }
   return <FocusLogBoard log={{ ...log, doc: log.doc }} />;
 }
 
 function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
+  const t = useT();
+  const tf = t.people.focus.page;
   const { doc, commit, undo, redo, canUndo, canRedo, saving, conflito } = log;
+  const presets: { value: Preset; label: string }[] = [
+    { value: '14d', label: tf.presetDays(14) },
+    { value: '30d', label: tf.presetDays(30) },
+    { value: '90d', label: tf.presetDays(90) },
+    { value: 'all', label: tf.presetAll },
+  ];
   const [busca, setBusca] = useState('');
   const [gran, setGran] = useState<Gran>('dia');
   const [preset, setPreset] = useState<Preset>('all');
@@ -173,31 +177,31 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
   return (
     <>
       <PageHeader
-        title="Timeline de foco"
-        documentTitle="Timeline de foco"
-        subtitle={`${doc.pessoas.length} ${doc.pessoas.length === 1 ? 'membro' : 'membros'} · ${plural(entradas.length, 'atividade', 'atividades')} (${totalTrocas} ${totalTrocas === 1 ? 'troca' : 'trocas'})`}
+        title={tf.title}
+        documentTitle={tf.title}
+        subtitle={tf.subtitle(doc.pessoas.length, entradas.length, totalTrocas)}
         actions={
           <Group gap="xs" wrap="nowrap">
-            <ActionIcon variant="default" size="lg" aria-label="Desfazer (Ctrl+Z)" title="Desfazer (Ctrl+Z)" disabled={!canUndo} onClick={undo}>
+            <ActionIcon variant="default" size="lg" aria-label={tf.undo} title={tf.undo} disabled={!canUndo} onClick={undo}>
               <IconArrowBackUp size={16} />
             </ActionIcon>
-            <ActionIcon variant="default" size="lg" aria-label="Refazer (Ctrl+Y)" title="Refazer (Ctrl+Y)" disabled={!canRedo} onClick={redo}>
+            <ActionIcon variant="default" size="lg" aria-label={tf.redo} title={tf.redo} disabled={!canRedo} onClick={redo}>
               <IconArrowForwardUp size={16} />
             </ActionIcon>
             <Button variant="default" size="sm" onClick={() => setDialogo({ tipo: 'equipe' })}>
-              Equipe
+              {tf.team}
             </Button>
             <Button variant="default" size="sm" onClick={() => setDialogo({ tipo: 'temas' })}>
-              Temas
+              {tf.themes}
             </Button>
             <Button variant="default" size="sm" onClick={() => setDialogo({ tipo: 'sinais' })}>
-              Sinais
+              {tf.signals}
             </Button>
             <Button variant="light" color="violet" size="sm" onClick={novaTroca}>
-              Troca de foco
+              {tf.shift}
             </Button>
             <Button size="sm" leftSection={<IconPlus size={14} />} onClick={() => setDialogo({ tipo: 'atividade', registro: null })}>
-              Atividade
+              {tf.activity}
             </Button>
           </Group>
         }
@@ -209,7 +213,7 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
             <Stack gap={6}>
               <Group gap={6} wrap="wrap" align="center">
                 <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-                  Equipe
+                  {tf.team}
                 </Text>
                 <Chip.Group
                   multiple
@@ -227,23 +231,23 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
                 </Chip.Group>
               </Group>
               <Group gap={6} wrap="wrap" align="center">
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" title="Sobre o que é o trabalho. Cadastrados na lista de temas.">
-                  Temas
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" title={tf.themesTip}>
+                  {tf.themes}
                 </Text>
                 <Chip.Group multiple value={temasOn} onChange={setTemasOn}>
                   <Group gap={4}>
-                    {doc.temas.map((t) => (
-                      <Chip key={t.nome} value={t.nome} size="xs" variant="light">
-                        <span className="tf-dot" style={{ background: t.cor }} aria-hidden />
-                        {t.nome}
+                    {doc.temas.map((tema) => (
+                      <Chip key={tema.nome} value={tema.nome} size="xs" variant="light">
+                        <span className="tf-dot" style={{ background: tema.cor }} aria-hidden />
+                        {tema.nome}
                       </Chip>
                     ))}
                   </Group>
                 </Chip.Group>
               </Group>
               <Group gap={6} wrap="wrap" align="center">
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase" title="Condições encontradas nas palavras de cada linha. Cadastradas pela equipe.">
-                  Sinais
+                <Text size="xs" fw={600} c="dimmed" tt="uppercase" title={tf.signalsTip}>
+                  {tf.signals}
                 </Text>
                 <Chip.Group multiple value={sinaisOn} onChange={setSinaisOn}>
                   <Group gap={4}>
@@ -259,31 +263,31 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
             </Stack>
 
             <Group gap="sm" wrap="wrap" align="center">
-              <SegmentedControl size="xs" value={preset} onChange={(v) => setPreset(v as Preset)} data={PRESETS} aria-label="Período" />
+              <SegmentedControl size="xs" value={preset} onChange={(v) => setPreset(v as Preset)} data={presets} aria-label={tf.period} />
               <SegmentedControl
                 size="xs"
                 value={gran}
                 onChange={(v) => setGran(v as Gran)}
                 data={[
-                  { value: 'dia', label: 'Dia' },
-                  { value: 'semana', label: 'Semana' },
-                  { value: 'mes', label: 'Mês' },
+                  { value: 'dia', label: tf.day },
+                  { value: 'semana', label: tf.week },
+                  { value: 'mes', label: tf.month },
                 ]}
-                aria-label="Granularidade"
+                aria-label={tf.granularity}
               />
               <SegmentedControl
                 size="xs"
                 value={visao}
                 onChange={(v) => setVisao(v as 'grade' | 'lista')}
                 data={[
-                  { value: 'grade', label: 'Grade' },
-                  { value: 'lista', label: 'Lista' },
+                  { value: 'grade', label: tf.grid },
+                  { value: 'lista', label: tf.list },
                 ]}
-                aria-label="Visão"
+                aria-label={tf.view}
               />
               <Select
                 size="xs"
-                aria-label="Ordenar registros por"
+                aria-label={tf.sortAria}
                 w={170}
                 allowDeselect={false}
                 value={ordem.criterio}
@@ -293,13 +297,13 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
                     criterio: (v ?? 'ordem') as CriterioOrdem,
                   }))
                 }
-                data={CRITERIOS_ORDEM}
+                data={criteriosOrdem()}
               />
               <ActionIcon
                 variant="default"
                 size="lg"
-                aria-label={ordem.direcao === 'asc' ? 'Ordem crescente: trocar para decrescente' : 'Ordem decrescente: trocar para crescente'}
-                title={ordem.direcao === 'asc' ? 'Crescente' : 'Decrescente'}
+                aria-label={ordem.direcao === 'asc' ? tf.ascAria : tf.descAria}
+                title={ordem.direcao === 'asc' ? tf.asc : tf.desc}
                 onClick={() =>
                   setOrdem((o) => ({
                     ...o,
@@ -314,10 +318,10 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
                 value={compacto ? 'compacto' : 'padrao'}
                 onChange={(v) => setCompacto(v === 'compacto')}
                 data={[
-                  { value: 'padrao', label: 'Padrão' },
-                  { value: 'compacto', label: 'Compacto' },
+                  { value: 'padrao', label: tf.standard },
+                  { value: 'compacto', label: tf.compact },
                 ]}
-                aria-label="Densidade"
+                aria-label={tf.density}
               />
             </Group>
           </Group>
@@ -326,18 +330,18 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
             <Group gap="sm" wrap="wrap" align="center">
               <TextInput
                 ref={searchRef}
-                aria-label="Buscar atividade ou troca"
-                placeholder="Buscar texto ou pessoa (tecla /)"
+                aria-label={tf.searchAria}
+                placeholder={tf.searchPlaceholder}
                 leftSection={<IconSearch size={14} />}
                 value={busca}
                 onChange={(e) => setBusca(e.currentTarget.value)}
                 w={280}
               />
-              <Switch label="Ocultar dias vazios" checked={ocultarVazios} onChange={(e) => setOcultarVazios(e.currentTarget.checked)} />
-              <Switch label="Só trocas de foco" checked={apenasTrocas} onChange={(e) => setApenasTrocas(e.currentTarget.checked)} />
+              <Switch label={tf.hideEmpty} checked={ocultarVazios} onChange={(e) => setOcultarVazios(e.currentTarget.checked)} />
+              <Switch label={tf.onlyShifts} checked={apenasTrocas} onChange={(e) => setApenasTrocas(e.currentTarget.checked)} />
             </Group>
             {meses.length > 0 && (
-              <Group gap={4} wrap="wrap" aria-label="Ir para o mês">
+              <Group gap={4} wrap="wrap" aria-label={tf.jumpMonth}>
                 {meses.map((m) => (
                   <Button
                     key={m.mes}
@@ -356,9 +360,9 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
       </Paper>
 
       {buckets.length === 0 ? (
-        <Empty title="Nenhuma atividade encontrada">
+        <Empty title={tf.emptyTitle}>
           <Text size="sm" c="dimmed">
-            Ajuste os filtros ou registre uma nova atividade.
+            {tf.emptyBody}
           </Text>
         </Empty>
       ) : visao === 'lista' ? (
@@ -370,14 +374,14 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
           onEditar={abrirAtividade}
         />
       ) : (
-        <div className="tf-viewport" role="region" aria-label="Linha do tempo de foco da equipe" tabIndex={0}>
+        <div className="tf-viewport" role="region" aria-label={tf.gridAria} tabIndex={0}>
           <div
             className="tf-grid"
             style={{
               gridTemplateColumns: `var(--tf-lane-w) repeat(${buckets.length}, ${larguraColuna})`,
             }}
           >
-            <div className="tf-corner">Equipe ({pessoasVisiveis.length})</div>
+            <div className="tf-corner">{tf.corner(pessoasVisiveis.length)}</div>
             {buckets.map((b) => {
               const { titulo, sub } = rotuloBucket(b, gran);
               const fds = gran === 'dia' && isFimDeSemana(b);
@@ -412,12 +416,13 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
                 />
               );
             })}
-            {visiveis.some((e) => e.pessoa === 'Geral') && (
+            {visiveis.some((e) => e.pessoa === GERAL) && (
               <LaneRow
-                nome="Geral"
-                cargo="Sem membro cadastrado"
+                nome={GERAL}
+                rotulo={tf.general}
+                cargo={tf.generalRole}
                 cor="#64748B"
-                atividades={contagemPorPessoa(visiveis, 'Geral')}
+                atividades={contagemPorPessoa(visiveis, GERAL)}
                 soltavel={false}
                 buckets={buckets}
                 gran={gran}
@@ -435,9 +440,7 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
       )}
 
       <Text size="xs" c="dimmed" mt="sm" aria-live="polite">
-        {conflito ? 'Não está salvando: recarregue a página.' : saving ? 'Salvando…' : 'Tudo salvo.'} Arraste um cartão para outro dia ou outra pessoa
-        para mudar quem fez e quando. Temas dizem sobre o que é o trabalho e vêm da lista de temas; sinais são condições que o texto revela
-        (bloqueado, urgente, em risco) e são cadastrados na lista de sinais. Ctrl+Z desfaz.
+        {conflito ? tf.notSaving : saving ? tf.saving : tf.saved} {tf.help}
       </Text>
 
       <EquipeDrawer
@@ -477,6 +480,7 @@ function FocusLogBoard({ log }: { log: FocusLog & { doc: Documento } }) {
 
 function LaneRow({
   nome,
+  rotulo,
   cargo,
   cor,
   atividades,
@@ -491,7 +495,10 @@ function LaneRow({
   onSoltar,
   onEditar,
 }: {
+  /** The lane's key: a member's name, or `GERAL`. */
   nome: string;
+  /** What the lane is called on screen, when it is not the key itself. */
+  rotulo?: string;
   cargo: string;
   cor: string;
   atividades: number;
@@ -507,18 +514,21 @@ function LaneRow({
   onSoltar: (pessoa: string, bucket: string, uid: string) => void;
   onEditar: (uid: string) => void;
 }) {
+  const t = useT();
+  const tf = t.people.focus.page;
+  const mostrado = rotulo ?? nome;
   return (
     <>
       <div className="tf-lane-label" style={{ ['--lane-c' as string]: cor }}>
         <span className="tf-avatar" style={{ background: cor }} aria-hidden>
-          {iniciais(nome)}
+          {iniciais(mostrado)}
         </span>
         <div style={{ minWidth: 0 }}>
           <Text size="sm" fw={600} truncate>
-            {nome}
+            {mostrado}
           </Text>
           <Text size="xs" c="dimmed" truncate>
-            {cargo || 'Membro'} · {plural(atividades, 'atividade', 'atividades')}
+            {cargo || tf.member} · {tf.activities(atividades)}
           </Text>
         </div>
       </div>
@@ -557,8 +567,8 @@ function LaneRow({
                   icone={e.icone ?? '🔀'}
                   cor={e.corDestaque ?? '#6366F1'}
                   estilo={e.estiloLinha ?? 'borda-gradiente'}
-                  de={e.deTema ?? 'Anterior'}
-                  para={e.paraTema ?? 'Novo foco'}
+                  de={e.deTema ?? tf.previous}
+                  para={e.paraTema ?? tf.newFocus}
                   texto={e.texto}
                   onEdit={() => onEditar(e.uid)}
                   draggable

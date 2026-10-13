@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import type { PersonDetail, PersonItem } from '../../api/types';
-import { fmtDate, fmtNum, plural } from '../../lib/format';
+import { t as catalog, useT } from '../../i18n';
+import { fmtDate, fmtNum } from '../../lib/format';
 import { blockSeverity } from '../../lib/people';
 import { Empty, IssueLink } from '../common';
 import { RiskBadge } from '../risk';
@@ -11,12 +12,15 @@ import { SeverityBadge } from './indicators';
 
 const dueText = (item: PersonItem) => {
   if (!item.open || item.due_in_days == null) return item.due_date ? fmtDate(item.due_date) : '—';
-  if (item.due_in_days < 0) return `vencido há ${-item.due_in_days} d`;
-  if (item.due_in_days === 0) return 'vence hoje';
-  return `em ${item.due_in_days} d`;
+  const tw = catalog().people.work;
+  if (item.due_in_days < 0) return tw.dueAgo(-item.due_in_days);
+  if (item.due_in_days === 0) return tw.dueToday;
+  return tw.dueIn(item.due_in_days);
 };
 
 function Items({ items }: { items: PersonItem[] }) {
+  const t = useT();
+  const tw = t.people.work;
   const [show, setShow] = useState('abertos');
   // "Em risco" is the open items whose situation is not "em dia": the same rule the Pedem um olhar list uses.
   const atRisk = (i: PersonItem) => i.open && Boolean(i.risk) && i.risk?.situation !== 'em_dia';
@@ -31,19 +35,19 @@ function Items({ items }: { items: PersonItem[] }) {
       <SegmentedControl
         size="xs"
         w="fit-content"
-        aria-label="Quais itens mostrar"
+        aria-label={tw.showAria}
         value={show}
         onChange={setShow}
         data={[
-          { value: 'abertos', label: `Abertos · ${items.filter((i) => i.open).length}` },
-          { value: 'risco', label: `Em risco · ${items.filter(atRisk).length}` },
-          { value: 'concluidos', label: `Concluídos (14 d) · ${items.filter((i) => !i.open).length}` },
-          { value: 'todos', label: 'Todos' },
+          { value: 'abertos', label: tw.open(items.filter((i) => i.open).length) },
+          { value: 'risco', label: tw.atRisk(items.filter(atRisk).length) },
+          { value: 'concluidos', label: tw.finished(items.filter((i) => !i.open).length) },
+          { value: 'todos', label: tw.all },
         ]}
       />
       {shown.length === 0 ? (
         <Text size="sm" c="dimmed">
-          Nenhum item neste filtro.
+          {tw.emptyFilter}
         </Text>
       ) : (
         <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
@@ -51,12 +55,12 @@ function Items({ items }: { items: PersonItem[] }) {
             <Table verticalSpacing="xs">
               <Table.Thead>
                 <Table.Tr>
-                  <Table.Th>Item</Table.Th>
-                  <Table.Th>Tipo</Table.Th>
-                  <Table.Th>Épico</Table.Th>
-                  <Table.Th>Situação</Table.Th>
-                  <Table.Th>Prazo</Table.Th>
-                  <Table.Th className="num">Est.</Table.Th>
+                  <Table.Th>{tw.colItem}</Table.Th>
+                  <Table.Th>{tw.colType}</Table.Th>
+                  <Table.Th>{tw.colEpic}</Table.Th>
+                  <Table.Th>{tw.colSituation}</Table.Th>
+                  <Table.Th>{tw.colDue}</Table.Th>
+                  <Table.Th className="num">{tw.colEstimate}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -87,7 +91,7 @@ function Items({ items }: { items: PersonItem[] }) {
                         <RiskBadge situation={item.risk.situation} size="xs" />
                       ) : (
                         <Badge variant="light" color="teal" size="xs">
-                          concluído
+                          {t.people.common.done}
                         </Badge>
                       )}
                     </Table.Td>
@@ -109,10 +113,12 @@ function Items({ items }: { items: PersonItem[] }) {
 }
 
 function Epics({ epics }: { epics: PersonDetail['epics'] }) {
+  const t = useT();
+  const tw = t.people.work;
   if (!epics.length) {
     return (
       <Text size="sm" c="dimmed">
-        Os itens desta pessoa não estão ligados a nenhum épico.
+        {tw.noEpics}
       </Text>
     );
   }
@@ -129,14 +135,14 @@ function Epics({ epics }: { epics: PersonDetail['epics'] }) {
             </Text>
             <Group gap={6}>
               <Badge variant="light" size="sm">
-                {plural(epic.open, 'aberto', 'abertos')}
+                {tw.epicOpen(epic.open)}
               </Badge>
               <Badge variant="light" color="teal" size="sm">
-                {plural(epic.finished, 'concluído', 'concluídos')}
+                {tw.epicDone(epic.finished)}
               </Badge>
               {epic.blocked > 0 && (
                 <Badge variant="light" color="red" size="sm">
-                  {plural(epic.blocked, 'bloqueado', 'bloqueados')}
+                  {tw.epicBlocked(epic.blocked)}
                 </Badge>
               )}
             </Group>
@@ -151,16 +157,18 @@ function Epics({ epics }: { epics: PersonDetail['epics'] }) {
 }
 
 function Blocks({ blocks }: { blocks: PersonItem[] }) {
-  if (!blocks.length) return <Empty title="Nenhum bloqueio aberto">Nada desta pessoa está sinalizado, em status de bloqueio ou esperando outro item.</Empty>;
+  const t = useT();
+  const tw = t.people.work;
+  if (!blocks.length) return <Empty title={tw.noBlocksTitle}>{tw.noBlocksBody}</Empty>;
   return (
     <Paper withBorder p={0} style={{ overflow: 'hidden' }}>
       <Table.ScrollContainer minWidth={620} mb={0}>
         <Table verticalSpacing="xs">
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>Item</Table.Th>
-              <Table.Th>Motivo</Table.Th>
-              <Table.Th>Parado há</Table.Th>
+              <Table.Th>{tw.colItem}</Table.Th>
+              <Table.Th>{tw.colReason}</Table.Th>
+              <Table.Th>{tw.colStalledFor}</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -178,7 +186,7 @@ function Blocks({ blocks }: { blocks: PersonItem[] }) {
                   <Table.Td>
                     <Group gap={6} wrap="nowrap">
                       <Text size="sm" className="num">
-                        {days} d
+                        {t.people.common.days(days)}
                       </Text>
                       <SeverityBadge level={level} />
                     </Group>
@@ -195,18 +203,20 @@ function Blocks({ blocks }: { blocks: PersonItem[] }) {
 
 /** Activities, epics and blocks: the lists the cards deliberately do not have. */
 export function PersonWork({ detail }: { detail: PersonDetail }) {
+  const t = useT();
+  const tw = t.people.work;
   const [view, setView] = useState('itens');
   return (
     <Stack gap="md">
       <SegmentedControl
         w="fit-content"
-        aria-label="Visão do trabalho"
+        aria-label={tw.viewAria}
         value={view}
         onChange={setView}
         data={[
-          { value: 'itens', label: 'Atividades e histórias' },
-          { value: 'epicos', label: `Épicos · ${detail.epics.length}` },
-          { value: 'bloqueios', label: `Bloqueios · ${detail.blocks.length}` },
+          { value: 'itens', label: tw.itemsView },
+          { value: 'epicos', label: tw.epicsView(detail.epics.length) },
+          { value: 'bloqueios', label: tw.blocksView(detail.blocks.length) },
         ]}
       />
       {view === 'itens' && <Items items={detail.items} />}

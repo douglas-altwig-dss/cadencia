@@ -16,12 +16,14 @@ import { notifications } from '@mantine/notifications';
 import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { useT } from '../../i18n';
+
 import {
   brDeIso,
   contagemPorPessoa,
   type Documento,
   type EstiloLinha,
-  ESTILOS_LINHA,
+  estilosLinha,
   type Entrada,
   ICONES_TROCA,
   isoDeBr,
@@ -33,6 +35,7 @@ import {
   type Pessoa,
   type Sinal,
   type Registro,
+  rotuloTema,
   type Tema,
 } from '../../lib/focusLog';
 import { useConfirm } from '../common';
@@ -62,6 +65,7 @@ export function EquipeDrawer({
   onRenamed: (antigo: string, novo: string) => void;
   onRemoved: (nome: string) => void;
 }) {
+  const t = useT();
   const { confirm, dialog } = useConfirm();
   const [editing, setEditing] = useState<Pessoa | 'nova' | null>(null);
   const [nome, setNome] = useState('');
@@ -81,12 +85,12 @@ export function EquipeDrawer({
     const self = editing && editing !== 'nova' ? editing.id : null;
     const repetido = documento.pessoas.some((p) => norm(p.nome) === norm(limpo) && p.id !== self);
     if (repetido) {
-      notifications.show({ message: 'Já existe um membro com este nome.', color: 'red' });
+      notifications.show({ message: t.people.focus.team.duplicate, color: 'red' });
       return;
     }
     if (editing === 'nova') {
       commit((d) => ({ ...d, pessoas: [...d.pessoas, { id: `p_${uid()}`, nome: limpo, cargo: cargo.trim(), cor }] }));
-      notifications.show({ message: 'Membro adicionado.' });
+      notifications.show({ message: t.people.focus.team.added });
     } else if (editing) {
       const antigo = editing.nome;
       commit((d) => ({
@@ -95,7 +99,7 @@ export function EquipeDrawer({
         registros: d.registros.map((r) => (r.nome === antigo ? { ...r, nome: limpo } : r)),
       }));
       if (antigo !== limpo) onRenamed(antigo, limpo);
-      notifications.show({ message: 'Membro atualizado.' });
+      notifications.show({ message: t.people.focus.team.updated });
     }
     setEditing(null);
   };
@@ -104,52 +108,52 @@ export function EquipeDrawer({
     const quantas = contagemPorPessoa(entradas, pessoa.nome);
     if (quantas > 0) {
       const ok = await confirm({
-        title: `Remover ${pessoa.nome}?`,
-        body: `${pessoa.nome} tem ${quantas} ${quantas === 1 ? 'atividade' : 'atividades'} no registro. As linhas continuam guardadas, só deixam de aparecer na grade.`,
-        confirmLabel: 'Remover membro',
+        title: t.people.focus.team.removeTitle(pessoa.nome),
+        body: t.people.focus.team.removeBody(pessoa.nome, quantas),
+        confirmLabel: t.people.focus.team.removeConfirm,
       });
       if (!ok) return;
     }
     commit((d) => ({ ...d, pessoas: d.pessoas.filter((p) => p.id !== pessoa.id) }));
     onRemoved(pessoa.nome);
-    notifications.show({ message: 'Membro removido.' });
+    notifications.show({ message: t.people.focus.team.removed });
   };
 
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size="md" title="Equipe">
+    <Drawer opened={opened} onClose={onClose} position="right" size="md" title={t.people.focus.page.team}>
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          Membros são as raias da grade. Quem não está aqui não aparece, e uma linha que cita um nome sem membro cadastrado fica em Geral.
+          {t.people.focus.team.intro}
         </Text>
 
         {editing ? (
           <Stack gap="xs" className="tf-form-box">
             <Text fw={600} size="sm">
-              {editing === 'nova' ? 'Adicionar membro' : `Editar ${editing.nome}`}
+              {editing === 'nova' ? t.people.focus.team.add : t.people.common.edit(editing.nome)}
             </Text>
             <SimpleGrid cols={{ base: 1, sm: 2 }}>
-              <TextInput label="Nome" value={nome} onChange={(e) => setNome(e.currentTarget.value)} placeholder="Ex: Mariana" required />
-              <TextInput label="Cargo ou papel" value={cargo} onChange={(e) => setCargo(e.currentTarget.value)} placeholder="Ex: Engenheira de dados" />
+              <TextInput label={t.people.common.name} value={nome} onChange={(e) => setNome(e.currentTarget.value)} placeholder={t.people.focus.team.namePlaceholder} required />
+              <TextInput label={t.people.focus.team.role} value={cargo} onChange={(e) => setCargo(e.currentTarget.value)} placeholder={t.people.focus.team.rolePlaceholder} />
             </SimpleGrid>
-            <ColorInput label="Cor da raia" value={cor} onChange={setCor} swatches={PALETA_PESSOAS} format="hex" />
+            <ColorInput label={t.people.focus.team.laneColor} value={cor} onChange={setCor} swatches={PALETA_PESSOAS} format="hex" />
             <Group gap="xs">
               <Button size="xs" onClick={save} disabled={!nome.trim()}>
-                {editing === 'nova' ? 'Cadastrar membro' : 'Salvar alterações'}
+                {editing === 'nova' ? t.people.focus.team.register : t.people.focus.team.saveChanges}
               </Button>
               <Button size="xs" variant="default" onClick={() => setEditing(null)}>
-                Cancelar
+                {t.people.common.cancel}
               </Button>
             </Group>
           </Stack>
         ) : (
           <Button size="xs" onClick={() => start('nova')} style={{ alignSelf: 'flex-start' }}>
-            Adicionar membro
+            {t.people.focus.team.add}
           </Button>
         )}
 
         <Stack gap="xs">
           <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-            Membros ({documento.pessoas.length})
+            {t.people.focus.team.members(documento.pessoas.length)}
           </Text>
           {documento.pessoas.map((p) => {
             const quantas = contagemPorPessoa(entradas, p.nome);
@@ -164,15 +168,15 @@ export function EquipeDrawer({
                       {p.nome}
                     </Text>
                     <Text size="xs" c="dimmed">
-                      {p.cargo || 'Membro'} · {quantas} {quantas === 1 ? 'atividade' : 'atividades'}
+                      {p.cargo || t.people.focus.page.member} · {t.people.focus.page.activities(quantas)}
                     </Text>
                   </div>
                 </Group>
                 <Group gap={4} wrap="nowrap">
-                  <ActionIcon variant="subtle" color="gray" aria-label={`Editar ${p.nome}`} onClick={() => start(p)}>
+                  <ActionIcon variant="subtle" color="gray" aria-label={t.people.common.edit(p.nome)} onClick={() => start(p)}>
                     <IconPencil size={15} />
                   </ActionIcon>
-                  <ActionIcon variant="subtle" color="red" aria-label={`Remover ${p.nome}`} onClick={() => remove(p)}>
+                  <ActionIcon variant="subtle" color="red" aria-label={t.people.common.remove(p.nome)} onClick={() => remove(p)}>
                     <IconTrash size={15} />
                   </ActionIcon>
                 </Group>
@@ -203,6 +207,7 @@ export function TemasDrawer({
   onRenamed: (antigo: string, novo: string) => void;
   onRemoved: (nome: string) => void;
 }) {
+  const t = useT();
   const { confirm, dialog } = useConfirm();
   const [editing, setEditing] = useState<Tema | 'novo' | null>(null);
   const [nome, setNome] = useState('');
@@ -221,7 +226,7 @@ export function TemasDrawer({
     if (!limpo || !editing) return;
     const repetido = documento.temas.some((t) => norm(t.nome) === norm(limpo) && t !== editing);
     if (repetido) {
-      notifications.show({ message: 'Já existe um tema com este nome.', color: 'red' });
+      notifications.show({ message: t.people.focus.themes.duplicate, color: 'red' });
       return;
     }
     const novo: Tema = { nome: limpo, cor, palavras: palavras.trim() };
@@ -240,76 +245,76 @@ export function TemasDrawer({
       }));
       if (antigo !== limpo) onRenamed(antigo, limpo);
     }
-    notifications.show({ message: 'Tema salvo. As palavras valem para as próximas leituras.' });
+    notifications.show({ message: t.people.focus.themes.saved });
     setEditing(null);
   };
 
   const remove = async (tema: Tema) => {
     const ok = await confirm({
-      title: `Remover o tema ${tema.nome}?`,
-      body: 'As linhas que o citam continuam como estão; só deixam de ser filtradas por ele.',
-      confirmLabel: 'Remover tema',
+      title: t.people.focus.themes.removeTitle(tema.nome),
+      body: t.people.focus.themes.removeBody,
+      confirmLabel: t.people.focus.themes.removeConfirm,
     });
     if (!ok) return;
     commit((d) => ({ ...d, temas: d.temas.filter((t) => t !== tema) }));
     onRemoved(tema.nome);
-    notifications.show({ message: 'Tema removido.' });
+    notifications.show({ message: t.people.focus.themes.removed });
   };
 
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size="md" title="Temas">
+    <Drawer opened={opened} onClose={onClose} position="right" size="md" title={t.people.focus.page.themes}>
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          Temas dizem sobre o que é o trabalho. Você cadastra cada um com as palavras que o identificam: uma linha que as cita entra no tema, sem diferenciar acentos nem maiúsculas. Uma troca de foco usa o tema para onde foi.
+          {t.people.focus.themes.intro}
         </Text>
 
         {editing ? (
           <Stack gap="xs" className="tf-form-box">
             <Text fw={600} size="sm">
-              {editing === 'novo' ? 'Novo tema' : `Editar ${editing.nome}`}
+              {editing === 'novo' ? t.people.focus.themes.new : t.people.common.edit(editing.nome)}
             </Text>
-            <TextInput label="Nome" value={nome} onChange={(e) => setNome(e.currentTarget.value)} required />
+            <TextInput label={t.people.common.name} value={nome} onChange={(e) => setNome(e.currentTarget.value)} required />
             <TextInput
-              label="Palavras que o identificam"
-              description="Separadas por vírgula"
+              label={t.people.focus.themes.words}
+              description={t.people.focus.themes.commaSeparated}
               value={palavras}
               onChange={(e) => setPalavras(e.currentTarget.value)}
             />
-            <ColorInput label="Cor" value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
+            <ColorInput label={t.people.common.color} value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
             <Group gap="xs">
               <Button size="xs" onClick={save} disabled={!nome.trim()}>
-                Salvar tema
+                {t.people.focus.themes.save}
               </Button>
               <Button size="xs" variant="default" onClick={() => setEditing(null)}>
-                Cancelar
+                {t.people.common.cancel}
               </Button>
             </Group>
           </Stack>
         ) : (
           <Button size="xs" onClick={() => start('novo')} style={{ alignSelf: 'flex-start' }}>
-            Novo tema
+            {t.people.focus.themes.new}
           </Button>
         )}
 
         <Stack gap="xs">
-          {documento.temas.map((t) => (
-            <Group key={t.nome} justify="space-between" wrap="nowrap" className="tf-person-row">
+          {documento.temas.map((tema) => (
+            <Group key={tema.nome} justify="space-between" wrap="nowrap" className="tf-person-row">
               <Group gap="sm" wrap="nowrap" style={{ minWidth: 0 }}>
-                <span className="tf-dot" style={{ background: t.cor, width: 12, height: 12 }} aria-hidden />
+                <span className="tf-dot" style={{ background: tema.cor, width: 12, height: 12 }} aria-hidden />
                 <div style={{ minWidth: 0 }}>
                   <Text size="sm" fw={600} truncate>
-                    {t.nome}
+                    {tema.nome}
                   </Text>
                   <Text size="xs" c="dimmed" truncate>
-                    {t.palavras || 'sem palavras: só entra por troca de foco'}
+                    {tema.palavras || t.people.focus.themes.noWords}
                   </Text>
                 </div>
               </Group>
               <Group gap={4} wrap="nowrap">
-                <ActionIcon variant="subtle" color="gray" aria-label={`Editar ${t.nome}`} onClick={() => start(t)}>
+                <ActionIcon variant="subtle" color="gray" aria-label={t.people.common.edit(tema.nome)} onClick={() => start(tema)}>
                   <IconPencil size={15} />
                 </ActionIcon>
-                <ActionIcon variant="subtle" color="red" aria-label={`Remover ${t.nome}`} onClick={() => remove(t)}>
+                <ActionIcon variant="subtle" color="red" aria-label={t.people.common.remove(tema.nome)} onClick={() => remove(tema)}>
                   <IconTrash size={15} />
                 </ActionIcon>
               </Group>
@@ -339,6 +344,7 @@ export function SinaisDrawer({
   onRenamed: (antigo: string, novo: string) => void;
   onRemoved: (nome: string) => void;
 }) {
+  const t = useT();
   const { confirm, dialog } = useConfirm();
   const [editing, setEditing] = useState<Sinal | 'novo' | null>(null);
   const [nome, setNome] = useState('');
@@ -359,7 +365,7 @@ export function SinaisDrawer({
     if (!limpo || !editing) return;
     const repetido = documento.sinais.some((s) => norm(s.nome) === norm(limpo) && s !== editing);
     if (repetido) {
-      notifications.show({ message: 'Já existe um sinal com este nome.', color: 'red' });
+      notifications.show({ message: t.people.focus.signals.duplicate, color: 'red' });
       return;
     }
     const novo: Sinal = { nome: limpo, cor, palavras: palavras.trim(), gatilho: gatilho.trim() };
@@ -370,56 +376,55 @@ export function SinaisDrawer({
       commit((d) => ({ ...d, sinais: d.sinais.map((s) => (s === editing ? novo : s)) }));
       if (antigo !== limpo) onRenamed(antigo, limpo);
     }
-    notifications.show({ message: 'Sinal salvo. Vale para as próximas leituras das linhas.' });
+    notifications.show({ message: t.people.focus.signals.saved });
     setEditing(null);
   };
 
   const remove = async (sinal: Sinal) => {
     const ok = await confirm({
-      title: `Remover o sinal ${sinal.nome}?`,
-      body: 'As linhas continuam como estão; só deixam de mostrar este sinal.',
-      confirmLabel: 'Remover sinal',
+      title: t.people.focus.signals.removeTitle(sinal.nome),
+      body: t.people.focus.signals.removeBody,
+      confirmLabel: t.people.focus.signals.removeConfirm,
     });
     if (!ok) return;
     commit((d) => ({ ...d, sinais: d.sinais.filter((s) => s !== sinal) }));
     onRemoved(sinal.nome);
-    notifications.show({ message: 'Sinal removido.' });
+    notifications.show({ message: t.people.focus.signals.removed });
   };
 
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size="md" title="Sinais">
+    <Drawer opened={opened} onClose={onClose} position="right" size="md" title={t.people.focus.page.signals}>
       <Stack gap="md">
         <Text size="sm" c="dimmed">
-          Sinais são condições que uma linha revela: bloqueio, espera, urgência. Cada um é encontrado pelas palavras dele no texto, como um tema,
-          mas marca como a linha está, não sobre o que ela é.
+          {t.people.focus.signals.intro}
         </Text>
 
         {editing ? (
           <Stack gap="xs" className="tf-form-box">
             <Text fw={600} size="sm">
-              {editing === 'novo' ? 'Novo sinal' : `Editar ${editing.nome}`}
+              {editing === 'novo' ? t.people.focus.signals.new : t.people.common.edit(editing.nome)}
             </Text>
-            <TextInput label="Nome" value={nome} onChange={(e) => setNome(e.currentTarget.value)} required />
+            <TextInput label={t.people.common.name} value={nome} onChange={(e) => setNome(e.currentTarget.value)} required />
             <TextInput
-              label="Palavras que o identificam"
-              description="Separadas por vírgula. Um sinal sem palavras não aparece em nenhuma linha."
+              label={t.people.focus.themes.words}
+              description={t.people.focus.signals.wordsHint}
               value={palavras}
               onChange={(e) => setPalavras(e.currentTarget.value)}
             />
-            <TextInput label="O que significa" description="Opcional. Aparece na legenda e na dica do sinal." value={gatilho} onChange={(e) => setGatilho(e.currentTarget.value)} />
-            <ColorInput label="Cor" value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
+            <TextInput label={t.people.focus.signals.meaning} description={t.people.focus.signals.meaningHint} value={gatilho} onChange={(e) => setGatilho(e.currentTarget.value)} />
+            <ColorInput label={t.people.common.color} value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
             <Group gap="xs">
               <Button size="xs" onClick={save} disabled={!nome.trim()}>
-                Salvar sinal
+                {t.people.focus.signals.save}
               </Button>
               <Button size="xs" variant="default" onClick={() => setEditing(null)}>
-                Cancelar
+                {t.people.common.cancel}
               </Button>
             </Group>
           </Stack>
         ) : (
           <Button size="xs" onClick={() => start('novo')} style={{ alignSelf: 'flex-start' }}>
-            Novo sinal
+            {t.people.focus.signals.new}
           </Button>
         )}
 
@@ -433,15 +438,15 @@ export function SinaisDrawer({
                     {s.nome}
                   </Text>
                   <Text size="xs" c="dimmed" truncate>
-                    {s.gatilho || s.palavras || 'sem palavras: não aparece em nenhuma linha'}
+                    {s.gatilho || s.palavras || t.people.focus.signals.noWords}
                   </Text>
                 </div>
               </Group>
               <Group gap={4} wrap="nowrap">
-                <ActionIcon variant="subtle" color="gray" aria-label={`Editar ${s.nome}`} onClick={() => start(s)}>
+                <ActionIcon variant="subtle" color="gray" aria-label={t.people.common.edit(s.nome)} onClick={() => start(s)}>
                   <IconPencil size={15} />
                 </ActionIcon>
-                <ActionIcon variant="subtle" color="red" aria-label={`Remover ${s.nome}`} onClick={() => remove(s)}>
+                <ActionIcon variant="subtle" color="red" aria-label={t.people.common.remove(s.nome)} onClick={() => remove(s)}>
                   <IconTrash size={15} />
                 </ActionIcon>
               </Group>
@@ -472,6 +477,7 @@ export function TrocaModal({
   seed?: Partial<Registro>;
   commit: Commit;
 }) {
+  const t = useT();
   const { confirm, dialog } = useConfirm();
   const base = inicial ?? seed ?? {};
   const temas = documento.temas.map((t) => t.nome);
@@ -484,7 +490,7 @@ export function TrocaModal({
   const [estilo, setEstilo] = useState<EstiloLinha>(base.estiloLinha ?? 'borda-gradiente');
   const [motivo, setMotivo] = useState(base.registro ?? '');
 
-  const opcoesDe = [...temas, PAUSA];
+  const opcoesDe = [...temas, PAUSA].map((value) => ({ value, label: rotuloTema(value) }));
   const pessoasOpcoes = documento.pessoas.map((p) => ({ value: p.nome, label: p.nome }));
 
   const save = () => {
@@ -505,37 +511,37 @@ export function TrocaModal({
       ...d,
       registros: inicial ? d.registros.map((r) => (r.uid === inicial.uid ? payload : r)) : [...d.registros, payload],
     }));
-    notifications.show({ message: 'Troca de foco salva.' });
+    notifications.show({ message: t.people.focus.shift.saved });
     onClose();
   };
 
   const remove = async () => {
     if (!inicial) return;
     const ok = await confirm({
-      title: 'Excluir esta troca de foco?',
-      body: 'A troca sai da linha do tempo. Use Desfazer (Ctrl+Z) para voltar atrás.',
-      confirmLabel: 'Excluir troca',
+      title: t.people.focus.shift.deleteTitle,
+      body: t.people.focus.shift.deleteBody,
+      confirmLabel: t.people.focus.shift.deleteConfirm,
     });
     if (!ok) return;
     commit((d) => ({ ...d, registros: d.registros.filter((r) => r.uid !== inicial.uid) }));
-    notifications.show({ message: 'Troca de foco removida.' });
+    notifications.show({ message: t.people.focus.shift.removed });
     onClose();
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Troca de foco" size="lg">
+    <Modal opened={opened} onClose={onClose} title={t.people.focus.page.shift} size="lg">
       <Stack gap="sm">
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <Select label="Membro da equipe" data={pessoasOpcoes} value={nome} onChange={(v) => setNome(v ?? '')} allowDeselect={false} />
-          <TextInput label="Data da transição" type="date" value={data} onChange={(e) => setData(e.currentTarget.value)} />
-          <Select label="De (tema que deixa de ser foco)" data={opcoesDe} value={de} onChange={(v) => setDe(v ?? PAUSA)} allowDeselect={false} />
-          <Select label="Para (novo foco prioritário)" data={temas} value={para} onChange={(v) => setPara(v ?? '')} allowDeselect={false} />
+          <Select label={t.people.focus.shift.member} data={pessoasOpcoes} value={nome} onChange={(v) => setNome(v ?? '')} allowDeselect={false} />
+          <TextInput label={t.people.focus.shift.date} type="date" value={data} onChange={(e) => setData(e.currentTarget.value)} />
+          <Select label={t.people.focus.shift.fromTheme} data={opcoesDe} value={de} onChange={(v) => setDe(v ?? PAUSA)} allowDeselect={false} />
+          <Select label={t.people.focus.shift.toTheme} data={temas} value={para} onChange={(v) => setPara(v ?? '')} allowDeselect={false} />
         </SimpleGrid>
 
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
           <div>
             <Text size="sm" fw={500} mb={4}>
-              Ícone de destaque
+              {t.people.focus.shift.icon}
             </Text>
             <Group gap={6}>
               {ICONES_TROCA.map((ic) => (
@@ -544,7 +550,7 @@ export function TrocaModal({
                   variant={icone === ic ? 'filled' : 'default'}
                   size="compact-md"
                   aria-pressed={icone === ic}
-                  aria-label={`Ícone ${ic}`}
+                  aria-label={t.people.focus.shift.iconAria(ic)}
                   onClick={() => setIcone(ic)}
                 >
                   {ic}
@@ -552,15 +558,15 @@ export function TrocaModal({
               ))}
             </Group>
           </div>
-          <Select label="Estilo da borda" data={ESTILOS_LINHA.map((e) => ({ value: e.value, label: e.label }))} value={estilo} onChange={(v) => setEstilo((v ?? 'borda-gradiente') as EstiloLinha)} allowDeselect={false} />
+          <Select label={t.people.focus.shift.borderStyle} data={estilosLinha()} value={estilo} onChange={(v) => setEstilo((v ?? 'borda-gradiente') as EstiloLinha)} allowDeselect={false} />
         </SimpleGrid>
 
-        <ColorInput label="Cor de destaque" value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
-        <Textarea label="Motivo da mudança" rows={2} value={motivo} onChange={(e) => setMotivo(e.currentTarget.value)} placeholder="Ex: pausado por causa de um bloqueio no deploy" />
+        <ColorInput label={t.people.focus.shift.highlightColor} value={cor} onChange={setCor} swatches={PALETA_DESTAQUE} format="hex" />
+        <Textarea label={t.people.focus.shift.reason} rows={2} value={motivo} onChange={(e) => setMotivo(e.currentTarget.value)} placeholder={t.people.focus.shift.reasonPlaceholder} />
 
         <div className="tf-form-box">
           <Text size="xs" c="dimmed" mb={6} tt="uppercase" fw={600}>
-            Pré-visualização
+            {t.people.focus.shift.preview}
           </Text>
           <TrocaCard icone={icone} cor={cor} estilo={estilo} de={de} para={para || '—'} texto={motivo.trim()} />
         </div>
@@ -568,15 +574,15 @@ export function TrocaModal({
         <Group justify={inicial ? 'space-between' : 'flex-end'} gap="xs">
           {inicial && (
             <Button color="red" variant="light" onClick={remove}>
-              Excluir
+              {t.people.common.delete}
             </Button>
           )}
           <Group gap="xs">
             <Button variant="default" onClick={onClose}>
-              Cancelar
+              {t.people.common.cancel}
             </Button>
             <Button onClick={save} disabled={!nome || !para}>
-              Salvar transição
+              {t.people.focus.shift.save}
             </Button>
           </Group>
         </Group>
@@ -603,6 +609,7 @@ export function AtividadeModal({
   pessoa?: string;
   commit: Commit;
 }) {
+  const t = useT();
   const { confirm, dialog } = useConfirm();
   const [nome, setNome] = useState(inicial?.nome ?? pessoa ?? documento.pessoas[0]?.nome ?? '');
   const [data, setData] = useState(() => (inicial ? isoDeBr(inicial.data) : hojeIso()));
@@ -616,53 +623,53 @@ export function AtividadeModal({
       ...d,
       registros: inicial ? d.registros.map((r) => (r.uid === inicial.uid ? payload : r)) : [...d.registros, payload],
     }));
-    notifications.show({ message: inicial ? 'Atividade atualizada.' : 'Atividade adicionada.' });
+    notifications.show({ message: inicial ? t.people.focus.activity.updated : t.people.focus.activity.added });
     onClose();
   };
 
   const remove = async () => {
     if (!inicial) return;
     const ok = await confirm({
-      title: 'Excluir esta atividade?',
-      body: 'A linha sai do registro. Use Desfazer (Ctrl+Z) para voltar atrás.',
-      confirmLabel: 'Excluir atividade',
+      title: t.people.focus.activity.deleteTitle,
+      body: t.people.focus.activity.deleteBody,
+      confirmLabel: t.people.focus.activity.deleteConfirm,
     });
     if (!ok) return;
     commit((d) => ({ ...d, registros: d.registros.filter((r) => r.uid !== inicial.uid) }));
-    notifications.show({ message: 'Atividade removida.' });
+    notifications.show({ message: t.people.focus.activity.removed });
     onClose();
   };
 
   return (
-    <Modal opened={opened} onClose={onClose} title={inicial ? 'Editar atividade' : 'Nova atividade'} size="md">
+    <Modal opened={opened} onClose={onClose} title={inicial ? t.people.focus.cards.editActivity : t.people.focus.activity.newTitle} size="md">
       <Stack gap="sm">
         <SimpleGrid cols={{ base: 1, sm: 2 }}>
-          <Select label="Responsável" data={documento.pessoas.map((p) => ({ value: p.nome, label: p.nome }))} value={nome} onChange={(v) => setNome(v ?? '')} allowDeselect={false} />
-          <TextInput label="Data" type="date" value={data} onChange={(e) => setData(e.currentTarget.value)} />
+          <Select label={t.people.focus.activity.owner} data={documento.pessoas.map((p) => ({ value: p.nome, label: p.nome }))} value={nome} onChange={(v) => setNome(v ?? '')} allowDeselect={false} />
+          <TextInput label={t.people.focus.sort.data} type="date" value={data} onChange={(e) => setData(e.currentTarget.value)} />
         </SimpleGrid>
         <Textarea
-          label="Descrição"
+          label={t.people.common.description}
           rows={4}
           value={texto}
           onChange={(e) => setTexto(e.currentTarget.value)}
-          placeholder="O que foi feito ou alinhado? Cite outras pessoas com o nome para separar o trabalho delas."
+          placeholder={t.people.focus.activity.placeholder}
           autosize
         />
         <Text size="xs" c="dimmed">
-          Uma linha escrita pelo gestor que cita membros da equipe é dividida em uma atividade por pessoa citada.
+          {t.people.focus.activity.splitNote}
         </Text>
         <Group justify={inicial ? 'space-between' : 'flex-end'} gap="xs">
           {inicial && (
             <Button color="red" variant="light" onClick={remove}>
-              Excluir
+              {t.people.common.delete}
             </Button>
           )}
           <Group gap="xs">
             <Button variant="default" onClick={onClose}>
-              Cancelar
+              {t.people.common.cancel}
             </Button>
             <Button onClick={save} disabled={!nome || !texto.trim()}>
-              {inicial ? 'Salvar' : 'Adicionar'}
+              {inicial ? t.people.common.save : t.people.common.add}
             </Button>
           </Group>
         </Group>

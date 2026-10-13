@@ -2,6 +2,7 @@ import { Anchor, Avatar, Badge, Group, Paper, Stack, Text, Tooltip } from '@mant
 import { Link } from 'react-router';
 
 import type { PersonIndicators, PlanRole } from '../../api/types';
+import { useT } from '../../i18n';
 import { RoleChip } from '../epicPlan/shared';
 import { PersonIndicatorBlocks } from './indicators';
 
@@ -38,6 +39,7 @@ export function PersonCard({
   roles: CardRole[];
   indicators?: PersonIndicators;
 }) {
+  const t = useT();
   const edge = roles[0]?.role.cor ?? 'var(--border-soft)';
   return (
     // A card, not a link: the name is the link, and its stretched ::after covers the whole card. The "i"s
@@ -67,7 +69,7 @@ export function PersonCard({
               )}
               {roles.length === 0 && (
                 <Text size="xs" c="dimmed">
-                  sem função
+                  {t.people.common.noRole}
                 </Text>
               )}
             </Group>
@@ -76,7 +78,7 @@ export function PersonCard({
 
         {!indicators ? (
           <Text size="sm" c="dimmed" my="md" ta="center">
-            Sem itens nem sprints nos boards acompanhados.
+            {t.people.card.noData}
           </Text>
         ) : (
           <PersonIndicatorBlocks indicators={indicators} layout="card" />
