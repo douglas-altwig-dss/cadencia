@@ -16,8 +16,10 @@ from pathlib import Path
 
 import pytest
 
-REPORT = Path(__file__).resolve().parents[1] / "cadencia" / "report"
+PACKAGE = Path(__file__).resolve().parents[1] / "cadencia"
+REPORT = PACKAGE / "report"
 CORE = REPORT / "core"
+DOMAIN = PACKAGE / "domain"
 
 #: What `core/` may not touch. `report.adapters` is on the list too: an adapter knows both
 #: vocabularies, and the engine depending on one would put the seam back where it started.
@@ -37,8 +39,17 @@ def _imports(path: Path) -> list[tuple[int, str]]:
     return found
 
 
+#: Pure code builds messages and never renders them (docs/i18n-backend.md, R1): of the i18n package
+#: it may import the value type alone. Rendering needs a locale, which only a boundary knows.
+I18N_ALLOWED = "cadencia.i18n.message"
+
+
+def _renders(module: str) -> bool:
+    return (module == "cadencia.i18n" or module.startswith("cadencia.i18n.")) and module != I18N_ALLOWED
+
+
 def _offends(module: str) -> bool:
-    if module.startswith("cadencia.report.adapters"):
+    if module.startswith("cadencia.report.adapters") or _renders(module):
         return True
     return module in FORBIDDEN_EXACT or any(module == f or module.startswith(f + ".") for f in FORBIDDEN)
 
@@ -51,6 +62,36 @@ def test_the_engine_imports_nothing_from_the_application(path: Path) -> None:
         + ", ".join(f"linha {line}: {module}" for line, module in bad)
         + ". O motor trabalha sobre DeckData e arquivos; o que precisa da aplicação vai para "
         "report/adapters ou entra por parâmetro."
+    )
+
+
+#: What `domain/` may not touch: it is pure, and the analytics layer is where it meets the store.
+DOMAIN_FORBIDDEN = (
+    "cadencia.store",
+    "cadencia.analytics",
+    "cadencia.api",
+    "cadencia.collector",
+    "cadencia.jira",
+)
+
+
+def _domain_offends(module: str) -> bool:
+    return (
+        _renders(module)
+        or module == "cadencia.config"
+        or any(module == f or module.startswith(f + ".") for f in DOMAIN_FORBIDDEN)
+    )
+
+
+@pytest.mark.parametrize(
+    "path", sorted(DOMAIN.rglob("*.py")), ids=lambda p: str(p.relative_to(DOMAIN)).replace("\\", "/")
+)
+def test_the_domain_builds_messages_and_never_renders_them(path: Path) -> None:
+    bad = [(line, module) for line, module in _imports(path) if _domain_offends(module)]
+    assert not bad, (
+        f"domain/{path.relative_to(DOMAIN)} reaches outside the pure layer: "
+        + ", ".join(f"line {line}: {module}" for line, module in bad)
+        + ". Build Msg values (cadencia.i18n.message) and let the boundary render them."
     )
 
 

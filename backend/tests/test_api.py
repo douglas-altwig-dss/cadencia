@@ -10,7 +10,7 @@ from cadencia.api.app import create_app
 from cadencia.api.deps import clock
 from cadencia.jira.errors import JiraAuthError
 from cadencia.report.core.sample_template import build_sample_template
-from tests.support import NOW, collect_demo
+from tests.support import NOW, PT_BR, collect_demo
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ def client(demo, sessions, settings):
     asyncio.run(collect_demo(demo, sessions, settings))
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
-    with TestClient(app) as test_client:
+    with TestClient(app, headers=PT_BR) as test_client:
         yield test_client
 
 

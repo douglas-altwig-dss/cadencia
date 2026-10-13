@@ -41,6 +41,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["ignore::DeprecationWarning:pptx.*"]
+markers = ["locale(name): run the test with this locale as the ambient and process default (default pt-BR)"]
 
 [tool.ruff]
 line-length = 110

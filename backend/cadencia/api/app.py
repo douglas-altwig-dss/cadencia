@@ -27,6 +27,8 @@ from cadencia.api import (
 from cadencia.api.security import SecurityHeaders, TokenAuth
 from cadencia.config import Settings, get_settings
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, configure_default_locale, render, using_locale
+from cadencia.i18n.middleware import LocaleMiddleware, locale_of
 from cadencia.jira.errors import JiraError
 from cadencia.logging import configure_logging, register_secret
 from cadencia.runtime import prepare_database
@@ -37,6 +39,8 @@ log = logging.getLogger(__name__)
 
 def create_app(settings: Settings | None = None, sessions: sessionmaker[Session] | None = None) -> FastAPI:
     settings = settings or get_settings()
+    # The language of what this process produces outside a request (scheduler jobs it starts).
+    configure_default_locale(settings.locale)
     if sessions is None:
         configure_logging(settings.log_level, settings.log_json)
         engine = make_engine(settings.database_url)
@@ -59,23 +63,44 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     app.add_middleware(
         CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"]
     )
+    # Outermost, so the token check's 401 and everything inside speak the request's language.
+    app.add_middleware(LocaleMiddleware)
+
+    # Every handler reads the locale from the request rather than from the contextvar: the
+    # catch-all one runs in ServerErrorMiddleware, outside LocaleMiddleware, after it has reset.
 
     @app.exception_handler(JiraError)
-    async def jira_error(_request: Request, exc: JiraError) -> JSONResponse:
-        return JSONResponse(status_code=502, content={"detail": exc.as_dict()})
+    async def jira_error(request: Request, exc: JiraError) -> JSONResponse:
+        with using_locale(locale_of(request)):
+            detail = exc.as_dict()
+        return JSONResponse(status_code=502, content={"detail": detail})
 
     # Only the errors that mean "not found" or "invalid" are explained to the user. A bare
     # KeyError/ValueError is a bug, and answering it with 404/400 is what used to hide one.
     @app.exception_handler(NotFound)
-    async def not_found(_request: Request, exc: NotFound) -> JSONResponse:
+    async def not_found(request: Request, exc: NotFound) -> JSONResponse:
+        locale = locale_of(request)
         return JSONResponse(
-            status_code=404, content={"detail": {"cause": "não encontrado", "message": exc.message}}
+            status_code=404,
+            content={
+                "detail": {
+                    "cause": render(Msg("common.error.not_found"), locale),
+                    "message": render(exc.msg, locale),
+                }
+            },
         )
 
     @app.exception_handler(Invalid)
-    async def bad_request(_request: Request, exc: Invalid) -> JSONResponse:
+    async def bad_request(request: Request, exc: Invalid) -> JSONResponse:
+        locale = locale_of(request)
         return JSONResponse(
-            status_code=400, content={"detail": {"cause": "requisição inválida", "message": str(exc)}}
+            status_code=400,
+            content={
+                "detail": {
+                    "cause": render(Msg("common.error.invalid"), locale),
+                    "message": render(exc.msg, locale),
+                }
+            },
         )
 
     @app.exception_handler(Exception)
@@ -85,15 +110,18 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
             exc_info=exc,
             extra={"fields": {"method": request.method, "path": request.url.path}},
         )
+        locale = locale_of(request)
+        message = Msg("common.error.internal.message", error=type(exc).__name__, path=request.url.path)
         return JSONResponse(
             status_code=500,
             content={
                 "detail": {
-                    "cause": "erro interno",
-                    "message": f"{type(exc).__name__} em {request.url.path}",
-                    "action": "Veja o log da API para o rastreamento completo.",
+                    "cause": render(Msg("common.error.internal.cause"), locale),
+                    "message": render(message, locale),
+                    "action": render(Msg("common.error.internal.action"), locale),
                 }
             },
+            headers={"Content-Language": locale, "Vary": "Accept-Language"},
         )
 
     for module in (

@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 from starlette.datastructures import Headers, MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from cadencia.i18n import tr
+
 #: Reachable without the token: a container health check has no credential to send.
 PUBLIC_PATHS = frozenset({"/api/health"})
 #: #14: what a read-only share link opens. Every route under it authenticates by the unguessable,
@@ -53,12 +55,12 @@ class TokenAuth:
         response = JSONResponse(
             status_code=401,
             headers={"WWW-Authenticate": "Bearer"},
+            # LocaleMiddleware wraps this one, so tr() speaks the request's language.
             content={
                 "detail": {
-                    "cause": "credencial ausente ou inválida",
-                    "message": "A API exige o token definido em CADENCIA_API_TOKEN.",
-                    "action": "Acesse pela interface web (que entra com usuário e senha) ou envie "
-                    "Authorization: Bearer <token>.",
+                    "cause": tr("common.auth.cause"),
+                    "message": tr("common.auth.message"),
+                    "action": tr("common.auth.action"),
                 }
             },
         )

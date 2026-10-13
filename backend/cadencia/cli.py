@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from cadencia.config import get_settings
+from cadencia.i18n import configure_default_locale
 
 
 def _print(value: Any) -> None:
@@ -490,6 +491,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # Before the parser: help texts and everything printed speak CADENCIA_LOCALE.
+    configure_default_locale(get_settings().locale)
     args = build_parser().parse_args(argv)
     args.func(args)
 

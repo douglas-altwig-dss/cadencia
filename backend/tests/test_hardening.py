@@ -17,13 +17,13 @@ from cadencia.collector.service import COLLECT_LEASE, LEASE_TTL
 from cadencia.store import repo
 from cadencia.store import schema as s
 from cadencia.store.db import session_scope
-from tests.support import NOW, collect_demo, make_settings
+from tests.support import NOW, PT_BR, collect_demo, make_settings
 
 
 def _client(settings, sessions, **kwargs):
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
-    return TestClient(app, **kwargs)
+    return TestClient(app, **{"headers": PT_BR, **kwargs})
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_a_bare_key_error_is_a_500_not_a_not_found(sessions, settings):
     def boom() -> dict:
         return {}["missing"]
 
-    with TestClient(app, raise_server_exceptions=False) as client:
+    with TestClient(app, raise_server_exceptions=False, headers=PT_BR) as client:
         response = client.get("/api/boom")
     assert response.status_code == 500
     assert response.json()["detail"]["cause"] == "erro interno"

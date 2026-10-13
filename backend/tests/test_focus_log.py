@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
 from cadencia.focus_log.model import Documento, normaliza
-from tests.support import NOW
+from tests.support import NOW, PT_BR
 
 PACKAGE = Path(__file__).resolve().parents[1] / "cadencia" / "focus_log"
 
@@ -38,7 +38,7 @@ FORBIDDEN = (
 def client(sessions, settings):
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
-    with TestClient(app) as test_client:
+    with TestClient(app, headers=PT_BR) as test_client:
         yield test_client
 
 

@@ -15,7 +15,7 @@ from cadencia.api.deps import clock
 from cadencia.domain.capacity import Availability, sprint_capacity
 from cadencia.domain.models import BoardProfile, Person
 from cadencia.store.db import make_engine, upgrade
-from tests.support import NOW, collect_demo
+from tests.support import NOW, PT_BR, collect_demo
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def client(demo, sessions, settings):
     asyncio.run(collect_demo(demo, sessions, settings))
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
-    with TestClient(app) as test_client:
+    with TestClient(app, headers=PT_BR) as test_client:
         yield test_client
 
 
@@ -165,7 +165,7 @@ def test_a_sprint_nobody_closed_after_its_end_is_counted_over_the_week(demo, ses
     app = create_app(settings, sessions)
     # Wednesday of the week after: sprint 12 ended on Friday the 11th but is still open in Jira.
     app.dependency_overrides[clock] = lambda: NOW + timedelta(days=6)
-    with TestClient(app) as late:
+    with TestClient(app, headers=PT_BR) as late:
         ana = next(p for p in ok(late.get("/api/people/overview"))["items"] if p["account_id"] == "demo-ana")
     work = ana["workload"]
     assert work["window"] == "sprint" and work["sprint_overdue"] is True
@@ -274,7 +274,7 @@ def plan_client(sessions, settings):
     asyncio.run(collect_demo(DemoJira(NOW, epic_plan=True), sessions, settings, select=(4,)))
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
-    with TestClient(app) as test_client:
+    with TestClient(app, headers=PT_BR) as test_client:
         yield test_client
 
 

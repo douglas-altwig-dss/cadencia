@@ -17,7 +17,7 @@ from cadencia.collector.scheduler import deck_attachment
 from cadencia.report.core.sample_template import build_sample_template
 from cadencia.store import schema as s
 from cadencia.store.db import session_scope
-from tests.support import NOW, collect_demo, make_settings
+from tests.support import NOW, PT_BR, collect_demo, make_settings
 
 
 def ok(response):
@@ -34,7 +34,7 @@ def _app(settings, sessions):
 @pytest.fixture
 def client(demo, sessions, settings):
     asyncio.run(collect_demo(demo, sessions, settings))
-    with TestClient(_app(settings, sessions)) as test_client:
+    with TestClient(_app(settings, sessions), headers=PT_BR) as test_client:
         yield test_client
 
 
@@ -273,7 +273,7 @@ def test_share_links_open_one_deck_without_the_api_token(sessions, tmp_path, dem
     settings = make_settings(tmp_path, api_token="s3cret", public_url="https://cadencia.example")
     asyncio.run(collect_demo(demo, sessions, settings))
     auth = {"Authorization": "Bearer s3cret"}
-    with TestClient(_app(settings, sessions)) as client:
+    with TestClient(_app(settings, sessions), headers=PT_BR) as client:
         path = build_sample_template(tmp_path / "modelo.pptx")
         template = client.post(
             "/api/reports/templates", files={"file": ("m.pptx", path.read_bytes())}, headers=auth

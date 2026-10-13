@@ -20,6 +20,7 @@ from cadencia.analytics.epic_plan import board_epic_summaries
 from cadencia.analytics.health import board_health
 from cadencia.config import Settings
 from cadencia.domain.models import HierarchyLevel
+from cadencia.i18n import DECK_LOCALE, using_locale
 from cadencia.report.core.context import FIELDS, DeckData, FieldSpec, VariableSpec
 from cadencia.store import repo
 from cadencia.store import schema as s
@@ -67,24 +68,28 @@ class JiraSource:
         template_name: str = "",
         anonymize: bool = False,
     ) -> DeckData:
-        defaults = repo.profile_defaults(self._settings)
-        boards = [
-            load_board(self._session, board_id, defaults, self._settings.history_days)
-            for board_id in target_ids
-            if self._session.get(s.BoardRow, board_id)
-        ]
-        return deck_data(
-            boards,
-            reference,
-            now=now,
-            anonymize=anonymize,
-            committed=lambda sprint_id: repo.load_commitment(self._session, sprint_id),
-            variables=variables,
-            slide_variables=slide_variables,
-            registry=registry,
-            template_name=template_name,
-            inputs=lambda data, reference: self.inputs(data, reference, now),
-        )
+        # The deck is filled into a pt-BR template and is not translated (docs/i18n.md): whatever
+        # the request or CADENCIA_LOCALE says, text rendered while its data is built is pt-BR.
+        # `inputs()` runs inside too (through the lambda below), and so does every DeckData build.
+        with using_locale(DECK_LOCALE):
+            defaults = repo.profile_defaults(self._settings)
+            boards = [
+                load_board(self._session, board_id, defaults, self._settings.history_days)
+                for board_id in target_ids
+                if self._session.get(s.BoardRow, board_id)
+            ]
+            return deck_data(
+                boards,
+                reference,
+                now=now,
+                anonymize=anonymize,
+                committed=lambda sprint_id: repo.load_commitment(self._session, sprint_id),
+                variables=variables,
+                slide_variables=slide_variables,
+                registry=registry,
+                template_name=template_name,
+                inputs=lambda data, reference: self.inputs(data, reference, now),
+            )
 
     def inputs(self, data: BoardData, reference: datetime, now: datetime) -> BoardInputs:
         """What the deck needs from the store, per board: the last checkpoint against the

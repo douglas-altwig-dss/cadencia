@@ -33,9 +33,18 @@ from cadencia.report.service import generate_report, save_edits, store_template
 from cadencia.store import repo
 from cadencia.store.db import session_scope
 from tests.golden import compare, run_digest
-from tests.support import NOW, collect_demo
+from tests.support import NOW, collect_demo, process_locale
 
 UPDATE = os.environ.get("CADENCIA_UPDATE_GOLDEN") == "1"
+
+
+@pytest.fixture(autouse=True, params=["en-US", "de-DE"])
+def _locale(request):
+    """Every case runs under en-US and de-DE — as the request's language and as CADENCIA_LOCALE —
+    against the same pt-BR snapshots: the deck is not translated (docs/i18n.md), so neither
+    language may leak into it. pt-BR is left out on purpose; it would prove nothing."""
+    with process_locale(request.param):
+        yield request.param
 
 
 @pytest.fixture

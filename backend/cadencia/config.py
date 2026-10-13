@@ -15,6 +15,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from cadencia.i18n.runtime import DEFAULT_LOCALE, canonical
+
 _SECRETS_DIR = os.environ.get("CADENCIA_SECRETS_DIR", "/run/secrets")
 
 
@@ -68,6 +70,10 @@ class Settings(BaseSettings):
     ai_model: str = "claude-opus-5"
     ai_timeout_seconds: float = 60.0
 
+    # Language of everything produced outside a request: CLI output, scheduler notifications
+    # (docs/i18n.md). Requests answer in their own Accept-Language; the deck is always pt-BR.
+    locale: str = DEFAULT_LOCALE
+
     # API / logging. An empty token leaves the API open (local development); see README.
     api_token: SecretStr = SecretStr("")
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -80,8 +86,13 @@ class Settings(BaseSettings):
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError):
-            raise ValueError(f"fuso horário desconhecido: {value!r}") from None
+            raise ValueError(f"fuso horário desconhecido: {value!r}") from None  # i18n: out of scope
         return value
+
+    @field_validator("locale")
+    @classmethod
+    def _supported_locale(cls, value: str) -> str:
+        return canonical(value)  # "pt_br" → "pt-BR"; an unsupported one is refused at boot
 
     @property
     def templates_dir(self) -> Path:

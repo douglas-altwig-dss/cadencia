@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
-from tests.support import NOW, collect_demo
+from tests.support import NOW, PT_BR, collect_demo
 
 
 @pytest.fixture
@@ -20,7 +20,8 @@ def make_client(demo, sessions, settings):
     def build(at=NOW, **kwargs):
         app = create_app(settings, sessions)
         app.dependency_overrides[clock] = lambda: at
-        return TestClient(app, **kwargs)
+        headers = {**PT_BR, **kwargs.pop("headers", {})}
+        return TestClient(app, headers=headers, **kwargs)
 
     return build
 
