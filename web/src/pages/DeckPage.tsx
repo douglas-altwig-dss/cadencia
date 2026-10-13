@@ -102,7 +102,8 @@ import { type RibbonEntry, type RibbonGroup, type RibbonTab } from '../component
 import { VariablesDrawer } from './VariablesDrawer';
 import { useCommands, useRegisterCommands } from '../lib/commands';
 import { useFilters } from '../lib/filters';
-import { fmtDate, fmtDateTime, plural } from '../lib/format';
+import { collator, t as messages, useT } from '../i18n';
+import { fmtDate, fmtDateTime } from '../lib/format';
 import { openShortcuts, typing } from '../lib/shortcuts';
 
 type Drawer = 'gerar' | 'textos' | 'regras' | 'modelo' | 'versoes' | 'diagnostico' | 'acessibilidade' | 'uso' | 'narrativa';
@@ -126,16 +127,17 @@ function fixLink(run: ReportRun, item: ValidationItem, onFix?: (fix: Fix) => voi
   const produced = run.validation.produced?.find((p) => p.index === item.slide);
   const shape = item.target?.match(/\/sh(\d+)/)?.[1];
   const variable = item.field?.startsWith('texto.') ? item.field.slice(6) : null;
+  const t = messages().deck.page;
   return (
     <Group gap={6} display="inline-flex" ml={6}>
       {produced && (
         <Anchor size="xs" component="button" onClick={() => onFix({ slide: `${produced.origin_slide_id}:${produced.board_id ?? 0}:${produced.page}`, shape, run: run.id })}>
-          abrir no editor
+          {t.openInEditor}
         </Anchor>
       )}
       {variable && (
         <Anchor size="xs" component="button" onClick={() => onFix({ variable })}>
-          abrir Variáveis
+          {t.openVariables}
         </Anchor>
       )}
     </Group>
@@ -166,6 +168,8 @@ function RunResult({
   context: RunContext;
   onRun?: (run: ReportRun) => void;
 }) {
+  const t = useT();
+  const r = t.deck.page;
   const [presenting, setPresenting] = useState<number | null>(null);
   const [modal, setModal] = useState<null | 'share' | 'partial' | 'perguntas'>(null);
   // #27: "Atualizar números" swaps the deck on screen for a fresh one without leaving the room.
@@ -186,27 +190,25 @@ function RunResult({
     <Stack gap="xs">
       <Group gap="sm">
         <Badge color={run.status === 'ok' ? 'teal' : 'red'} variant="light">
-          {run.status === 'ok' ? 'validação ok' : `validação com ${plural(v.errors.length, 'erro', 'erros')}`}
+          {run.status === 'ok' ? r.validationOk : r.validationErrors(v.errors.length)}
         </Badge>
         <Text size="sm">
-          {v.slides} slides · referência {fmtDate(run.reference_at, true)}
-          {run.audience ? ` · público ${run.audience}` : ''}
+          {r.runSummary(v.slides, fmtDate(run.reference_at, true))}
+          {run.audience ? ` · ${r.audienceOf(run.audience)}` : ''}
           {run.seconds != null ? ` · ${run.seconds.toFixed(1)} s` : ''}
         </Text>
       </Group>
       {scene.data?.template_deleted && (
-        <Alert color="yellow" variant="light" title="O modelo original foi apagado">
+        <Alert color="yellow" variant="light" title={r.templateDeletedTitle}>
           <Stack gap="xs">
             <Text size="sm">
-              O arquivo desta geração continua íntegro, mas perdeu o tema e as marcações de campo
-              vinculado, que vivem no modelo. Escolha um modelo reenviado para tentar recuperá-los
-              — só ajuda quando os slides do modelo baterem com os desta geração.
+              {r.templateDeletedBody}
             </Text>
             <Group gap="xs">
               <Select
                 size="xs"
-                placeholder="Escolher modelo"
-                data={(templates.data?.items ?? []).map((t) => ({ value: String(t.id), label: t.name }))}
+                placeholder={r.chooseTemplate}
+                data={(templates.data?.items ?? []).map((item) => ({ value: String(item.id), label: item.name }))}
                 value={reassociateWith}
                 onChange={setReassociateWith}
                 w={240}
@@ -217,33 +219,33 @@ function RunResult({
                 loading={reassociate.isPending}
                 onClick={() => reassociateWith && reassociate.mutate(Number(reassociateWith))}
               >
-                Reassociar
+                {r.reassociate}
               </Button>
             </Group>
-            {reassociate.error && <ErrorState error={reassociate.error} title="Não reassociado" />}
+            {reassociate.error && <ErrorState error={reassociate.error} title={r.reassociateFailed} />}
           </Stack>
         </Alert>
       )}
       <Group gap="xs">
         <RunDownloads run={run} requireApproval={!!context.draft.require_approval} />
         <Button size="xs" variant="default" leftSection={<IconShare size={14} />} onClick={() => setModal('share')}>
-          Compartilhar
+          {r.share}
         </Button>
         <Button size="xs" variant="default" leftSection={<IconMessage2 size={14} />} onClick={() => setModal('perguntas')}>
-          Perguntas
+          {t.deck.questions.title}
         </Button>
         <Button size="xs" variant="default" leftSection={<IconRefresh size={14} />} onClick={() => setModal('partial')}>
-          Regenerar parte
+          {r.regeneratePart}
         </Button>
       </Group>
       <ReviewControls run={run} />
       {run.kind === 'parcial' && run.parent_run_id && (
         <Text size="xs" c="dimmed">
-          Regeneração parcial de <span className="mono">{run.parent_run_id}</span>.
+          {r.partialOf(<span key="p" className="mono">{run.parent_run_id}</span>)}
         </Text>
       )}
       <ShareModal run={run} opened={modal === 'share'} onClose={() => setModal(null)} />
-      <Modal opened={modal === 'perguntas'} onClose={() => setModal(null)} title="Perguntas" size="md">
+      <Modal opened={modal === 'perguntas'} onClose={() => setModal(null)} title={t.deck.questions.title} size="md">
         <Box h={420}>
           <QuestionsPanel runId={run.id} />
         </Box>
@@ -257,7 +259,7 @@ function RunResult({
         onDone={onRun}
       />
       {v.errors.length > 0 && (
-        <Alert color="red" variant="light" title="Erros">
+        <Alert color="red" variant="light" title={r.errors}>
           <List size="sm">
             {v.errors.map((e, i) => (
               <List.Item key={i}>
@@ -269,7 +271,7 @@ function RunResult({
         </Alert>
       )}
       {v.warnings.length > 0 && (
-        <Alert color="yellow" variant="light" title="Avisos">
+        <Alert color="yellow" variant="light" title={r.warnings}>
           <List size="sm">
             {v.warnings.map((w, i) => (
               <List.Item key={i}>
@@ -283,7 +285,7 @@ function RunResult({
       <Accordion variant="contained" chevronPosition="left">
         <Accordion.Item value="a11y">
           <Accordion.Control icon={<IconAccessible size={16} />}>
-            <Text size="sm">Acessibilidade</Text>
+            <Text size="sm">{r.accessibility}</Text>
           </Accordion.Control>
           <Accordion.Panel>
             <RunA11y
@@ -298,7 +300,7 @@ function RunResult({
       </Accordion>
       {run.delivery && run.delivery.length > 0 && (
         <Text size="xs" c="dimmed">
-          Enviada para: {run.delivery.map((d) => `${d.name || d.kind} (${d.ok ? 'ok' : `falhou: ${d.error}`})`).join(' · ')}
+          {r.sentTo(run.delivery.map((d) => `${d.name || d.kind} (${d.ok ? 'ok' : r.failed(d.error ?? '')})`).join(' · '))}
         </Text>
       )}
       {v.info.map((line) => (
@@ -310,10 +312,10 @@ function RunResult({
         <Stack gap="xs">
           <Group>
             <Button size="xs" variant="light" leftSection={<IconPresentation size={14} />} onClick={() => setPresenting(0)}>
-              Apresentar daqui
+              {r.presentFromHere}
             </Button>
             <Text size="xs" c="dimmed">
-              {v.preview.images.length} slides renderizados desta geração.
+              {r.rendered(v.preview.images.length)}
             </Text>
           </Group>
           {/* M13: the run is drawn by SlideStage, like the editor and the shared link; the rendered
@@ -356,6 +358,8 @@ function GenerateTab({
    * object each time (even for the same `kind`) is what makes clicking the same entry twice work. */
   focus?: { kind: 'previa' | 'historico'; at: number } | null;
 }) {
+  const t = useT();
+  const g = t.deck.generate;
   const boards = useBoards('', 1, 200, true);
   const generate = useGenerate();
   const runs = useRuns(templateId);
@@ -393,21 +397,21 @@ function GenerateTab({
     <Stack gap="md">
       <Paper withBorder p="md">
         <Group align="flex-end" wrap="wrap">
-          <DateInput label="Data de referência" placeholder="último checkpoint" value={reference} onChange={setReference} clearable valueFormat="DD/MM/YYYY" w={200} />
+          <DateInput label={g.referenceDate} placeholder={g.lastCheckpoint} value={reference} onChange={setReference} clearable valueFormat="DD/MM/YYYY" w={200} />
           <MultiSelect
-            label="Boards"
-            placeholder="do mapeamento ou todos os acompanhados"
+            label={g.boards}
+            placeholder={g.boardsPlaceholder}
             data={scopedBoards.map((b) => ({ value: String(b.id), label: b.name }))}
             value={boardIds}
             onChange={setBoardIds}
             w={320}
             clearable
           />
-          <Switch label="Anonimizar nesta geração" checked={anonymize} onChange={(e) => setAnonymize(e.currentTarget.checked)} />
+          <Switch label={g.anonymize} checked={anonymize} onChange={(e) => setAnonymize(e.currentTarget.checked)} />
           {audiences.length > 0 && (
-            <Select label="Público" placeholder="todos os slides" data={audiences} value={audience} onChange={setAudience} clearable w={180} />
+            <Select label={g.audience} placeholder={g.allSlides} data={audiences} value={audience} onChange={setAudience} clearable w={180} />
           )}
-          <Switch label="Enviar aos canais" checked={send} onChange={(e) => setSend(e.currentTarget.checked)} />
+          <Switch label={g.notify} checked={send} onChange={(e) => setSend(e.currentTarget.checked)} />
           <Button
             onClick={() =>
               generate.mutate({
@@ -426,10 +430,10 @@ function GenerateTab({
             }
             loading={generate.isPending}
           >
-            Gerar apresentação
+            {g.generate}
           </Button>
           <Button variant="default" leftSection={<IconEye size={16} />} onClick={() => setPreviewing(true)}>
-            Prévia de um board
+            {g.previewBoard}
           </Button>
         </Group>
       </Paper>
@@ -441,7 +445,7 @@ function GenerateTab({
         onClose={() => setPreviewing(false)}
       />
       <ReadinessAlert readiness={readiness.data} compact />
-      {generate.error && <ErrorState error={generate.error} title="A geração falhou" />}
+      {generate.error && <ErrorState error={generate.error} title={g.failed} />}
       {current && (
         <RunResult
           key={current.id}
@@ -455,9 +459,9 @@ function GenerateTab({
         />
       )}
       <Group justify="space-between" ref={historyRef}>
-        <Title order={5}>Gerações (.pptx e PDF)</Title>
+        <Title order={5}>{g.history}</Title>
         <Button size="compact-xs" variant="subtle" leftSection={<IconArrowsDiff size={14} />} disabled={history.length < 2} onClick={() => setComparing(true)}>
-          Comparar duas
+          {g.compareTwo}
         </Button>
       </Group>
       {comparing && <CompareModal runs={history} initial={current?.id} opened onClose={() => setComparing(false)} />}
@@ -466,11 +470,11 @@ function GenerateTab({
           <Table>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Gerada em</Table.Th>
-                <Table.Th>Referência</Table.Th>
-                <Table.Th>Validação</Table.Th>
-                <Table.Th>Revisão</Table.Th>
-                <Table.Th>Versão do modelo</Table.Th>
+                <Table.Th>{g.colCreated}</Table.Th>
+                <Table.Th>{g.colReference}</Table.Th>
+                <Table.Th>{g.colValidation}</Table.Th>
+                <Table.Th>{g.colReview}</Table.Th>
+                <Table.Th>{g.colTemplateVersion}</Table.Th>
                 <Table.Th />
               </Table.Tr>
             </Table.Thead>
@@ -483,7 +487,7 @@ function GenerateTab({
                     </Anchor>
                     {run.kind === 'parcial' && (
                       <Badge size="xs" variant="outline" ml={6}>
-                        parcial
+                        {g.partial}
                       </Badge>
                     )}
                     {run.audience ? (
@@ -495,7 +499,7 @@ function GenerateTab({
                   <Table.Td>{fmtDate(run.reference_at, true)}</Table.Td>
                   <Table.Td>
                     <Badge color={run.status === 'ok' ? 'teal' : 'red'} variant="light">
-                      {run.status === 'ok' ? 'ok' : plural(run.validation.errors.length, 'erro', 'erros')}
+                      {run.status === 'ok' ? 'ok' : t.deck.preview.errors(run.validation.errors.length)}
                     </Badge>
                   </Table.Td>
                   <Table.Td>
@@ -519,7 +523,7 @@ function GenerateTab({
         </Table.ScrollContainer>
       ) : (
         <Text size="sm" c="dimmed">
-          Nenhuma apresentação gerada com este modelo.
+          {g.none}
         </Text>
       )}
     </Stack>
@@ -537,6 +541,8 @@ function GenerateTab({
  * the slide you are looking at.
  */
 function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack: () => void }) {
+  const t = useT();
+  const w = t.deck.workspace;
   const detail = useTemplate(templateId);
   const catalog = useCatalog();
   const save = useSaveMapping(templateId);
@@ -591,31 +597,31 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
   const commandRun = runs.data?.items?.find((run) => run.id === (get('run') ?? runs.data?.items?.[0]?.id));
   const commandForce = commandRun ? needsForce(commandRun, !!draft?.require_approval) : false;
   useRegisterCommands('apresentacao', [
-    { id: 'gerar', label: 'Gerar apresentação', shortcut: 'Ctrl+Enter', run: () => openGenerate() },
-    { id: 'previa', label: 'Prévia de um board', run: () => openGenerate('previa') },
+    { id: 'gerar', label: w.generate, shortcut: 'Ctrl+Enter', run: () => openGenerate() },
+    { id: 'previa', label: w.previewBoard, run: () => openGenerate('previa') },
     {
       id: 'pptx',
-      label: 'Baixar .pptx da geração aberta',
+      label: w.downloadPptxOpen,
       disabled: !commandRun,
       run: () => commandRun && window.open(runFileUrl(commandRun, 'pptx', commandForce), '_blank', 'noopener'),
     },
     {
       id: 'pdf',
-      label: 'Baixar PDF da geração aberta',
+      label: w.downloadPdfOpen,
       disabled: !commandRun,
       run: () => commandRun && window.open(runFileUrl(commandRun, 'pdf', commandForce), '_blank', 'noopener'),
     },
-    { id: 'variaveis', label: 'Variáveis', run: () => setDrawer('textos') },
-    { id: 'narrativa', label: 'Narrativa por board', run: () => setDrawer('narrativa') },
-    { id: 'regras', label: 'Regras da apresentação', run: () => setDrawer('regras') },
-    { id: 'versoes', label: 'Versões das edições', run: () => setDrawer('versoes') },
-    { id: 'modelos', label: 'Gerenciar modelos', run: () => setDrawer('modelo') },
-    { id: 'diagnostico', label: 'Diagnóstico do modelo', run: () => setDrawer('diagnostico') },
-    { id: 'acessibilidade', label: 'Acessibilidade do modelo', run: () => setDrawer('acessibilidade') },
-    { id: 'uso', label: 'Uso do modelo', run: () => setDrawer('uso') },
-    { id: 'assistente', label: 'Assistente do modelo', run: () => set({ assistente: '1' }) },
-    { id: 'tela-cheia', label: 'Tela cheia do editor', shortcut: 'F11', run: () => void full.toggle() },
-    { id: 'menu', label: menuVisible ? 'Esconder o título e o menu' : 'Mostrar o título e o menu', run: () => setMenuVisible((v) => !v) },
+    { id: 'variaveis', label: w.variables, run: () => setDrawer('textos') },
+    { id: 'narrativa', label: w.narrative, run: () => setDrawer('narrativa') },
+    { id: 'regras', label: w.rules, run: () => setDrawer('regras') },
+    { id: 'versoes', label: w.versions, run: () => setDrawer('versoes') },
+    { id: 'modelos', label: w.manageTemplates, run: () => setDrawer('modelo') },
+    { id: 'diagnostico', label: w.diagnostics, run: () => setDrawer('diagnostico') },
+    { id: 'acessibilidade', label: w.templateA11y, run: () => setDrawer('acessibilidade') },
+    { id: 'uso', label: w.usage, run: () => setDrawer('uso') },
+    { id: 'assistente', label: w.wizard, run: () => set({ assistente: '1' }) },
+    { id: 'tela-cheia', label: w.editorFullscreen, shortcut: 'F11', run: () => void full.toggle() },
+    { id: 'menu', label: menuVisible ? w.hideMenu : w.showMenu, run: () => setMenuVisible((v) => !v) },
   ]);
 
   /** A mapping the server already has (loaded, or restored): it is both the draft and the baseline. */
@@ -662,15 +668,15 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
   const downloadCurrent = (format: 'pptx' | 'pdf') =>
     currentRun && window.open(runFileUrl(currentRun, format, needsForce(currentRun, !!draft.require_approval)), '_blank', 'noopener');
   const titles: Record<Drawer, string> = {
-    gerar: 'Gerar a apresentação',
-    textos: 'Variáveis',
-    regras: 'Regras da apresentação',
-    modelo: 'Modelos',
-    versoes: 'Versões das edições',
-    diagnostico: 'Diagnóstico do modelo',
-    acessibilidade: 'Acessibilidade do modelo',
-    uso: 'Uso do modelo',
-    narrativa: 'Narrativa por board',
+    gerar: w.drawerGenerate,
+    textos: w.variables,
+    regras: w.rules,
+    modelo: w.templates,
+    versoes: w.versions,
+    diagnostico: w.diagnostics,
+    acessibilidade: w.templateA11y,
+    uso: w.usage,
+    narrativa: w.narrative,
   };
 
   /**
@@ -700,65 +706,65 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
   const documentTabs: RibbonTab[] = [
     {
       id: 'arquivo',
-      label: 'Arquivo',
+      label: w.tabs.file,
       groups: captioned(
         [
-          { label: 'Voltar à galeria', icon: <IconArrowLeft size={15} />, onClick: onBack },
-          { label: 'Gerar apresentação', icon: <IconPlayerPlay size={15} />, shortcut: 'Ctrl+Enter', divider: true, onClick: () => openGenerate() },
+          { label: w.backToGallery, icon: <IconArrowLeft size={15} />, onClick: onBack },
+          { label: w.generate, icon: <IconPlayerPlay size={15} />, shortcut: 'Ctrl+Enter', divider: true, onClick: () => openGenerate() },
           {
             // RF-70: the editor is where the deck ends up, so this is where it is taken away from.
-            label: currentRun ? 'Baixar .pptx' : 'Baixar .pptx (gere primeiro)',
+            label: currentRun ? w.downloadPptx : w.downloadPptxFirst,
             icon: <IconDownload size={15} />,
             disabled: !currentRun,
             onClick: () => downloadCurrent('pptx'),
           },
           {
-            label: currentRun ? 'Baixar PDF' : 'Baixar PDF (gere primeiro)',
+            label: currentRun ? w.downloadPdf : w.downloadPdfFirst,
             icon: <IconFileTypePdf size={15} />,
             disabled: !currentRun,
             onClick: () => downloadCurrent('pdf'),
           },
-          { label: 'Prévia de um board', icon: <IconEye size={15} />, onClick: () => openGenerate('previa') },
-          { label: 'Gerações (.pptx e PDF)', icon: <IconPresentation size={15} />, onClick: () => openGenerate('historico') },
-          { label: 'Versões das edições', icon: <IconHistory size={15} />, onClick: () => setDrawer('versoes') },
-          { label: 'Gerenciar modelos', icon: <IconUpload size={15} />, divider: true, onClick: () => setDrawer('modelo') },
-          { label: 'Reler o modelo do arquivo', icon: <IconRefresh size={15} />, onClick: () => refresh.mutate() },
-          { label: 'Assistente do modelo', icon: <IconWand size={15} />, onClick: () => set({ assistente: '1' }) },
-          { label: 'Diagnóstico do modelo', icon: <IconStethoscope size={15} />, onClick: () => setDrawer('diagnostico') },
-          { label: 'Acessibilidade', icon: <IconAccessible size={15} />, onClick: () => setDrawer('acessibilidade') },
-          { label: 'Uso do modelo', icon: <IconChartBar size={15} />, onClick: () => setDrawer('uso') },
+          { label: w.previewBoard, icon: <IconEye size={15} />, onClick: () => openGenerate('previa') },
+          { label: t.deck.generate.history, icon: <IconPresentation size={15} />, onClick: () => openGenerate('historico') },
+          { label: w.versions, icon: <IconHistory size={15} />, onClick: () => setDrawer('versoes') },
+          { label: w.manageTemplates, icon: <IconUpload size={15} />, divider: true, onClick: () => setDrawer('modelo') },
+          { label: w.reread, icon: <IconRefresh size={15} />, onClick: () => refresh.mutate() },
+          { label: w.wizard, icon: <IconWand size={15} />, onClick: () => set({ assistente: '1' }) },
+          { label: w.diagnostics, icon: <IconStethoscope size={15} />, onClick: () => setDrawer('diagnostico') },
+          { label: w.accessibility, icon: <IconAccessible size={15} />, onClick: () => setDrawer('acessibilidade') },
+          { label: w.usage, icon: <IconChartBar size={15} />, onClick: () => setDrawer('uso') },
         ],
-        ['Navegação', 'Geração', 'Modelo'],
+        [w.groups.navigation, w.groups.generation, w.groups.template],
       ),
     },
     {
       id: 'pagina-inicial',
-      label: 'Página Inicial',
+      label: w.tabs.home,
       groups: captioned(
         [
-          { label: 'Salvar mapeamento', icon: <IconDeviceFloppy size={15} />, shortcut: 'Ctrl+S', onClick: saveMappingNow },
+          { label: w.saveMapping, icon: <IconDeviceFloppy size={15} />, shortcut: 'Ctrl+S', onClick: saveMappingNow },
           ...fromCommands('editar').map((entry, index) => (index === 0 ? { ...entry, divider: true } : entry)),
         ],
-        ['Mapeamento', 'Desfazer', 'Área de Transferência', 'Edição'],
+        [w.groups.mapping, w.groups.undo, w.groups.clipboard, w.groups.editing],
       ),
     },
     {
       id: 'exibir',
-      label: 'Exibir',
+      label: w.tabs.view,
       groups: captioned(
         [
-          { label: full.fullscreen ? 'Sair da tela cheia' : 'Tela cheia', icon: <IconMaximize size={15} />, shortcut: 'F11', onClick: () => full.toggle() },
+          { label: full.fullscreen ? w.exitFullscreen : w.fullscreen, icon: <IconMaximize size={15} />, shortcut: 'F11', onClick: () => full.toggle() },
           // Grade/réguas/ímã/ajustar become the ribbon's own richer toggle controls (`GuidesControls`,
           // `ZoomControl`) with pressed-state feedback a plain command entry can't show.
           ...fromCommands('ver', ['zoom-ajustar', 'grade', 'reguas', 'ima']).map((entry, index) => (index === 0 ? { ...entry, divider: true } : entry)),
         ],
-        ['Janela', 'Painéis'],
+        [w.groups.window, w.groups.panels],
       ),
     },
-    { id: 'inserir', label: 'Inserir', groups: captioned(fromCommands('inserir'), ['Conteúdo', 'Comentários']) },
+    { id: 'inserir', label: w.tabs.insert, groups: captioned(fromCommands('inserir'), [w.groups.content, w.groups.comments]) },
     {
       id: 'formatar',
-      label: 'Formatar',
+      label: w.tabs.format,
       // Negrito/itálico/sublinhado/alinhamento/marcadores/pincel/bloquear already get rich controls
       // (`FontControls`, `ParagraphControls`, `FormatPainterControl`, `LockControl`); only what has
       // no rich equivalent — hiding a shape — stays a plain command here.
@@ -776,48 +782,48 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
           'colar-formato',
           'bloquear',
         ]),
-        ['Forma'],
+        [w.groups.shape],
       ),
     },
     {
       id: 'slide',
-      label: 'Slide',
+      label: w.tabs.slide,
       groups: captioned(
         fromCommands('slide'),
-        ['Slide', 'Propriedades', 'Modelo'],
+        [w.groups.slide, w.groups.properties, w.groups.template],
       ),
     },
-    { id: 'organizar', label: 'Organizar', groups: captioned(fromCommands('organizar'), ['Ordem', 'Alinhar', 'Distribuir', 'Agrupar']) },
+    { id: 'organizar', label: w.tabs.arrange, groups: captioned(fromCommands('organizar'), [w.groups.order, w.groups.align, w.groups.distribute, w.groups.group]) },
     {
       id: 'ferramentas',
-      label: 'Ferramentas',
+      label: w.tabs.tools,
       groups: captioned(
         [
-          { label: 'Variáveis', icon: <IconBraces size={15} />, onClick: () => setDrawer('textos') },
-          { label: 'Narrativa por board', icon: <IconSparkles size={15} />, onClick: () => setDrawer('narrativa') },
-          { label: 'Regras da apresentação', icon: <IconAdjustments size={15} />, onClick: () => setDrawer('regras') },
-          { label: 'Recomeçar da sugestão', icon: <IconWand size={15} />, divider: true, danger: true, onClick: () => setDraft(fromSuggestion(data.suggestion)) },
+          { label: w.variables, icon: <IconBraces size={15} />, onClick: () => setDrawer('textos') },
+          { label: w.narrative, icon: <IconSparkles size={15} />, onClick: () => setDrawer('narrativa') },
+          { label: w.rules, icon: <IconAdjustments size={15} />, onClick: () => setDrawer('regras') },
+          { label: w.restartFromSuggestion, icon: <IconWand size={15} />, divider: true, danger: true, onClick: () => setDraft(fromSuggestion(data.suggestion)) },
         ],
-        ['Personalização', 'Modelo'],
+        [w.groups.customization, w.groups.template],
       ),
     },
     {
       id: 'apresentar',
-      label: 'Apresentar',
+      label: w.tabs.present,
       groups: [
         {
-          caption: 'Apresentação',
+          caption: w.groups.presentation,
           entries: [
-            { label: 'Apresentar a última geração', icon: <IconPresentation size={15} />, disabled: !lastSlides.length, onClick: () => setPresentingLast(true) },
-            { label: 'Escolher outra geração…', icon: <IconPresentation size={15} />, onClick: () => openGenerate('historico') },
+            { label: w.presentLast, icon: <IconPresentation size={15} />, disabled: !lastSlides.length, onClick: () => setPresentingLast(true) },
+            { label: w.chooseOtherRun, icon: <IconPresentation size={15} />, onClick: () => openGenerate('historico') },
           ],
         },
       ],
     },
     {
       id: 'ajuda',
-      label: 'Ajuda',
-      groups: [{ caption: 'Suporte', entries: [{ label: 'Atalhos do teclado', icon: <IconKeyboard size={15} />, shortcut: '?', onClick: openShortcuts }] }],
+      label: w.tabs.help,
+      groups: [{ caption: w.groups.support, entries: [{ label: w.shortcuts, icon: <IconKeyboard size={15} />, shortcut: '?', onClick: openShortcuts }] }],
     },
   ];
 
@@ -828,14 +834,14 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
           <DeckTitleBar
             title={data.name}
             leading={
-              <ActionIcon variant="subtle" color="gray" size="sm" aria-label="Voltar à galeria" onClick={onBack}>
+              <ActionIcon variant="subtle" color="gray" size="sm" aria-label={w.backToGallery} onClick={onBack}>
                 <IconArrowLeft size={15} />
               </ActionIcon>
             }
             badge={
               data.mapping_outdated ? (
                 <Badge size="sm" color="yellow" variant="light">
-                  modelo mudou
+                  {w.templateChanged}
                 </Badge>
               ) : null
             }
@@ -846,21 +852,21 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
       {phone && (
         <Group gap="xs" wrap="wrap">
           <Button size="compact-sm" leftSection={<IconPlayerPlay size={15} />} onClick={() => openGenerate()}>
-            Gerar
+            {w.generateShort}
           </Button>
           <Button size="compact-sm" variant="default" leftSection={<IconDownload size={15} />} disabled={!currentRun} onClick={() => downloadCurrent('pptx')}>
-            Baixar .pptx
+            {w.downloadPptx}
           </Button>
           <Button size="compact-sm" variant="default" leftSection={<IconFileTypePdf size={15} />} disabled={!currentRun} onClick={() => downloadCurrent('pdf')}>
-            Baixar PDF
+            {w.downloadPdf}
           </Button>
           <Button size="compact-sm" variant="default" leftSection={<IconPresentation size={15} />} disabled={!lastSlides.length} onClick={() => setPresentingLast(true)}>
-            Apresentar
+            {w.present}
           </Button>
         </Group>
       )}
 
-      {save.error && <ErrorState error={save.error} title="Mapeamento não salvo" />}
+      {save.error && <ErrorState error={save.error} title={w.mappingNotSaved} />}
 
       <DeckEditorTab
         key={editorKey}
@@ -986,6 +992,8 @@ function DeckRules({
   setDraft: (m: DeckMapping) => void;
   boards: TemplateDetail['boards'];
 }) {
+  const t = useT();
+  const d = t.deck.rules;
   const shared = useDeckPalette();
   const spaceKeys = draft.space_keys ?? [];
   // RF-55: a space narrows the run to its boards, so the board list follows the chosen spaces.
@@ -1000,13 +1008,13 @@ function DeckRules({
     ),
   ]
     .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+    .sort((a, b) => collator().compare(a.label, b.label));
   return (
     <Stack gap="md">
       <MultiSelect
-        label="Espaços da apresentação"
-        description="vazio = todos; escolher um espaço restringe também os boards abaixo"
-        placeholder="todos os espaços"
+        label={d.spaces}
+        description={d.spacesHint}
+        placeholder={d.allSpaces}
         data={spaceOptions}
         value={spaceKeys}
         onChange={(value) =>
@@ -1024,37 +1032,37 @@ function DeckRules({
         clearable
       />
       <MultiSelect
-        label="Boards dos slides repetidos"
-        placeholder="todos os acompanhados"
+        label={d.boards}
+        placeholder={d.allTracked}
         data={options}
         value={draft.board_ids.map(String)}
         onChange={(value) => setDraft({ ...draft, board_ids: value.map(Number) })}
         searchable
       />
-      <Switch label="Anonimizar nomes" checked={draft.anonymize} onChange={(e) => setDraft({ ...draft, anonymize: e.currentTarget.checked })} />
+      <Switch label={d.anonymize} checked={draft.anonymize} onChange={(e) => setDraft({ ...draft, anonymize: e.currentTarget.checked })} />
       <Switch
-        label="Gerar automaticamente no checkpoint"
+        label={d.autoGenerate}
         checked={draft.auto_generate}
         onChange={(e) => setDraft({ ...draft, auto_generate: e.currentTarget.checked })}
       />
-      <Divider label="Públicos e aprovação" />
+      <Divider label={d.audiencesDivider} />
       <TagsInput
-        label="Públicos"
-        description="Ex.: diretoria, time. Cada slide pode ser restrito a públicos (painel do slide); ao gerar, escolhe-se um."
-        placeholder="digite e Enter"
+        label={d.audiences}
+        description={d.audiencesHint}
+        placeholder={d.typeEnter}
         value={draft.audiences ?? []}
         onChange={(audiences) => setDraft({ ...draft, audiences: audiences.map((a) => a.trim().toLowerCase()).filter(Boolean) })}
         clearable
       />
       <Switch
-        label="Exigir aprovação antes de baixar"
-        description="Uma geração só é baixada sem aviso depois de enviada para revisão e aprovada; comentários em aberto impedem a aprovação."
+        label={d.requireApproval}
+        description={d.requireApprovalHint}
         checked={!!draft.require_approval}
         onChange={(e) => setDraft({ ...draft, require_approval: e.currentTarget.checked })}
       />
-      <Divider label="Geração agendada" />
+      <Divider label={d.scheduled} />
       <ScheduleEditor value={draft.schedule} audiences={draft.audiences ?? []} onChange={(schedule) => setDraft({ ...draft, schedule })} />
-      <Divider label="Cores e rótulos dos status" />
+      <Divider label={d.colors} />
       {/* RF-62: one configuration, in the manager. Overriding it *here* is a per-template choice
           and stays available, but the shared values are what most templates should use. */}
       <StatusPalette
@@ -1070,8 +1078,7 @@ function DeckRules({
         inherited={shared.data ?? undefined}
       />
       <Text size="xs" c="dimmed">
-        Vazio herda de <b>Variáveis → Cores do semáforo</b>. Preencha só o que este modelo faz
-        diferente.
+        {d.inherits(<b key="p">{d.inheritsPath}</b>)}
       </Text>
     </Stack>
   );
@@ -1084,12 +1091,14 @@ function DeckRules({
  * same "open this template" the dropdown used to do.
  */
 export function DeckPage() {
+  const t = useT();
+  const p = t.deck.home;
   const templates = useTemplates();
   const { get, set } = useFilters();
   const items = useMemo(() => templates.data?.items ?? [], [templates.data]);
   // RF-34: the model, the tab and the slide live in the URL, so a mapping in progress is a link.
   const chosen = get('modelo');
-  const selected = items.some((t) => String(t.id) === chosen) ? chosen : null;
+  const selected = items.some((item) => String(item.id) === chosen) ? chosen : null;
   const [managing, setManaging] = useState(false);
   const upload = useUploadTemplate();
 
@@ -1106,14 +1115,14 @@ export function DeckPage() {
   return (
     <>
       <PageHeader
-        title="Apresentação de fim de sprint"
-        subtitle="O modelo .pptx é o contrato visual: a Cadência preenche as áreas dele e nunca redesenha os slides."
+        title={p.title}
+        subtitle={p.subtitle}
       />
       {templates.isLoading && <Loading />}
       {templates.error && <ErrorState error={templates.error} />}
       {templates.data && !items.length && (
         <Stack gap="md" align="flex-start">
-          <Empty title="Nenhum modelo ainda">Envie o .pptx usado na reunião de sexta: a Cadência extrai o manifesto e sugere o mapeamento.</Empty>
+          <Empty title={p.emptyTitle}>{p.emptyBody}</Empty>
           <Box w={240}>
             <UploadCard
               uploading={upload.isPending}
@@ -1135,7 +1144,7 @@ export function DeckPage() {
           }
         />
       )}
-      <Drawer opened={managing} onClose={() => setManaging(false)} position="right" size="lg" title="Modelos">
+      <Drawer opened={managing} onClose={() => setManaging(false)} position="right" size="lg" title={t.deck.workspace.templates}>
         <TemplatesDrawer
           current={-1}
           onSelect={(id) => {

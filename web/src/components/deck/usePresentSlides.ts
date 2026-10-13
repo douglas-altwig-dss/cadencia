@@ -1,5 +1,6 @@
 import { useRunScene } from '../../api/hooks';
 import type { DeckMapping, ReportRun, TemplateDetail } from '../../api/types';
+import { useT } from '../../i18n';
 import { fmtDate } from '../../lib/format';
 import type { PresentSlide } from '../PresentMode';
 
@@ -8,6 +9,7 @@ import type { PresentSlide } from '../PresentMode';
  * the run's own panel and the workspace's "Apresentar a última geração".
  */
 export function usePresentSlides(run: ReportRun | undefined, data: TemplateDetail | undefined, draft: DeckMapping | null): PresentSlide[] {
+  const t = useT();
   const scene = useRunScene(run?.id);
   if (!run) return [];
   return (run.validation.preview.images ?? []).map((path, index) => {
@@ -21,7 +23,7 @@ export function usePresentSlides(run: ReportRun | undefined, data: TemplateDetai
       // #30: keyed like the editor names a produced slide, so the usage report can find its template slide.
       key: produced ? `${produced.origin_slide_id}:${produced.board_id ?? 0}:${produced.page}` : name,
       image: `/api/reports/runs/${run.id}/files/${name}`,
-      title: origin?.name || `Slide ${index + 1}`,
+      title: origin?.name || t.deck.slideN(index + 1),
       subtitle: [board, fmtDate(run.reference_at, true)].filter(Boolean).join(' · '),
       notes: sceneSlide?.notes || templateSlide?.notes,
       minutes: origin?.minutes ?? null,

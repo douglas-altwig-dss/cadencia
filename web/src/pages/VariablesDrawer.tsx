@@ -55,22 +55,12 @@ import type {
   VariableValue,
 } from '../api/types';
 import { StatusLegend, StatusPalette } from '../components/StatusPalette';
-import { FieldCatalog, FieldPicker, KIND_LABEL } from './FieldCatalog';
+import { FieldCatalog, FieldPicker } from './FieldCatalog';
+import { collator, t as messages, useT } from '../i18n';
 import { ErrorState, Loading, Note, useConfirm } from '../components/common';
 
-const SCOPE_LABEL: Record<VariableScope, string> = {
-  slide: 'Slide',
-  board: 'Board',
-  space: 'Espaço',
-  global: 'Padrão (todos)',
-};
-/** What the badge next to a resolved value says; the long label does not fit there. */
-const SCOPE_SHORT: Record<VariableScope, string> = {
-  slide: 'slide',
-  board: 'board',
-  space: 'espaço',
-  global: 'padrão',
-};
+/** Level names live in `deck.variables.scope`; `scopeShort` is the badge's shorter one. */
+const bold = (text: string) => <b key={text}>{text}</b>;
 /** Narrowest first: the order the value is looked for, and the order the table shows. */
 const ORDER: VariableScope[] = ['slide', 'board', 'space', 'global'];
 
@@ -116,7 +106,7 @@ function Placeholder({ text }: { text: string }) {
   return (
     <CopyButton value={text}>
       {({ copied, copy }) => (
-        <Tooltip label={copied ? 'copiado' : 'copiar o marcador'} withArrow>
+        <Tooltip label={copied ? messages().deck.variables.copied : messages().deck.variables.copyMarker} withArrow>
           <Badge
             variant="light"
             className="mono"
@@ -145,6 +135,8 @@ function VariableForm({
   catalog: CatalogField[];
   onClose: () => void;
 }) {
+  const t = useT();
+  const vt = t.deck.variables;
   const create = useCreateVariable();
   const patch = usePatchVariable();
   const [name, setName] = useState(initial?.name ?? '');
@@ -166,40 +158,40 @@ function VariableForm({
   const error = create.error ?? patch.error;
 
   return (
-    <Modal opened onClose={onClose} title={initial ? 'Editar variável' : 'Nova variável'} size="lg">
+    <Modal opened onClose={onClose} title={initial ? vt.editTitle : vt.newTitle} size="lg">
       <Stack gap="sm">
         <Group grow align="flex-start">
           <TextInput
-            label="Nome"
-            description={finalName ? `usada como {{texto.${finalName}}}` : 'sem espaços nem acentos'}
+            label={vt.name}
+            description={finalName ? vt.usedAs(`{{texto.${finalName}}}`) : vt.nameHint}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
           />
           <TextInput
-            label="Rótulo"
-            description="como aparece na lista de campos"
+            label={vt.label}
+            description={vt.labelHint}
             value={label}
             onChange={(event) => setLabel(event.currentTarget.value)}
           />
         </Group>
         <Textarea
-          label="Descrição"
-          description="para quem for preencher; não vai para o slide"
+          label={vt.description}
+          description={vt.descriptionHint}
           autosize
           minRows={2}
           value={description}
           onChange={(event) => setDescription(event.currentTarget.value)}
         />
         <Switch
-          label={`Só para o modelo “${templateName}”`}
-          description="desligado, a variável fica disponível em todos os modelos"
+          label={vt.onlyTemplate(templateName)}
+          description={vt.onlyTemplateHint}
           checked={bound}
           onChange={(event) => setBound(event.currentTarget.checked)}
         />
-        <Divider label="De onde vem o valor" labelPosition="left" />
+        <Divider label={vt.sourceDivider} labelPosition="left" />
         <Switch
-          label="Ler de um campo do Jira"
-          description="ligada, a variável diz o que o Jira disser para cada board; um valor escrito à mão continua ganhando dela"
+          label={vt.readFromJira}
+          description={vt.readFromJiraHint}
           checked={source !== null}
           onChange={(event) => {
             if (event.currentTarget.checked) setPicking(true);
@@ -216,7 +208,7 @@ function VariableForm({
                   </Text>
                   {sourceSpec && (
                     <Badge size="xs" variant="outline">
-                      {KIND_LABEL[sourceSpec.kind]}
+                      {t.deck.fieldCatalog.kinds[sourceSpec.kind]}
                     </Badge>
                   )}
                 </Group>
@@ -225,7 +217,7 @@ function VariableForm({
                 </Text>
               </Stack>
               <Button size="compact-xs" variant="subtle" onClick={() => setPicking(true)}>
-                Trocar
+                {vt.change}
               </Button>
             </Group>
           </Paper>
@@ -238,29 +230,25 @@ function VariableForm({
           onClose={() => setPicking(false)}
         />
         <Switch
-          label="Tem valor padrão"
-          description={
-            source
-              ? 'usado só quando o campo do Jira vier vazio para aquele board'
-              : 'desligado, um alvo sem valor próprio faz a geração falhar em vez de sair em branco'
-          }
+          label={vt.hasDefault}
+          description={source ? vt.hasDefaultSourceHint : vt.hasDefaultHint}
           checked={hasDefault}
           onChange={(event) => setHasDefault(event.currentTarget.checked)}
         />
         {hasDefault && (
           <Textarea
-            label="Valor padrão do registro"
-            description="o último recurso, abaixo de slide, board, espaço e padrão global"
+            label={vt.registryDefault}
+            description={vt.registryDefaultHint}
             autosize
             minRows={2}
             value={fallback}
             onChange={(event) => setFallback(event.currentTarget.value)}
           />
         )}
-        {error && <ErrorState error={error} title="Variável não salva" />}
+        {error && <ErrorState error={error} title={vt.notSaved} />}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancelar
+            {vt.cancel}
           </Button>
           <Button
             disabled={!finalName}
@@ -292,7 +280,7 @@ function VariableForm({
               }
             }}
           >
-            Salvar
+            {vt.save}
           </Button>
         </Group>
       </Stack>
@@ -316,6 +304,8 @@ function ValueEditor({
   slides: ManifestSlide[];
   onClose: () => void;
 }) {
+  const t = useT();
+  const vt = t.deck.variables;
   const save = useSetVariableValue();
   const [scope, setScope] = useState<VariableScope>(initialScope);
   const [key, setKey] = useState(() => {
@@ -340,26 +330,27 @@ function ValueEditor({
   const boardGroups = useMemo(() => {
     const groups = new Map<string, { value: string; label: string }[]>();
     for (const board of boards) {
-      const group = board.space_name || board.space_key || 'Sem espaço';
+      const group = board.space_name || board.space_key || vt.noSpace;
       if (!groups.has(group)) groups.set(group, []);
       groups.get(group)!.push({ value: String(board.id), label: board.name });
     }
+    const compare = collator().compare;
     return [...groups]
-      .sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'))
+      .sort((a, b) => compare(a[0], b[0]))
       .map(([group, items]) => ({ group, items }));
-  }, [boards]);
+  }, [boards, vt]);
 
   const needsKey = scope !== 'global';
   const existing = variable.values.find((v) => v.scope === scope && v.scope_key === (needsKey ? key : ''));
 
   return (
-    <Modal opened onClose={onClose} title={`Valor de ${variable.placeholder}`} size="lg">
+    <Modal opened onClose={onClose} title={vt.valueOf(variable.placeholder)} size="lg">
       <Stack gap="sm">
         <Group grow align="flex-start">
           <Select
-            label="Nível"
-            description="o mais estreito ganha: slide, board, espaço, padrão"
-            data={ORDER.map((s) => ({ value: s, label: SCOPE_LABEL[s] }))}
+            label={vt.level}
+            description={vt.levelHint}
+            data={ORDER.map((s) => ({ value: s, label: vt.scope[s] }))}
             value={scope}
             onChange={(next) => {
               if (!next) return;
@@ -372,7 +363,7 @@ function ValueEditor({
           />
           {needsKey && (
             <Select
-              label={SCOPE_LABEL[scope]}
+              label={vt.scope[scope]}
               data={scope === 'board' ? boardGroups : flat[scope]}
               value={key}
               onChange={(next) => {
@@ -380,17 +371,17 @@ function ValueEditor({
                 setValue('');
               }}
               searchable
-              error={!key ? 'escolha o alvo' : undefined}
+              error={!key ? vt.chooseTarget : undefined}
             />
           )}
         </Group>
         {!needsKey && (
           <Text size="xs" c="dimmed">
-            O valor padrão vale para qualquer espaço, board ou slide que não tenha um valor próprio.
+            {vt.defaultAppliesTo}
           </Text>
         )}
         <Textarea
-          label="Texto"
+          label={vt.text}
           autosize
           minRows={4}
           maxRows={14}
@@ -399,13 +390,13 @@ function ValueEditor({
         />
         {existing && (
           <Text size="xs" c="dimmed">
-            Já existe um valor neste nível; salvar substitui.
+            {vt.alreadySet}
           </Text>
         )}
-        {save.error && <ErrorState error={save.error} title="Valor não salvo" />}
+        {save.error && <ErrorState error={save.error} title={vt.valueNotSaved} />}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>
-            Cancelar
+            {vt.cancel}
           </Button>
           <Button
             disabled={needsKey && !key}
@@ -417,7 +408,7 @@ function ValueEditor({
               )
             }
           >
-            Salvar
+            {vt.save}
           </Button>
         </Group>
       </Stack>
@@ -441,6 +432,8 @@ function ValueEditor({
  * "Sugerir" only shows the suggestion, with its legend, until it is applied.
  */
 function SharedPalette({ server }: { server: DeckPalette }) {
+  const t = useT();
+  const pt = t.deck.palette;
   const savePalette = useSaveDeckPalette();
   const accessiblePalette = useAccessiblePalette();
   const [local, setLocal] = useState(server);
@@ -459,7 +452,7 @@ function SharedPalette({ server }: { server: DeckPalette }) {
     <Stack gap="sm">
       <Group justify="space-between">
         <Text size="xs" c="dimmed">
-          Vermelho e verde lado a lado somem para quem tem daltonismo — sem ícone nem rótulo para desempatar, ao contrário dos badges do resto do app.
+          {pt.colorblindHint}
         </Text>
         <Button
           size="compact-xs"
@@ -467,14 +460,14 @@ function SharedPalette({ server }: { server: DeckPalette }) {
           loading={accessiblePalette.isFetching}
           onClick={() => accessiblePalette.refetch().then((r) => r.data && setSuggestion(r.data.palette))}
         >
-          Sugerir paleta acessível
+          {pt.suggest}
         </Button>
       </Group>
       {suggestion && (
         <Paper withBorder p="sm">
           <Stack gap="xs">
             <Text size="xs" fw={600}>
-              Sugestão para daltonismo — ainda não aplicada
+              {pt.suggestionTitle}
             </Text>
             <StatusLegend palette={suggestion} labels={local.status_labels} />
             <Group gap="xs">
@@ -485,10 +478,10 @@ function SharedPalette({ server }: { server: DeckPalette }) {
                   setSuggestion(null);
                 }}
               >
-                Aplicar sugestão
+                {pt.apply}
               </Button>
               <Button size="compact-xs" variant="subtle" onClick={() => setSuggestion(null)}>
-                Descartar
+                {pt.discard}
               </Button>
             </Group>
           </Stack>
@@ -508,10 +501,10 @@ function SharedPalette({ server }: { server: DeckPalette }) {
       />
       <Divider my="xs" />
       <Text size="xs" fw={600}>
-        Como fica
+        {pt.howItLooks}
       </Text>
       <StatusLegend palette={local.palette} labels={local.status_labels} />
-      {savePalette.error && <ErrorState error={savePalette.error} title="Cores não salvas" />}
+      {savePalette.error && <ErrorState error={savePalette.error} title={pt.notSaved} />}
     </Stack>
   );
 }
@@ -527,10 +520,13 @@ export function VariablesDrawer({
   boards: DeckBoard[];
   slides: ManifestSlide[];
 }) {
+  const t = useT();
+  const vt = t.deck.variables;
   const spaces = useMemo(() => {
     const seen = new Map<string, string>();
     for (const board of boards) if (board.space_key) seen.set(board.space_key, board.space_name || board.space_key);
-    return [...seen].map(([key, name]) => ({ key, name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    const compare = collator().compare;
+    return [...seen].map(([key, name]) => ({ key, name })).sort((a, b) => compare(a.name, b.name));
   }, [boards]);
 
   const [space, setSpace] = useState<string | null>(spaces[0]?.key ?? null);
@@ -562,11 +558,11 @@ export function VariablesDrawer({
   const target = { space, board, slide };
 
   const targetLabel = (scope: VariableScope, key: string) => {
-    if (scope === 'global') return 'qualquer alvo';
+    if (scope === 'global') return vt.anyTarget;
     if (scope === 'space') return spaces.find((s) => s.key === key)?.name ?? key;
-    if (scope === 'board') return boards.find((b) => String(b.id) === key)?.name ?? `board ${key}`;
+    if (scope === 'board') return boards.find((b) => String(b.id) === key)?.name ?? vt.boardRef(key);
     const found = slides.find((s) => String(s.slide_id) === key);
-    return found ? `slide ${found.index}` : `slide ${key}`;
+    return vt.slideRef(found ? String(found.index) : key);
   };
 
   const conflicts = data.conflicts ?? [];
@@ -577,7 +573,7 @@ export function VariablesDrawer({
       {confirmDialog}
       <Tabs.List mb="sm">
         <Tabs.Tab value="variaveis" leftSection={<IconBraces size={14} />}>
-          Variáveis
+          {vt.tabVariables}
         </Tabs.Tab>
         <Tabs.Tab
           value="campos"
@@ -588,20 +584,17 @@ export function VariablesDrawer({
             </Badge>
           }
         >
-          Campos do Jira
+          {vt.tabFields}
         </Tabs.Tab>
         <Tabs.Tab value="cores" leftSection={<IconPalette size={14} />}>
-          Cores do semáforo
+          {vt.tabColors}
         </Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="cores">
         <Stack gap="sm">
-          <Note title="Uma configuração para todos os modelos">
-            As cores e as palavras do semáforo ficam aqui e valem para qualquer apresentação. Antes
-            este formulário existia duas vezes, em telas diferentes, cada uma gravando no seu
-            modelo — então “o verde” era o que a última pessoa tivesse digitado na tela que abriu.
-            Um modelo cuja legenda diga outra coisa continua podendo sobrescrever só aquilo.
+          <Note title={vt.colorsNoteTitle}>
+            {vt.colorsNote}
           </Note>
           {palette.data && <SharedPalette server={palette.data} />}
         </Stack>
@@ -609,11 +602,8 @@ export function VariablesDrawer({
 
       <Tabs.Panel value="campos">
         <Stack gap="sm">
-          <Note title="O que o Jira já sabe">
-            Estes campos são calculados a cada geração — não se escreve valor para eles. Cada um
-            mantém seu <b>tipo</b>: texto, número, linhas, listas agrupadas, semáforo ou série de
-            gráfico. É por isso que eles não viram variáveis de texto: uma tabela ou um gráfico
-            deixaria de caber. Para colocar um no slide, escolha a área e use <b>Campo</b>.
+          <Note title={vt.fieldsNoteTitle}>
+            {vt.fieldsNote(bold)}
           </Note>
           <FieldCatalog fields={data.catalog ?? []} />
         </Stack>
@@ -622,7 +612,7 @@ export function VariablesDrawer({
       <Tabs.Panel value="variaveis">
     <Stack gap="md">
       {conflicts.length > 0 && (
-        <Alert variant="light" color="yellow" title="Nomes com mais de uma resposta">
+        <Alert variant="light" color="yellow" title={vt.conflictsTitle}>
           <Stack gap={2}>
             {conflicts.map((conflict) => (
               <Text key={`${conflict.kind}:${conflict.name}`} size="xs">
@@ -632,23 +622,18 @@ export function VariablesDrawer({
           </Stack>
         </Alert>
       )}
-      <Note title="Um nome, um valor por alvo">
-        Escreva <span className="mono">{'{{texto.nome}}'}</span> em qualquer campo do slide. Na hora de gerar, a
-        Cadência procura um valor do alvo mais estreito para o mais amplo: <b>slide → board → espaço → padrão</b>. O
-        valor <b>padrão</b> é global: vale para todo alvo que não tenha um mais estreito, e abaixo dele só existe o
-        padrão declarado no <b>registro</b> da variável. Fora daí não há padrão nenhum: um nome não registrado, ou
-        registrado e sem valor nem padrão, faz a geração falhar em vez de sair em branco. Uma variável pode valer
-        para todos os modelos ou só para este.
+      <Note title={vt.howTitle}>
+        {vt.how(<span key="m" className="mono">{'{{texto.nome}}'}</span>, bold)}
       </Note>
 
       <Paper withBorder p="sm">
         <Text size="xs" fw={600} mb="xs">
-          Ver o que cada variável vai dizer em
+          {vt.previewIn}
         </Text>
         <Group grow align="flex-start">
           <Select
-            label="Espaço"
-            placeholder="nenhum (padrão)"
+            label={vt.space}
+            placeholder={vt.spaceNone}
             data={spaces.map((s) => ({ value: s.key, label: s.name }))}
             value={space}
             onChange={chooseSpace}
@@ -656,9 +641,9 @@ export function VariablesDrawer({
             searchable
           />
           <Select
-            label="Board"
-            placeholder={space ? 'qualquer board do espaço' : 'qualquer'}
-            description={space ? `${spaceBoards.length} no espaço escolhido` : undefined}
+            label={vt.board}
+            placeholder={space ? vt.anyBoardOfSpace : vt.any}
+            description={space ? vt.inChosenSpace(spaceBoards.length) : undefined}
             data={spaceBoards.map((b) => ({ value: String(b.id), label: b.name }))}
             value={board}
             onChange={setBoard}
@@ -666,8 +651,8 @@ export function VariablesDrawer({
             searchable
           />
           <Select
-            label="Slide"
-            placeholder="qualquer"
+            label={vt.slide}
+            placeholder={vt.any}
             data={slides.map((s) => ({ value: String(s.slide_id), label: `${s.index}. ${s.headline || s.layout}` }))}
             value={slide}
             onChange={setSlide}
@@ -677,22 +662,21 @@ export function VariablesDrawer({
         </Group>
         {!space && !board && !slide && (
           <Text size="xs" c="dimmed" mt={6}>
-            Sem alvo escolhido: o que aparece abaixo é o valor padrão, o global.
+            {vt.noTarget}
           </Text>
         )}
       </Paper>
 
       <Group justify="space-between">
-        <Title order={5}>Variáveis</Title>
+        <Title order={5}>{vt.tabVariables}</Title>
         <Button size="compact-sm" leftSection={<IconPlus size={15} />} onClick={() => setEditing(null)}>
-          Nova variável
+          {vt.newTitle}
         </Button>
       </Group>
 
       {data.items.length === 0 ? (
-        <Alert variant="light" color="petrol" title="Nenhuma variável ainda">
-          Crie a primeira — por exemplo <span className="mono">definicao</span> — e dê a ela um valor padrão, que
-          vale para todos, ou um valor por espaço.
+        <Alert variant="light" color="petrol" title={vt.emptyTitle}>
+          {vt.emptyBody(<span key="e" className="mono">definicao</span>)}
         </Alert>
       ) : (
         <Stack gap="md">
@@ -709,23 +693,23 @@ export function VariablesDrawer({
                     <Placeholder text={variable.placeholder} />
                     <Text size="sm">{variable.label}</Text>
                     {variable.template_id !== null && (
-                      <Tooltip label={`só aparece no modelo “${templateName}”`}>
+                      <Tooltip label={vt.onlyInTemplate(templateName)}>
                         <Badge size="xs" color="petrol" variant="filled">
-                          deste modelo
+                          {vt.thisTemplate}
                         </Badge>
                       </Tooltip>
                     )}
                     {/* RF-59: the kind is what decides which areas this variable can fill, so it
                         sits next to the name rather than inside the edit form. */}
                     <Badge size="xs" variant="outline" color={variable.kind === 'text' ? 'gray' : 'petrol'}>
-                      {KIND_LABEL[variable.kind]}
+                      {t.deck.fieldCatalog.kinds[variable.kind]}
                     </Badge>
                     {variable.source_field && (
                       <Tooltip
                         label={
                           variable.kind === 'text'
-                            ? `lê de ${variable.source_field}; um valor escrito à mão ganha dele`
-                            : `lê de ${variable.source_field}; deste tipo não se escreve valor à mão`
+                            ? vt.readsFromText(variable.source_field)
+                            : vt.readsFromTyped(variable.source_field)
                         }
                       >
                         <Badge size="xs" color="teal" variant="light" leftSection={<IconPlugConnected size={9} />}>
@@ -734,9 +718,9 @@ export function VariablesDrawer({
                       </Tooltip>
                     )}
                     {variable.kind === 'text' && !globalValue && variable.default === null && !variable.source_field && (
-                      <Tooltip label="sem valor global e sem padrão no registro: um alvo que não definir um valor próprio faz a geração falhar">
+                      <Tooltip label={vt.noDefaultTip}>
                         <Badge size="xs" color="red" variant="light">
-                          sem padrão
+                          {vt.noDefault}
                         </Badge>
                       </Tooltip>
                     )}
@@ -750,7 +734,7 @@ export function VariablesDrawer({
                           leftSection={<IconWorld size={12} />}
                           onClick={() => setValuing({ variable, scope: 'global' })}
                         >
-                          Valor padrão
+                          {vt.defaultValue}
                         </Button>
                         <Button
                           size="compact-xs"
@@ -758,25 +742,25 @@ export function VariablesDrawer({
                           leftSection={<IconPlus size={12} />}
                           onClick={() => setValuing({ variable, scope: 'space' })}
                         >
-                          Definir valor
+                          {vt.setValue}
                         </Button>
                       </>
                     )}
-                    <ActionIcon variant="subtle" aria-label={`Editar ${variable.name}`} onClick={() => setEditing(variable)}>
+                    <ActionIcon variant="subtle" aria-label={vt.editNamed(variable.name)} onClick={() => setEditing(variable)}>
                       <IconEdit size={15} />
                     </ActionIcon>
                     <ActionIcon
                       variant="subtle"
                       color="red"
-                      aria-label={`Excluir ${variable.name}`}
+                      aria-label={vt.deleteNamed(variable.name)}
                       loading={remove.isPending}
                       onClick={async () => {
                         // Without the variable a deck that uses it is refused until it is filled in again (RF-45).
                         if (
                           await confirm({
-                            title: `Excluir a variável ${variable.name}?`,
-                            body: 'Os valores definidos para ela somem. Uma apresentação que a usa é recusada até que a variável volte ou que o slide seja ajustado.',
-                            confirmLabel: 'Excluir variável',
+                            title: vt.deleteTitle(variable.name),
+                            body: vt.deleteBody,
+                            confirmLabel: vt.deleteConfirm,
                           })
                         )
                           remove.mutate(variable.id);
@@ -794,16 +778,16 @@ export function VariablesDrawer({
                 <Paper withBorder p={6} mb={6} bg="var(--mantine-color-default-hover)">
                   <Group gap={6} mb={2}>
                     <Text size="xs" c="dimmed">
-                      No alvo escolhido acima:
+                      {vt.atTarget}
                     </Text>
                     {fromSource.has(variable.name) ? (
                       <Badge size="xs" color="teal" variant="outline">
-                        vem do Jira · {variable.source_field}
+                        {vt.fromJira(variable.source_field ?? '')}
                       </Badge>
                     ) : (
                       winner && (
                         <Badge size="xs" variant="outline">
-                          vem do nível {SCOPE_SHORT[winner.scope]}
+                          {vt.fromLevel(vt.scopeShort[winner.scope])}
                         </Badge>
                       )
                     )}
@@ -814,26 +798,25 @@ export function VariablesDrawer({
                     </Text>
                   ) : variable.source_field && !board ? (
                     <Badge size="sm" color="teal" variant="light">
-                      escolha um board acima para ver o que {variable.source_field} diz
+                      {vt.chooseBoard(variable.source_field)}
                     </Badge>
                   ) : (
                     <Badge size="sm" color="yellow" variant="light">
-                      nenhum valor alcança este alvo
+                      {vt.noValueReaches}
                     </Badge>
                   )}
                 </Paper>
                 {variable.kind !== 'text' ? (
                   <Text size="xs" c="dimmed">
-                    Esta variável vem inteira de <span className="mono">{variable.source_field}</span> e é
-                    recalculada a cada geração. Não há valor a escrever por espaço ou por board.
+                    {vt.typedNote(<span key="s" className="mono">{variable.source_field}</span>)}
                   </Text>
                 ) : (
                 <Table verticalSpacing={4}>
                   <Table.Thead>
                     <Table.Tr>
-                      <Table.Th w={150}>Nível</Table.Th>
-                      <Table.Th w={180}>Alvo</Table.Th>
-                      <Table.Th>Texto</Table.Th>
+                      <Table.Th w={150}>{vt.level}</Table.Th>
+                      <Table.Th w={180}>{vt.target}</Table.Th>
+                      <Table.Th>{vt.text}</Table.Th>
                       <Table.Th w={40} />
                     </Table.Tr>
                   </Table.Thead>
@@ -842,7 +825,7 @@ export function VariablesDrawer({
                       <Table.Tr key={`${entry.scope}:${entry.scope_key}`}>
                         <Table.Td>
                           <Badge size="xs" variant="outline">
-                            {SCOPE_LABEL[entry.scope]}
+                            {vt.scope[entry.scope]}
                           </Badge>
                         </Table.Td>
                         <Table.Td>
@@ -858,7 +841,7 @@ export function VariablesDrawer({
                             size="sm"
                             variant="subtle"
                             color="red"
-                            aria-label={`Remover o valor de ${SCOPE_LABEL[entry.scope]}`}
+                            aria-label={vt.removeValue(vt.scope[entry.scope])}
                             onClick={() =>
                               clear.mutate({ id: variable.id, scope: entry.scope, scope_key: entry.scope_key })
                             }
@@ -873,11 +856,11 @@ export function VariablesDrawer({
                     <Table.Tr>
                       <Table.Td>
                         <Badge size="xs" variant="light">
-                          {SCOPE_LABEL.global}
+                          {vt.scope.global}
                         </Badge>
                       </Table.Td>
                       <Table.Td>
-                        <Text size="xs">qualquer alvo</Text>
+                        <Text size="xs">{vt.anyTarget}</Text>
                       </Table.Td>
                       <Table.Td>
                         {globalValue ? (
@@ -887,10 +870,10 @@ export function VariablesDrawer({
                         ) : variable.default !== null ? (
                           <Group gap={6} wrap="nowrap">
                             <Badge size="xs" variant="outline" color="gray">
-                              do registro
+                              {vt.fromRegistry}
                             </Badge>
                             <Text size="xs" lineClamp={2} style={{ whiteSpace: 'pre-wrap' }}>
-                              {variable.default || '(vazio)'}
+                              {variable.default || vt.empty}
                             </Text>
                           </Group>
                         ) : (
@@ -899,7 +882,7 @@ export function VariablesDrawer({
                             variant="subtle"
                             onClick={() => setValuing({ variable, scope: 'global' })}
                           >
-                            definir o padrão
+                            {vt.setDefault}
                           </Button>
                         )}
                       </Table.Td>
@@ -909,7 +892,7 @@ export function VariablesDrawer({
                             size="sm"
                             variant="subtle"
                             color="red"
-                            aria-label={`Remover o valor de ${SCOPE_LABEL.global}`}
+                            aria-label={vt.removeValue(vt.scope.global)}
                             onClick={() => clear.mutate({ id: variable.id, scope: 'global', scope_key: '' })}
                           >
                             <IconTrash size={13} />

@@ -4,6 +4,7 @@ import { IconDatabase, IconSearch, IconStar, IconStarFilled } from '@tabler/icon
 import { useMemo, useState } from 'react';
 
 import type { CatalogField, FieldKind } from '../api/types';
+import { collator, t as messages, useT } from '../i18n';
 
 /** #17: which fields someone pins for quick access, per browser — the catalogue can grow past a
  * screenful once a few templates are wired up, and scrolling the same list every time is the cost
@@ -15,16 +16,17 @@ function useFavoriteFields() {
   return [favorites, toggle] as const;
 }
 
-/** What each kind can actually do, in the words the field picker used to carry. */
-export const KIND_LABEL: Record<FieldKind, string> = {
-  text: 'texto',
-  number: 'número',
-  groups: 'lista agrupada',
-  rows: 'linhas',
-  row_groups: 'linhas agrupadas',
-  status: 'semáforo',
-  series: 'série (gráfico)',
-};
+/** What each kind can actually do, in the words the field picker used to carry. Read at use time. */
+export const kindLabel = (kind: FieldKind): string => messages().deck.fieldCatalog.kinds[kind];
+
+const KINDS: FieldKind[] = ['text', 'number', 'groups', 'rows', 'row_groups', 'status', 'series'];
+
+/**
+ * The same labels as a lookup table, kept for the callers that index it (`KIND_LABEL[kind]`). Each
+ * entry is a getter, so it follows the current language instead of the one at module load.
+ */
+export const KIND_LABEL = {} as Readonly<Record<FieldKind, string>>;
+for (const kind of KINDS) Object.defineProperty(KIND_LABEL, kind, { get: () => kindLabel(kind), enumerable: true });
 
 /** Binding modes a field of each kind can fill — the rule the old picker applied by filtering. */
 export const MODE_KINDS: Record<string, FieldKind[]> = {
@@ -68,6 +70,8 @@ export function FieldCatalog({
   mode?: string;
   emptyHint?: string;
 }) {
+  const t = useT();
+  const f = t.deck.fieldCatalog;
   const [query, setQuery] = useState('');
   const [favorites, toggleFavorite] = useFavoriteFields();
   const usable = useMemo(() => {
@@ -86,13 +90,14 @@ export function FieldCatalog({
   const groups = useMemo(() => {
     const byGroup = new Map<string, CatalogField[]>();
     for (const field of usable) {
-      const group = field.group ?? (field.scope === 'deck' ? 'Do relatório' : 'Do board');
+      const group = field.group ?? (field.scope === 'deck' ? f.fromReport : f.fromBoard);
       byGroup.set(group, [...(byGroup.get(group) ?? []), field]);
     }
-    return [...byGroup].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
-  }, [usable]);
+    const compare = collator().compare;
+    return [...byGroup].sort((a, b) => compare(a[0], b[0]));
+  }, [usable, f]);
 
-  const favoriteFields = useMemo(() => usable.filter((f) => favorites.includes(f.key)), [usable, favorites]);
+  const favoriteFields = useMemo(() => usable.filter((field) => favorites.includes(field.key)), [usable, favorites]);
 
   const renderField = (field: CatalogField) => {
     const picked = field.key === value;
@@ -105,11 +110,11 @@ export function FieldCatalog({
               {field.label}
             </Text>
             <Badge size="xs" variant="outline" color={picked ? 'petrol' : 'gray'}>
-              {KIND_LABEL[field.kind]}
+              {f.kinds[field.kind]}
             </Badge>
             {field.origin === 'variavel' && (
               <Badge size="xs" variant="light" color="petrol">
-                variável
+                {f.variable}
               </Badge>
             )}
           </Group>
@@ -126,7 +131,7 @@ export function FieldCatalog({
           size="sm"
           variant="subtle"
           color={isFavorite ? 'yellow' : 'gray'}
-          aria-label={isFavorite ? `Tirar ${field.label} dos favoritos` : `Marcar ${field.label} como favorito`}
+          aria-label={isFavorite ? f.unfavorite(field.label) : f.favorite(field.label)}
           onClick={(event) => {
             event.stopPropagation();
             toggleFavorite(field.key);
@@ -163,14 +168,14 @@ export function FieldCatalog({
     <Stack gap="xs">
       <TextInput
         size="xs"
-        placeholder="Procurar por nome, chave ou descrição"
+        placeholder={f.search}
         leftSection={<IconSearch size={14} />}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
       />
       {usable.length === 0 ? (
         <Text size="xs" c="dimmed">
-          {emptyHint ?? 'Nenhum campo deste tipo.'}
+          {emptyHint ?? f.empty}
         </Text>
       ) : (
         <ScrollArea.Autosize mah={420} type="auto">
@@ -178,7 +183,7 @@ export function FieldCatalog({
             {favoriteFields.length > 0 && (
               <Stack gap={2}>
                 <Text size="xs" fw={600} c="dimmed">
-                  ★ Favoritos
+                  ★ {f.favorites}
                 </Text>
                 {favoriteFields.map(renderField)}
               </Stack>
@@ -214,8 +219,9 @@ export function FieldPicker({
   onPick: (key: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
-    <Modal opened={opened} onClose={onClose} title="Campos do Jira" size="lg">
+    <Modal opened={opened} onClose={onClose} title={t.deck.fieldCatalog.pickerTitle} size="lg">
       <FieldCatalog
         fields={fields}
         value={value}
@@ -224,7 +230,7 @@ export function FieldPicker({
           onPick(key);
           onClose();
         }}
-        emptyHint="Nenhum campo do catálogo serve para este modo de preenchimento."
+        emptyHint={t.deck.fieldCatalog.pickerEmpty}
       />
     </Modal>
   );

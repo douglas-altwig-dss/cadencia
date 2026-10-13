@@ -2,10 +2,10 @@ import { Alert, Badge, Button, Code, Group, List, Loader, Select, Stack, Table, 
 import { IconSparkles } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 
-import { plural } from '../../lib/format';
 import { useAiStatus, useDraftNarrative, useTemplateA11y, useTemplateDiagnostics, useTemplateUsage } from '../../api/deckHooks';
 import { useCreateVariable, useSetVariableValue, useVariables } from '../../api/hooks';
 import type { TemplateDetail } from '../../api/types';
+import { t as messages, useT } from '../../i18n';
 import { ErrorState, Note } from '../common';
 import { A11yList } from './RunPanels';
 
@@ -13,19 +13,22 @@ const SEVERITY = { erro: 'red', aviso: 'yellow', info: 'gray' } as const;
 
 /** What an item of a diagnostic check is, in one line. */
 function describe(item: unknown): string {
-  if (typeof item === 'number') return `slide ${item}`;
+  const d = messages().deck.diagnostics;
+  if (typeof item === 'number') return d.slideRef(item);
   if (item && typeof item === 'object') {
     const o = item as Record<string, unknown>;
     if (o.family) return `${o.family}${o.face ? ` → ${o.face}` : ''}`;
-    if (o.marker) return `slide ${o.slide}: {{${o.marker}}}`;
-    if (o.area) return `slide ${o.slide}: ${o.name || o.area}`;
-    if (o.message) return `slide ${o.slide}: ${o.message}`;
+    if (o.marker) return d.onSlide(String(o.slide), `{{${o.marker}}}`);
+    if (o.area) return d.onSlide(String(o.slide), String(o.name || o.area));
+    if (o.message) return d.onSlide(String(o.slide), String(o.message));
   }
   return JSON.stringify(item);
 }
 
 /** #24: what to fix in a template before its first deck. Also the wizard's first step (#23). */
 export function TemplateDiagnosticsPanel({ templateId }: { templateId: number }) {
+  const t = useT();
+  const d = t.deck.diagnostics;
   const diagnostics = useTemplateDiagnostics(templateId);
   if (diagnostics.isLoading) return <Loader size="sm" />;
   if (diagnostics.error) return <ErrorState error={diagnostics.error} />;
@@ -33,18 +36,18 @@ export function TemplateDiagnosticsPanel({ templateId }: { templateId: number })
   return (
     <Stack gap="sm">
       <Text size="sm" c="dimmed">
-        {data.slides} slides{data.size_mb != null ? ` · ${data.size_mb} MB` : ''}
+        {d.size(data.slides, data.size_mb)}
       </Text>
       {!data.checks.length && (
         <Text size="sm" c="teal.8">
-          Nada a corrigir: fontes, marcadores, vínculos, nomes e imagens estão em ordem.
+          {d.clean}
         </Text>
       )}
       {data.checks.map((check) => (
         <Stack key={check.id} gap={4}>
           <Group gap="xs">
             <Badge color={SEVERITY[check.severity]} variant="light">
-              {check.severity}
+              {d.severity[check.severity]}
             </Badge>
             <Text size="sm">{check.message}</Text>
           </Group>
@@ -52,7 +55,7 @@ export function TemplateDiagnosticsPanel({ templateId }: { templateId: number })
             {check.items.slice(0, 8).map((item, i) => (
               <List.Item key={i}>{describe(item)}</List.Item>
             ))}
-            {check.count > 8 && <List.Item>…e mais {check.count - 8}.</List.Item>}
+            {check.count > 8 && <List.Item>{t.deck.a11y.more(check.count - 8)}</List.Item>}
           </List>
         </Stack>
       ))}
@@ -62,15 +65,14 @@ export function TemplateDiagnosticsPanel({ templateId }: { templateId: number })
 
 /** #15: the template's own accessibility, before anything is generated from it. */
 export function TemplateA11yPanel({ templateId, onOpen }: { templateId: number; onOpen?: (slide: number, shape: string | null) => void }) {
+  const t = useT();
   const report = useTemplateA11y(templateId);
   if (report.isLoading) return <Loader size="sm" />;
   if (report.error) return <ErrorState error={report.error} />;
   return (
     <Stack gap="sm">
       <Text size="sm" c="dimmed">
-        Imagens e gráficos sem texto alternativo, texto com contraste abaixo de 4,5:1 (3:1 para
-        texto grande) e slides cujo título não é o primeiro a ser lido. Cada geração repete esta
-        verificação e mostra o resultado junto da validação.
+        {t.deck.templateA11y.intro}
       </Text>
       <A11yList report={report.data} onOpen={onOpen} />
     </Stack>
@@ -79,6 +81,8 @@ export function TemplateA11yPanel({ templateId, onOpen }: { templateId: number; 
 
 /** #30: how the template behaves over its last decks, to trim it with data rather than taste. */
 export function TemplateUsagePanel({ templateId }: { templateId: number }) {
+  const t = useT();
+  const u = t.deck.usage;
   const usage = useTemplateUsage(templateId);
   if (usage.isLoading) return <Loader size="sm" />;
   if (usage.error) return <ErrorState error={usage.error} />;
@@ -86,7 +90,7 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
   if (!data.runs) {
     return (
       <Text size="sm" c="dimmed">
-        Nenhuma apresentação de entrega gerada com este modelo ainda.
+        {u.none}
       </Text>
     );
   }
@@ -95,25 +99,25 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
       <Group gap="lg">
         <Stack gap={0}>
           <Text size="xs" c="dimmed">
-            Gerações
+            {u.runs}
           </Text>
           <Text fw={600} className="num">
-            {data.runs} ({data.ok} ok)
+            {u.runsValue(data.runs, data.ok)}
           </Text>
         </Stack>
         {data.seconds_avg != null && (
           <Stack gap={0}>
             <Text size="xs" c="dimmed">
-              Tempo de geração
+              {u.duration}
             </Text>
             <Text fw={600} className="num">
-              {data.seconds_avg} s (máx. {data.seconds_max} s)
+              {u.durationValue(data.seconds_avg, data.seconds_max)}
             </Text>
           </Stack>
         )}
       </Group>
       {data.suggestions.length > 0 && (
-        <Note title="Sugestões">
+        <Note title={u.suggestions}>
           <List size="sm">
             {data.suggestions.map((s) => (
               <List.Item key={s}>{s}</List.Item>
@@ -123,7 +127,7 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
       )}
       {data.dropped.length > 0 && (
         <Stack gap={4}>
-          <Title order={6}>Slides que saíram vazios e foram retirados</Title>
+          <Title order={6}>{u.dropped}</Title>
           <Table>
             <Table.Tbody>
               {data.dropped.map((d) => (
@@ -138,7 +142,7 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
       )}
       {data.presented.length > 0 ? (
         <Stack gap={4}>
-          <Title order={6}>Tempo médio na tela ao apresentar</Title>
+          <Title order={6}>{u.presented}</Title>
           <Table>
             <Table.Tbody>
               {data.presented.map((p) => (
@@ -146,7 +150,7 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
                   <Table.Td>{p.name}</Table.Td>
                   <Table.Td className="num">{p.avg_seconds} s</Table.Td>
                   <Table.Td className="num" c="dimmed">
-                    {plural(p.times, 'apresentação', 'apresentações')}
+                    {u.times(p.times)}
                   </Table.Td>
                 </Table.Tr>
               ))}
@@ -155,12 +159,12 @@ export function TemplateUsagePanel({ templateId }: { templateId: number }) {
         </Stack>
       ) : (
         <Text size="xs" c="dimmed">
-          O tempo por slide aparece depois que alguém apresentar pela Cadência (Apresentar daqui).
+          {u.presentedEmpty}
         </Text>
       )}
       {data.problems.length > 0 && (
         <Stack gap={4}>
-          <Title order={6}>Problemas mais frequentes na validação</Title>
+          <Title order={6}>{u.problems}</Title>
           <Group gap={4}>
             {data.problems.map((p) => (
               <Badge key={p.kind} variant="light" color="gray">
@@ -183,6 +187,8 @@ const NARRATIVE = 'narrativa';
  * started with CADENCIA_AI_ENABLED, because the numbers leave Cadência.
  */
 export function NarrativePanel({ templateId, boards }: { templateId: number; boards: TemplateDetail['boards'] }) {
+  const t = useT();
+  const n = t.deck.narrative;
   const ai = useAiStatus();
   const [boardId, setBoardId] = useState<string | null>(boards[0] ? String(boards[0].id) : null);
   const variables = useVariables({ templateId, boardId: boardId ? Number(boardId) : null });
@@ -209,11 +215,10 @@ export function NarrativePanel({ templateId, boards }: { templateId: number; boa
   return (
     <Stack gap="md">
       <Text size="sm" c="dimmed">
-        Um parágrafo de abertura por board, guardado na variável <Code>texto.narrativa</Code>. Coloque o
-        marcador <Code>{'{{texto.narrativa}}'}</Code> numa caixa do slide repetido por board.
+        {n.intro(<Code key="v">texto.narrativa</Code>, <Code key="m">{'{{texto.narrativa}}'}</Code>)}
       </Text>
       <Select
-        label="Board"
+        label={n.board}
         data={boards.map((b) => ({ value: String(b.id), label: b.space_name ? `${b.name} · ${b.space_name}` : b.name }))}
         value={boardId}
         onChange={setBoardId}
@@ -228,34 +233,33 @@ export function NarrativePanel({ templateId, boards }: { templateId: number; boa
             disabled={!boardId}
             onClick={() => boardId && draft.mutate(Number(boardId), { onSuccess: (r) => setText(r.texto) })}
           >
-            Sugerir com IA
+            {n.suggest}
           </Button>
           <Text size="xs" c="dimmed">
-            Envia só números do board ({ai.data.model}); nenhum nome de pessoa ou título de item.
+            {n.sendsOnly(ai.data.model ?? '')}
           </Text>
         </Group>
       ) : (
         <Alert variant="light" color="gray">
-          A sugestão por IA está desligada neste servidor. Quem administra pode ligá-la com
-          <Code>CADENCIA_AI_ENABLED=true</Code> e <Code>CADENCIA_ANTHROPIC_API_KEY</Code>. O texto pode ser escrito à mão.
+          {n.disabled(<Code key="e">CADENCIA_AI_ENABLED=true</Code>, <Code key="k">CADENCIA_ANTHROPIC_API_KEY</Code>)}
         </Alert>
       )}
-      {draft.error && <ErrorState error={draft.error} title="Sem sugestão" />}
+      {draft.error && <ErrorState error={draft.error} title={n.noSuggestion} />}
       {draft.data && (
         <Text size="xs" c="dimmed">
-          Rascunho feito a partir de: {Object.keys(draft.data.fatos).join(', ')}. Revise antes de salvar.
+          {n.draftFrom(Object.keys(draft.data.fatos).join(', '))}
         </Text>
       )}
-      <Textarea label="Texto" autosize minRows={4} maxRows={12} value={text} onChange={(e) => setText(e.currentTarget.value)} />
-      {(create.error || setValue.error) && <ErrorState error={(create.error ?? setValue.error)!} title="Não salvo" />}
+      <Textarea label={n.text} autosize minRows={4} maxRows={12} value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      {(create.error || setValue.error) && <ErrorState error={(create.error ?? setValue.error)!} title={n.notSaved} />}
       <Group justify="space-between">
         {setValue.isSuccess && (
           <Text size="xs" c="teal.8">
-            Salvo para este board.
+            {n.saved}
           </Text>
         )}
         <Button ml="auto" onClick={() => void save()} loading={create.isPending || setValue.isPending} disabled={!boardId || text.trim() === (stored ?? '')}>
-          Salvar para o board
+          {n.save}
         </Button>
       </Group>
     </Stack>

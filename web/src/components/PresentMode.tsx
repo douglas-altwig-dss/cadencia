@@ -19,6 +19,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useQuestions } from '../api/deckHooks';
+import { useT } from '../i18n';
 import { audienceUrl, channelName, issueKeys, supportsAudience, type Ink, type PresentMessage } from '../lib/presentChannel';
 import { QuestionsPanel } from './deck/QuestionsPanel';
 import { InkLayer, type InkTool } from './InkLayer';
@@ -75,6 +76,8 @@ export function PresentMode({
   /** #30: seconds spent on each slide (by key), reported once when the presentation ends. */
   onFinish?: (seconds: Record<string, number>) => void;
 }) {
+  const t = useT();
+  const p = t.deck.present;
   const [index, setIndex] = useState(initial);
   const [showNotes, setShowNotes] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
@@ -215,8 +218,8 @@ export function PresentMode({
         p: () => setRunning((v) => !v),
         s: () => (audience ? setAudience(null) : openAudience()),
         f: () => void stage.current?.requestFullscreen?.().catch(() => undefined),
-        d: () => setTool((t) => (t === 'pen' ? 'none' : 'pen')),
-        l: () => setTool((t) => (t === 'laser' ? 'none' : 'laser')),
+        d: () => setTool((v) => (v === 'pen' ? 'none' : 'pen')),
+        l: () => setTool((v) => (v === 'laser' ? 'none' : 'laser')),
         c: () => setInk(NO_INK),
         e: () => setShowEvidence((v) => !v),
         q: () => runId && setShowQuestions((v) => !v),
@@ -246,7 +249,7 @@ export function PresentMode({
               {total ? index + 1 : 0} / {total}
             </Badge>
             <Text fw={600} lineClamp={1}>
-              {slide?.title ?? 'Sem slides'}
+              {slide?.title ?? p.noSlides}
             </Text>
             {slide?.subtitle && (
               <Text size="sm" c="dimmed" lineClamp={1}>
@@ -255,7 +258,7 @@ export function PresentMode({
             )}
           </Group>
           <Group gap={4} wrap="nowrap">
-            <Tooltip label={running ? 'pausar o cronômetro (p)' : 'retomar (p)'}>
+            <Tooltip label={running ? p.pauseTimer : p.resumeTimer}>
               <Button
                 size="compact-sm"
                 variant="subtle"
@@ -267,50 +270,50 @@ export function PresentMode({
               </Button>
             </Tooltip>
             {/* #26: this slide's own clock, against the minutes planned for it. */}
-            <Tooltip label={budget !== null ? `previsto: ${clock(budget)}` : 'tempo neste slide'}>
+            <Tooltip label={budget !== null ? p.planned(clock(budget)) : p.timeOnSlide}>
               <Badge variant={over ? 'filled' : 'light'} color={over ? 'red' : 'gray'} className="mono">
-                {over ? 'passou · ' : ''}
+                {over ? p.overPrefix : ''}
                 {clock(onSlide)}
                 {budget !== null ? ` / ${clock(budget)}` : ''}
               </Badge>
             </Tooltip>
-            <Tooltip label="zerar o cronômetro">
-              <ActionIcon variant="subtle" aria-label="Zerar o cronômetro" onClick={() => setSeconds(0)}>
+            <Tooltip label={p.resetTimerTip}>
+              <ActionIcon variant="subtle" aria-label={p.resetTimer} onClick={() => setSeconds(0)}>
                 <IconRefresh size={16} />
               </ActionIcon>
             </Tooltip>
             {onRefresh && (
-              <Tooltip label="gerar de novo com os números de agora">
+              <Tooltip label={p.refreshTip}>
                 <Button size="compact-sm" variant="subtle" leftSection={refreshing ? <Loader size={12} /> : <IconRefresh size={14} />} disabled={refreshing} onClick={onRefresh}>
-                  Atualizar números
+                  {p.refresh}
                 </Button>
               </Tooltip>
             )}
-            <Tooltip label="caneta (d) · apagar (c)">
-              <ActionIcon variant={tool === 'pen' ? 'filled' : 'subtle'} aria-label="Caneta" onClick={() => setTool((t) => (t === 'pen' ? 'none' : 'pen'))}>
+            <Tooltip label={p.penTip}>
+              <ActionIcon variant={tool === 'pen' ? 'filled' : 'subtle'} aria-label={p.pen} onClick={() => setTool((v) => (v === 'pen' ? 'none' : 'pen'))}>
                 <IconPencil size={16} />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label="laser (l)">
-              <ActionIcon variant={tool === 'laser' ? 'filled' : 'subtle'} aria-label="Laser" onClick={() => setTool((t) => (t === 'laser' ? 'none' : 'laser'))}>
+            <Tooltip label={p.laserTip}>
+              <ActionIcon variant={tool === 'laser' ? 'filled' : 'subtle'} aria-label={p.laser} onClick={() => setTool((v) => (v === 'laser' ? 'none' : 'laser'))}>
                 <IconPointer size={16} />
               </ActionIcon>
             </Tooltip>
             {ink.strokes.length > 0 && (
-              <Tooltip label="apagar os traços deste slide (c)">
-                <ActionIcon variant="subtle" aria-label="Apagar traços" onClick={() => setInk(NO_INK)}>
+              <Tooltip label={p.clearInkTip}>
+                <ActionIcon variant="subtle" aria-label={p.clearInk} onClick={() => setInk(NO_INK)}>
                   <IconEraser size={16} />
                 </ActionIcon>
               </Tooltip>
             )}
-            <Tooltip label={keys.length ? `itens citados neste slide (e)` : 'nenhum item citado neste slide'}>
-              <ActionIcon variant={showEvidence ? 'filled' : 'subtle'} aria-label="Evidências" onClick={() => setShowEvidence((v) => !v)}>
+            <Tooltip label={keys.length ? p.evidenceTip : p.noEvidenceTip}>
+              <ActionIcon variant={showEvidence ? 'filled' : 'subtle'} aria-label={p.evidence} onClick={() => setShowEvidence((v) => !v)}>
                 <IconListSearch size={16} />
               </ActionIcon>
             </Tooltip>
             {runId && (
-              <Tooltip label="perguntas da plateia">
-                <ActionIcon variant={showQuestions ? 'filled' : 'subtle'} aria-label="Perguntas" style={{ position: 'relative' }} onClick={() => setShowQuestions((v) => !v)}>
+              <Tooltip label={p.questionsTip}>
+                <ActionIcon variant={showQuestions ? 'filled' : 'subtle'} aria-label={p.questions} style={{ position: 'relative' }} onClick={() => setShowQuestions((v) => !v)}>
                   <IconMessage2 size={16} />
                   {pendingQuestions > 0 && (
                     <Badge size="xs" circle color="red" style={{ position: 'absolute', top: -4, right: -4 }}>
@@ -321,33 +324,33 @@ export function PresentMode({
               </Tooltip>
             )}
             {supportsAudience() && (
-              <Tooltip label={audience ? 'fechar a tela da plateia (s)' : 'abrir a tela da plateia em outra janela (s)'}>
+              <Tooltip label={audience ? p.closeAudienceTip : p.openAudienceTip}>
                 <Button
                   size="compact-sm"
                   variant={audience ? 'filled' : 'subtle'}
                   leftSection={<IconDeviceDesktop size={14} />}
                   onClick={() => (audience ? setAudience(null) : openAudience())}
                 >
-                  {audience ? 'Duas telas' : 'Tela da plateia'}
+                  {audience ? p.twoScreens : p.audienceScreen}
                 </Button>
               </Tooltip>
             )}
-            <Tooltip label="notas do apresentador (n)">
-              <ActionIcon variant={showNotes ? 'filled' : 'subtle'} aria-label="Notas do apresentador" onClick={() => setShowNotes((v) => !v)}>
+            <Tooltip label={p.notesTip}>
+              <ActionIcon variant={showNotes ? 'filled' : 'subtle'} aria-label={p.notes} onClick={() => setShowNotes((v) => !v)}>
                 <IconNotes size={16} />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label="todos os slides (g)">
-              <ActionIcon variant={showGrid ? 'filled' : 'subtle'} aria-label="Todos os slides" onClick={() => setShowGrid((v) => !v)}>
+            <Tooltip label={p.gridTip}>
+              <ActionIcon variant={showGrid ? 'filled' : 'subtle'} aria-label={p.grid} onClick={() => setShowGrid((v) => !v)}>
                 <IconLayoutGrid size={16} />
               </ActionIcon>
             </Tooltip>
-            <Tooltip label="tela cheia (f)">
-              <ActionIcon variant="subtle" aria-label="Tela cheia" onClick={() => void stage.current?.requestFullscreen?.().catch(() => undefined)}>
+            <Tooltip label={p.fullscreenTip}>
+              <ActionIcon variant="subtle" aria-label={p.fullscreen} onClick={() => void stage.current?.requestFullscreen?.().catch(() => undefined)}>
                 <IconMaximize size={16} />
               </ActionIcon>
             </Tooltip>
-            <ActionIcon variant="subtle" color="red" aria-label="Sair da apresentação" onClick={finish}>
+            <ActionIcon variant="subtle" color="red" aria-label={p.exit} onClick={finish}>
               <IconX size={18} />
             </ActionIcon>
           </Group>
@@ -357,7 +360,7 @@ export function PresentMode({
           <Box style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(260px, 2fr)', gap: 16, padding: 16 }}>
             <Stack gap={6} style={{ minHeight: 0 }}>
               <Text size="xs" c="dimmed">
-                Na tela da plateia agora
+                {p.onAudienceNow}
               </Text>
               {slide?.image ? (
                 <InkLayer ink={ink} tool={tool} onInk={setInk}>
@@ -370,32 +373,32 @@ export function PresentMode({
               )}
             </Stack>
             <Stack gap="sm" style={{ minHeight: 0 }}>
-              <Text className="mono" fz={36} fw={600} aria-label="Tempo de apresentação">
+              <Text className="mono" fz={36} fw={600} aria-label={p.elapsed}>
                 {clock(seconds)}
               </Text>
               <Stack gap={4}>
                 <Text size="xs" c="dimmed">
-                  A seguir
+                  {p.upNext}
                 </Text>
                 {slides[index + 1]?.image ? (
                   <img src={slides[index + 1].image} alt={slides[index + 1].title} style={{ width: '60%', border: '1px solid var(--mantine-color-default-border)' }} />
                 ) : (
-                  <Text size="sm">{slides[index + 1]?.title ?? 'Fim da apresentação'}</Text>
+                  <Text size="sm">{slides[index + 1]?.title ?? p.end}</Text>
                 )}
               </Stack>
               <Paper withBorder p="sm" style={{ flex: 1, minHeight: 0 }}>
                 <ScrollArea h="100%">
                   <Text size="lg" style={{ whiteSpace: 'pre-wrap' }} c={slide?.notes ? undefined : 'dimmed'}>
-                    {slide?.notes || 'Sem notas neste slide.'}
+                    {slide?.notes || p.noNotes}
                   </Text>
                 </ScrollArea>
               </Paper>
               <Group grow>
                 <Button variant="default" onClick={() => go(-1)} disabled={index === 0} leftSection={<IconChevronLeft size={16} />}>
-                  Anterior
+                  {p.previous}
                 </Button>
                 <Button onClick={() => go(1)} disabled={index >= total - 1} rightSection={<IconChevronRight size={16} />}>
-                  Próximo
+                  {p.next}
                 </Button>
               </Group>
             </Stack>
@@ -416,7 +419,7 @@ export function PresentMode({
             <ActionIcon
               size="xl"
               variant="subtle"
-              aria-label="Slide anterior"
+              aria-label={t.deck.viewer.previous}
               disabled={index === 0}
               onClick={() => go(-1)}
               style={{ position: 'absolute', left: 8, zIndex: 2 }}
@@ -435,7 +438,7 @@ export function PresentMode({
               ) : (
                 (slide?.render ?? (
                   <Text c="dimmed" ta="center">
-                    Nada para mostrar.
+                    {p.nothing}
                   </Text>
                 ))
               )}
@@ -443,7 +446,7 @@ export function PresentMode({
             <ActionIcon
               size="xl"
               variant="subtle"
-              aria-label="Próximo slide"
+              aria-label={t.deck.viewer.next}
               disabled={index >= total - 1}
               onClick={() => go(1)}
               style={{ position: 'absolute', right: 8, zIndex: 2 }}
@@ -456,7 +459,7 @@ export function PresentMode({
             <Paper withBorder w={280} radius={0} p="md" style={{ borderTop: 0, borderBottom: 0, borderRight: 0 }}>
               <Stack gap="xs" h="100%">
                 <Text fw={600} size="sm">
-                  Itens citados neste slide
+                  {p.evidenceTitle}
                 </Text>
                 {keys.length ? (
                   <ScrollArea style={{ flex: 1 }}>
@@ -470,11 +473,11 @@ export function PresentMode({
                   </ScrollArea>
                 ) : (
                   <Text size="sm" c="dimmed">
-                    Nenhuma chave de item neste slide.
+                    {p.noKeys}
                   </Text>
                 )}
                 <Text size="xs" c="dimmed">
-                  Abre o histórico do item na Cadência numa aba nova — a evidência por trás do número, se alguém perguntar.
+                  {p.evidenceHint}
                 </Text>
               </Stack>
             </Paper>
@@ -488,17 +491,17 @@ export function PresentMode({
             <Paper withBorder w={320} radius={0} p="md" style={{ borderTop: 0, borderBottom: 0, borderRight: 0 }}>
               <Stack gap="xs" h="100%">
                 <Text fw={600} size="sm">
-                  Notas do apresentador
+                  {p.notesTitle}
                 </Text>
                 <ScrollArea style={{ flex: 1 }}>
                   <Text size="sm" style={{ whiteSpace: 'pre-wrap' }} c={slide?.notes ? undefined : 'dimmed'}>
-                    {slide?.notes || 'Sem notas neste slide.'}
+                    {slide?.notes || p.noNotes}
                   </Text>
                 </ScrollArea>
                 {index + 1 < total && (
                   <Paper withBorder p="xs">
                     <Text size="xs" c="dimmed">
-                      A seguir
+                      {p.upNext}
                     </Text>
                     <Text size="sm" lineClamp={2}>
                       {slides[index + 1].title}
@@ -512,12 +515,12 @@ export function PresentMode({
 
         <Group justify="center" gap="xs" py={6} style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}>
           <Text size="xs" c="dimmed">
-            <Kbd>←</Kbd> <Kbd>→</Kbd> navegar · <Kbd>g</Kbd> todos os slides · <Kbd>n</Kbd> notas · <Kbd>s</Kbd> tela da plateia · <Kbd>d</Kbd> caneta · <Kbd>l</Kbd> laser · <Kbd>e</Kbd> evidências · <Kbd>f</Kbd> tela cheia · <Kbd>Esc</Kbd> sair
+            <Kbd>←</Kbd> <Kbd>→</Kbd> {p.keys.navigate} · <Kbd>g</Kbd> {p.keys.grid} · <Kbd>n</Kbd> {p.keys.notes} · <Kbd>s</Kbd> {p.keys.audience} · <Kbd>d</Kbd> {p.keys.pen} · <Kbd>l</Kbd> {p.keys.laser} · <Kbd>e</Kbd> {p.keys.evidence} · <Kbd>f</Kbd> {p.keys.fullscreen} · <Kbd>Esc</Kbd> {p.keys.exit}
           </Text>
         </Group>
       </Box>
 
-      <Modal opened={showGrid} onClose={() => setShowGrid(false)} title="Ir para o slide" size="xl">
+      <Modal opened={showGrid} onClose={() => setShowGrid(false)} title={p.goToSlide} size="xl">
         <Box style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
           {slides.map((item, position) => (
             <Paper

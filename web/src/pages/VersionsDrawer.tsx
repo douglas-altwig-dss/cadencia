@@ -6,7 +6,8 @@ import { useDeleteVersion, useNameVersion, useRestoreVersion, useVersion, useVer
 import { announce } from '../components/Announcer';
 import { ErrorState, Loading } from '../components/common';
 import { useAuthorName } from '../components/editor/CommentsPanel';
-import { fmtDateTime, fromNow, plural } from '../lib/format';
+import { useT } from '../i18n';
+import { fmtDateTime, fromNow } from '../lib/format';
 
 /**
  * RF-87: the edits and the mapping, as versions somebody can go back to. Autosave leaves one
@@ -14,6 +15,8 @@ import { fmtDateTime, fromNow, plural } from '../lib/format';
  * Restoring first stores what it replaces, so a restore can itself be undone.
  */
 export function VersionsDrawer({ templateId, onRestored }: { templateId: number; onRestored: (kind: 'edits' | 'mapping') => void }) {
+  const t = useT();
+  const v = t.deck.versions;
   const [kind, setKind] = useState<'edits' | 'mapping'>('edits');
   const [selected, setSelected] = useState<number | null>(null);
   const [label, setLabel] = useState('');
@@ -31,8 +34,8 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
       { id, author: author || undefined },
       {
         onSuccess: () => {
-          notifications.show({ title: 'Versão restaurada', message: kind === 'edits' ? 'O editor recarregou as edições.' : 'O mapeamento foi recarregado.' });
-          announce('Versão restaurada.');
+          notifications.show({ title: v.restored, message: kind === 'edits' ? v.restoredEdits : v.restoredMapping });
+          announce(v.restoredAnnounce);
           setSelected(null);
           setArmed(null);
           onRestored(kind);
@@ -44,24 +47,24 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
     <Stack gap="md">
       <SegmentedControl
         value={kind}
-        onChange={(v) => {
-          setKind(v as 'edits' | 'mapping');
+        onChange={(value) => {
+          setKind(value as 'edits' | 'mapping');
           setSelected(null);
         }}
         data={[
-          { value: 'edits', label: 'Edições do editor' },
-          { value: 'mapping', label: 'Mapeamento' },
+          { value: 'edits', label: v.edits },
+          { value: 'mapping', label: v.mapping },
         ]}
       />
       <Paper withBorder p="sm">
         <Group gap="xs" align="flex-end">
-          <TextInput label="Guardar o estado atual como" placeholder="ex.: antes da reunião de 12/09" value={label} onChange={(e) => setLabel(e.currentTarget.value)} style={{ flex: 1 }} />
+          <TextInput label={v.saveAs} placeholder={v.saveAsPlaceholder} value={label} onChange={(e) => setLabel(e.currentTarget.value)} style={{ flex: 1 }} />
           <Button
             disabled={!label.trim()}
             loading={name.isPending}
             onClick={() => name.mutate({ kind, label, author: author || undefined }, { onSuccess: () => setLabel('') })}
           >
-            Salvar versão
+            {v.save}
           </Button>
         </Group>
       </Paper>
@@ -69,7 +72,7 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
       {versions.error && <ErrorState error={versions.error} />}
       {versions.data && versions.data.items.length === 0 && (
         <Text size="sm" c="dimmed">
-          Nenhuma versão ainda: a primeira aparece quando {kind === 'edits' ? 'o editor salvar' : 'o mapeamento for salvo'}.
+          {kind === 'edits' ? v.emptyEdits : v.emptyMapping}
         </Text>
       )}
       <Stack gap={4}>
@@ -84,7 +87,7 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
             <Group justify="space-between" wrap="nowrap">
               <Stack gap={0}>
                 <Text size="sm" fw={version.auto ? 400 : 600}>
-                  {version.label || (version.auto ? 'Salvamento automático' : 'Sem nome')}
+                  {version.label || (version.auto ? v.autosave : v.unnamed)}
                 </Text>
                 <Text size="xs" c="dimmed">
                   <Tooltip label={fmtDateTime(version.updated_at)}>
@@ -94,7 +97,7 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
                 </Text>
               </Stack>
               <Badge size="xs" variant="light" color={version.auto ? 'gray' : 'petrol'}>
-                {version.auto ? 'automática' : 'com nome'}
+                {version.auto ? v.auto : v.named}
               </Badge>
             </Group>
             {selected === version.id && (
@@ -102,23 +105,23 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
                 {detail.isLoading && <Loading rows={2} />}
                 {detail.data && (detail.data.diff.same ? (
                   <Alert variant="light" color="gray" p="xs">
-                    <Text size="xs">Igual ao estado atual.</Text>
+                    <Text size="xs">{v.same}</Text>
                   </Alert>
                 ) : (
                   <Stack gap={2}>
                     <Text size="xs" fw={500}>
-                      Restaurar mudaria:
+                      {v.wouldChange}
                     </Text>
                     <List size="xs">
                       {detail.data.diff.slides.slice(0, 12).map((s) => (
                         <List.Item key={s.slide}>
-                          slide {s.slide}
-                          {s.shapes?.length ? `: ${plural(s.shapes.length, 'forma', 'formas')}` : ''}
+                          {v.slide(s.slide)}
+                          {s.shapes?.length ? `: ${v.shapes(s.shapes.length)}` : ''}
                           {s.other?.length ? ` · ${s.other.join(', ')}` : ''}
-                          {s.bindings !== undefined ? `: ${s.current_bindings} → ${plural(s.bindings, 'vínculo', 'vínculos')}` : ''}
+                          {s.bindings !== undefined ? `: ${v.bindings(s.current_bindings, s.bindings)}` : ''}
                         </List.Item>
                       ))}
-                      {detail.data.diff.deck.length > 0 && <List.Item>apresentação: {detail.data.diff.deck.join(', ')}</List.Item>}
+                      {detail.data.diff.deck.length > 0 && <List.Item>{v.deck(detail.data.diff.deck.join(', '))}</List.Item>}
                     </List>
                   </Stack>
                 ))}
@@ -130,10 +133,10 @@ export function VersionsDrawer({ templateId, onRestored }: { templateId: number;
                     loading={restore.isPending}
                     onClick={() => (armed === version.id ? doRestore(version.id) : setArmed(version.id))}
                   >
-                    {armed === version.id ? 'Confirmar: o estado atual vira uma versão' : 'Restaurar'}
+                    {armed === version.id ? v.confirmRestore : v.restore}
                   </Button>
                   <Button size="compact-xs" variant="subtle" color="red" onClick={() => remove.mutate(version.id, { onSuccess: () => setSelected(null) })}>
-                    Excluir
+                    {v.delete}
                   </Button>
                 </Group>
               </Stack>

@@ -5,6 +5,7 @@ import { useParams } from 'react-router';
 
 import { useSharedDeck } from '../api/deckHooks';
 import { DeckViewer } from '../components/deck/DeckViewer';
+import { useT } from '../i18n';
 import { fmtDate } from '../lib/format';
 import { loadDeckFonts } from '../lib/fonts';
 
@@ -14,6 +15,7 @@ import { loadDeckFonts } from '../lib/fonts';
  * else; a revoked or expired link reads the same as one that never existed.
  */
 export function SharedDeckPage() {
+  const t = useT();
   const token = useParams().token;
   const deck = useSharedDeck(token);
 
@@ -37,28 +39,28 @@ export function SharedDeckPage() {
             </span>
             <Text fw={700}>Cadência</Text>
             <Badge variant="default" leftSection={<IconLock size={12} />}>
-              somente leitura
+              {t.deck.shared.readOnly}
             </Badge>
           </Group>
           {deck.isLoading && (
             <Group role="status">
               <Loader size="sm" aria-hidden />
-              <Text size="sm">Abrindo a apresentação…</Text>
+              <Text size="sm">{t.deck.shared.opening}</Text>
             </Group>
           )}
           {deck.error && (
-            <Alert color="yellow" variant="light" title="Este link não abre mais">
-              O link pode ter expirado ou sido revogado. Peça um novo a quem o enviou.
+            <Alert color="yellow" variant="light" title={t.deck.shared.goneTitle}>
+              {t.deck.shared.goneBody}
             </Alert>
           )}
           {deck.data && (
             <>
               <div>
                 <Title order={2} id="shared-deck-title">
-                  {deck.data.template || 'Apresentação'}
+                  {deck.data.template || t.deck.shared.fallbackTitle}
                 </Title>
                 <Text c="dimmed" size="sm">
-                  Referência {fmtDate(deck.data.reference_at, true)}
+                  {t.deck.shared.reference(fmtDate(deck.data.reference_at, true))}
                   {deck.data.boards.length ? ` · ${deck.data.boards.join(', ')}` : ''}
                 </Text>
               </div>

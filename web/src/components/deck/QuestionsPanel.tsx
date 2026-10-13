@@ -3,6 +3,7 @@ import { IconSend2, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import { useAnswerQuestion, useAskQuestion, useDeleteQuestion, useQuestions } from '../../api/deckHooks';
+import { useT } from '../../i18n';
 import { fmtDateTime } from '../../lib/format';
 import { ErrorState } from '../common';
 
@@ -12,6 +13,7 @@ import { ErrorState } from '../common';
  * — can type a question here, and the same list is what the presenter moderates from `PresentMode`.
  */
 export function QuestionsPanel({ runId, live = false }: { runId: string; live?: boolean }) {
+  const t = useT();
   const questions = useQuestions(runId, live);
   const ask = useAskQuestion(runId);
   const answer = useAnswerQuestion(runId);
@@ -30,32 +32,32 @@ export function QuestionsPanel({ runId, live = false }: { runId: string; live?: 
     <Stack gap="xs" h="100%">
       <Group justify="space-between">
         <Text fw={600} size="sm">
-          Perguntas
+          {t.deck.questions.title}
         </Text>
         {pending > 0 && (
           <Badge size="sm" color="petrol">
-            {pending} sem resposta
+            {t.deck.questions.unanswered(pending)}
           </Badge>
         )}
       </Group>
       <Group gap={4} wrap="nowrap">
         <TextInput
           size="sm"
-          placeholder="Escreva uma pergunta…"
+          placeholder={t.deck.questions.placeholder}
           value={text}
           onChange={(e) => setText(e.currentTarget.value)}
           onKeyDown={(e) => e.key === 'Enter' && send()}
           style={{ flex: 1 }}
         />
-        <ActionIcon size="lg" variant="filled" aria-label="Enviar pergunta" disabled={!text.trim()} loading={ask.isPending} onClick={send}>
+        <ActionIcon size="lg" variant="filled" aria-label={t.deck.questions.send} disabled={!text.trim()} loading={ask.isPending} onClick={send}>
           <IconSend2 size={16} />
         </ActionIcon>
       </Group>
-      {ask.error && <ErrorState error={ask.error} title="Pergunta não enviada" />}
+      {ask.error && <ErrorState error={ask.error} title={t.deck.questions.sendFailed} />}
       <ScrollArea style={{ flex: 1 }}>
         {items.length === 0 ? (
           <Text size="sm" c="dimmed">
-            Nenhuma pergunta ainda.
+            {t.deck.questions.empty}
           </Text>
         ) : (
           <Stack gap="xs">
@@ -70,12 +72,12 @@ export function QuestionsPanel({ runId, live = false }: { runId: string; live?: 
                   <Group gap={4}>
                     <Checkbox
                       size="xs"
-                      label="respondida"
+                      label={t.deck.questions.answered}
                       checked={Boolean(q.answered_at)}
                       onChange={(e) => answer.mutate({ id: q.id, answered: e.currentTarget.checked })}
                     />
-                    <Tooltip label="Remover">
-                      <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remover pergunta" onClick={() => remove.mutate(q.id)}>
+                    <Tooltip label={t.deck.questions.remove}>
+                      <ActionIcon size="sm" variant="subtle" color="red" aria-label={t.deck.questions.removeQuestion} onClick={() => remove.mutate(q.id)}>
                         <IconTrash size={13} />
                       </ActionIcon>
                     </Tooltip>
@@ -88,7 +90,7 @@ export function QuestionsPanel({ runId, live = false }: { runId: string; live?: 
       </ScrollArea>
       {!live && (
         <Button size="compact-xs" variant="subtle" onClick={() => questions.refetch()} loading={questions.isFetching}>
-          Atualizar
+          {t.deck.questions.refresh}
         </Button>
       )}
     </Stack>

@@ -21,12 +21,15 @@ import { useDeleteTemplate, useTemplate, useTemplates, useUploadTemplate } from 
 import type { TemplateSummary } from '../api/types';
 import { ErrorState, Loading, Note } from '../components/common';
 import { TemplateDiagnosticsPanel } from '../components/deck/TemplatePanels';
-import { fmtDateTime, plural } from '../lib/format';
+import { useT } from '../i18n';
+import { fmtDateTime } from '../lib/format';
 
 const size = (bytes: number | null) =>
   bytes == null ? '—' : bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} kB`;
 
 function Upload({ onUploaded }: { onUploaded: (id: number) => void }) {
+  const t = useT();
+  const u = t.deck.templates;
   const upload = useUploadTemplate();
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
@@ -35,8 +38,8 @@ function Upload({ onUploaded }: { onUploaded: (id: number) => void }) {
       <Stack gap="xs">
         <Group align="flex-end" wrap="wrap">
           <FileInput
-            label="Arquivo"
-            placeholder="modelo .pptx"
+            label={u.file}
+            placeholder={u.filePlaceholder}
             accept=".pptx"
             value={file}
             onChange={setFile}
@@ -44,8 +47,8 @@ function Upload({ onUploaded }: { onUploaded: (id: number) => void }) {
             clearable
           />
           <TextInput
-            label="Nome"
-            description="opcional; sem isso usa o nome do arquivo"
+            label={u.name}
+            description={u.nameHint}
             value={name}
             onChange={(event) => setName(event.currentTarget.value)}
             w={220}
@@ -68,13 +71,13 @@ function Upload({ onUploaded }: { onUploaded: (id: number) => void }) {
               )
             }
           >
-            Enviar
+            {u.upload}
           </Button>
         </Group>
-        {upload.error && <ErrorState error={upload.error} title="Modelo recusado" />}
+        {upload.error && <ErrorState error={upload.error} title={u.refused} />}
         {upload.isSuccess && (
           <Text size="xs" c="teal.8">
-            Modelo enviado. A Cadência já leu o manifesto e sugeriu um mapeamento.
+            {u.uploaded}
           </Text>
         )}
       </Stack>
@@ -99,6 +102,8 @@ export function TemplatesDrawer({
   /** #23: a freshly uploaded template; defaults to simply opening it. */
   onUploaded?: (id: number) => void;
 }) {
+  const t = useT();
+  const u = t.deck.templates;
   const templates = useTemplates();
   // M13: what the open template used to say on the slides drawer lives with the template itself.
   const open = useTemplate(current > 0 ? current : undefined);
@@ -115,18 +120,18 @@ export function TemplatesDrawer({
       <Upload onUploaded={onUploaded ?? onSelect} />
 
       {items.length === 0 ? (
-        <Alert variant="light" color="petrol" title="Nenhum modelo ainda">
-          Envie o .pptx usado na reunião: a Cadência extrai o manifesto e propõe o mapeamento.
+        <Alert variant="light" color="petrol" title={u.emptyTitle}>
+          {u.emptyBody}
         </Alert>
       ) : (
         <Table.ScrollContainer minWidth={640}>
           <Table verticalSpacing="sm">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Modelo</Table.Th>
-                <Table.Th>Slides</Table.Th>
-                <Table.Th>Estado</Table.Th>
-                <Table.Th>Enviado</Table.Th>
+                <Table.Th>{u.colTemplate}</Table.Th>
+                <Table.Th>{u.colSlides}</Table.Th>
+                <Table.Th>{u.colState}</Table.Th>
+                <Table.Th>{u.colUploaded}</Table.Th>
                 <Table.Th w={72} />
               </Table.Tr>
             </Table.Thead>
@@ -146,7 +151,7 @@ export function TemplatesDrawer({
                         </Text>
                         {item.id === current && (
                           <Badge size="xs" variant="light" leftSection={<IconCheck size={10} />}>
-                            aberto
+                            {u.open}
                           </Badge>
                         )}
                       </Group>
@@ -160,27 +165,27 @@ export function TemplatesDrawer({
                     <Group gap={4}>
                       {item.has_mapping ? (
                         <Badge size="xs" variant="light">
-                          mapeado
+                          {t.deck.gallery.mapped}
                         </Badge>
                       ) : (
                         <Badge size="xs" variant="outline" color="gray">
-                          sem mapeamento
+                          {t.deck.gallery.unmapped}
                         </Badge>
                       )}
                       {item.has_edits && (
                         <Badge size="xs" color="orange" variant="light">
-                          com edições
+                          {u.withEdits}
                         </Badge>
                       )}
                       {item.runs > 0 && (
                         <Badge size="xs" variant="outline">
-                          {plural(item.runs, 'geração', 'gerações')}
+                          {t.deck.gallery.runs(item.runs)}
                         </Badge>
                       )}
                       {item.missing_file && (
-                        <Tooltip label="o .pptx não está mais no disco; só dá para excluir o registro">
+                        <Tooltip label={u.missingTip}>
                           <Badge size="xs" color="red" variant="light" leftSection={<IconAlertTriangle size={10} />}>
-                            arquivo ausente
+                            {t.deck.gallery.missingFile}
                           </Badge>
                         </Tooltip>
                       )}
@@ -191,16 +196,16 @@ export function TemplatesDrawer({
                   </Table.Td>
                   <Table.Td>
                     <Group gap={2} wrap="nowrap">
-                    <Tooltip label="diagnóstico do modelo">
-                      <ActionIcon variant="subtle" aria-label={`Diagnóstico do modelo ${item.name}`} onClick={() => setDiagnosing(item)} disabled={item.missing_file}>
+                    <Tooltip label={u.diagnoseTip}>
+                      <ActionIcon variant="subtle" aria-label={u.diagnose(item.name)} onClick={() => setDiagnosing(item)} disabled={item.missing_file}>
                         <IconStethoscope size={16} />
                       </ActionIcon>
                     </Tooltip>
-                    <Tooltip label="excluir o modelo">
+                    <Tooltip label={u.deleteTip}>
                       <ActionIcon
                         variant="subtle"
                         color="red"
-                        aria-label={`Excluir o modelo ${item.name}`}
+                        aria-label={u.deleteNamed(item.name)}
                         onClick={() => setConfirming(item)}
                       >
                         <IconTrash size={16} />
@@ -216,53 +221,49 @@ export function TemplatesDrawer({
       )}
 
       {open.data && !open.data.mapping && (
-        <Note title="Mapeamento sugerido a partir dos rótulos do modelo">
-          A Cadência leu os rótulos (“REPORT WEEK”, “Completed Activities”, “Blockers”…) e a legenda de cores do modelo e propôs os vínculos.
-          Abra o modelo no editor para revisar — o mapeamento é salvo sozinho.
+        <Note title={u.suggestedTitle}>
+          {u.suggestedBody}
           {open.data.suggestion.notes.length > 0 && ` ${open.data.suggestion.notes.join(' ')}`}
         </Note>
       )}
       {open.data?.mapping_outdated && (
-        <Alert color="yellow" variant="light" title="O modelo mudou desde o mapeamento">
+        <Alert color="yellow" variant="light" title={u.outdatedTitle}>
           {open.data.missing_targets.length
-            ? `Áreas que não existem mais: ${open.data.missing_targets.join(', ')}.`
-            : 'Nenhuma área mapeada sumiu, mas confira o resultado.'}
+            ? u.missingAreas(open.data.missing_targets.join(', '))
+            : u.noAreaMissing}
         </Alert>
       )}
 
-      {remove.error && <ErrorState error={remove.error} title="Modelo não excluído" />}
+      {remove.error && <ErrorState error={remove.error} title={u.deleteFailed} />}
 
-      <Modal opened={diagnosing !== null} onClose={() => setDiagnosing(null)} title={`Diagnóstico — ${diagnosing?.name ?? ''}`} size="lg">
+      <Modal opened={diagnosing !== null} onClose={() => setDiagnosing(null)} title={u.diagnosisTitle(diagnosing?.name ?? '')} size="lg">
         {diagnosing && <TemplateDiagnosticsPanel templateId={diagnosing.id} />}
       </Modal>
 
       <Modal
         opened={confirming !== null}
         onClose={() => setConfirming(null)}
-        title={`Excluir “${confirming?.name}”?`}
+        title={u.confirmTitle(confirming?.name ?? '')}
       >
         <Stack gap="sm">
-          <Text size="sm">Isto remove, sem volta:</Text>
+          <Text size="sm">{u.removes}</Text>
           <List size="sm" spacing={2}>
-            <List.Item>o arquivo .pptx do modelo e suas prévias;</List.Item>
+            <List.Item>{u.removesFile}</List.Item>
             <List.Item>
-              o mapeamento{confirming?.has_mapping ? '' : ' (não há nenhum salvo)'};
+              {confirming?.has_mapping ? u.removesMapping : u.removesMappingNone}
             </List.Item>
             <List.Item>
-              as edições manuais{confirming?.has_edits ? '' : ' (não há nenhuma)'}.
+              {confirming?.has_edits ? u.removesEdits : u.removesEditsNone}
             </List.Item>
           </List>
           {confirming && confirming.runs > 0 && (
-            <Alert variant="light" color="petrol" title="As apresentações já geradas ficam">
-              {confirming.runs === 1
-                ? '1 apresentação gerada com este modelo continua disponível'
-                : `${confirming.runs} apresentações geradas com este modelo continuam disponíveis`}{' '}
-              para download no histórico. O editor delas abre sem o tema e sem as marcas de campo vinculado, que vêm do modelo.
+            <Alert variant="light" color="petrol" title={u.runsStayTitle}>
+              {u.runsStay(confirming.runs)}
             </Alert>
           )}
           <Group justify="flex-end">
             <Button variant="default" onClick={() => setConfirming(null)}>
-              Cancelar
+              {u.cancel}
             </Button>
             <Button
               color="red"
@@ -271,14 +272,14 @@ export function TemplatesDrawer({
                 confirming &&
                 remove.mutate(confirming.id, {
                   onSuccess: () => {
-                    const left = items.filter((t) => t.id !== confirming.id);
+                    const left = items.filter((other) => other.id !== confirming.id);
                     if (confirming.id === current) onSelect(left[0]?.id ?? null);
                     setConfirming(null);
                   },
                 })
               }
             >
-              Excluir
+              {u.delete}
             </Button>
           </Group>
         </Stack>

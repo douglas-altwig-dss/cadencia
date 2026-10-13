@@ -3,13 +3,14 @@ import { IconAlertTriangle, IconFileTypePpt, IconSettings, IconUpload } from '@t
 
 import { useTemplatePreviews } from '../../api/hooks';
 import type { TemplateSummary } from '../../api/types';
-import { plural } from '../../lib/format';
+import { useT } from '../../i18n';
 
 const previewUrl = (templateId: number, name: string) => `/api/reports/templates/${templateId}/previews/${name}`;
 
 /** One card's own thumbnail — a separate component so each fetches (and, the first time, renders)
  * its own preview independently, without blocking the rest of the gallery. */
 function Thumbnail({ item }: { item: TemplateSummary }) {
+  const t = useT();
   const previews = useTemplatePreviews(item.missing_file ? undefined : item.id);
   const image = previews.data?.images?.[0];
   return (
@@ -18,7 +19,7 @@ function Thumbnail({ item }: { item: TemplateSummary }) {
         <Stack align="center" justify="center" gap={4}>
           <IconAlertTriangle size={24} color="var(--mantine-color-red-6)" />
           <Text size="xs" c="dimmed">
-            arquivo ausente
+            {t.deck.gallery.missingFile}
           </Text>
         </Stack>
       ) : image ? (
@@ -27,7 +28,7 @@ function Thumbnail({ item }: { item: TemplateSummary }) {
         <Stack align="center" justify="center" gap={6}>
           <Loader size="sm" />
           <Text size="xs" c="dimmed">
-            gerando prévia…
+            {t.deck.gallery.generatingPreview}
           </Text>
         </Stack>
       ) : (
@@ -45,6 +46,7 @@ function Thumbnail({ item }: { item: TemplateSummary }) {
 }
 
 function TemplateCard({ item, onSelect }: { item: TemplateSummary; onSelect: () => void }) {
+  const t = useT();
   return (
     <UnstyledButton onClick={onSelect} style={{ textAlign: 'left', display: 'block', width: '100%' }}>
       <Card withBorder padding="xs">
@@ -57,20 +59,20 @@ function TemplateCard({ item, onSelect }: { item: TemplateSummary; onSelect: () 
           </Text>
           <Group gap={4}>
             <Text size="xs" c="dimmed">
-              {plural(item.slides, 'slide', 'slides')}
+              {t.deck.gallery.slides(item.slides)}
             </Text>
             {item.has_mapping ? (
               <Badge size="xs" variant="light">
-                mapeado
+                {t.deck.gallery.mapped}
               </Badge>
             ) : (
               <Badge size="xs" variant="outline" color="gray">
-                sem mapeamento
+                {t.deck.gallery.unmapped}
               </Badge>
             )}
             {item.runs > 0 && (
               <Badge size="xs" variant="outline">
-                {plural(item.runs, 'geração', 'gerações')}
+                {t.deck.gallery.runs(item.runs)}
               </Badge>
             )}
           </Group>
@@ -102,14 +104,15 @@ export function TemplateGallery({
   uploading: boolean;
   uploadError?: unknown;
 }) {
+  const t = useT();
   return (
     <Stack gap="md">
       <Group justify="space-between">
         <Text size="sm" c="dimmed">
-          {plural(items.length, 'modelo', 'modelos')} — escolha um para abrir em modo de edição.
+          {t.deck.gallery.intro(items.length)}
         </Text>
         <Button variant="default" size="xs" leftSection={<IconSettings size={14} />} onClick={onManage}>
-          Gerenciar modelos
+          {t.deck.gallery.manage}
         </Button>
       </Group>
       <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, lg: 4 }} spacing="md">
@@ -125,8 +128,9 @@ export function TemplateGallery({
 /** The gallery's own upload tile — kept apart from the card grid (an upload is not "open this
  * file") but visually the same row, matching the "new file" tile both slide products show. */
 export function UploadCard({ uploading, error, onFile }: { uploading: boolean; error?: unknown; onFile: (file: File) => void }) {
+  const t = useT();
   return (
-    <Tooltip label="Enviar um novo modelo .pptx" position="bottom">
+    <Tooltip label={t.deck.gallery.uploadTip} position="bottom">
       <Card withBorder padding="xs" component="label" style={{ cursor: 'pointer', borderStyle: 'dashed' }}>
         <input
           type="file"
@@ -143,14 +147,14 @@ export function UploadCard({ uploading, error, onFile }: { uploading: boolean; e
             <Stack align="center" justify="center" gap={6}>
               {uploading ? <Loader size="sm" /> : <IconUpload size={28} color="var(--mantine-color-dimmed)" />}
               <Text size="xs" c="dimmed">
-                {uploading ? 'Enviando…' : 'Novo modelo'}
+                {uploading ? t.deck.gallery.uploading : t.deck.gallery.newTemplate}
               </Text>
             </Stack>
           </AspectRatio>
         </Card.Section>
         {Boolean(error) && (
           <Text size="xs" c="red" mt={4}>
-            Modelo recusado.
+            {t.deck.gallery.refused}
           </Text>
         )}
       </Card>

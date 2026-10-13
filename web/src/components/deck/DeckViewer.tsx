@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { DeckScene } from '../../api/types';
 import { EMPTY_EDITS, effectiveShapes } from '../../lib/deckEdits';
+import { useT } from '../../i18n';
 import { SlideStage } from '../editor/SlideStage';
 
 /**
@@ -21,6 +22,7 @@ export function DeckViewer({
   raster?: (index: number) => string | undefined;
   maxHeight?: number;
 }) {
+  const t = useT();
   const [current, setCurrent] = useState(0);
   const { ref, width } = useElementSize();
   const slides = scene.slides;
@@ -42,7 +44,7 @@ export function DeckViewer({
   if (!slide) {
     return (
       <Text size="sm" c="dimmed">
-        Nenhum slide nesta apresentação.
+        {t.deck.viewer.empty}
       </Text>
     );
   }
@@ -54,17 +56,17 @@ export function DeckViewer({
         )}
       </Box>
       <Group justify="center" gap="md">
-        <ActionIcon variant="default" onClick={() => setCurrent((c) => Math.max(c - 1, 0))} disabled={current === 0} aria-label="Slide anterior">
+        <ActionIcon variant="default" onClick={() => setCurrent((c) => Math.max(c - 1, 0))} disabled={current === 0} aria-label={t.deck.viewer.previous}>
           <IconChevronLeft size={16} />
         </ActionIcon>
         <Text size="sm" className="num" aria-live="polite">
-          Slide {current + 1} de {slides.length}
+          {t.deck.viewer.position(current + 1, slides.length)}
         </Text>
         <ActionIcon
           variant="default"
           onClick={() => setCurrent((c) => Math.min(c + 1, slides.length - 1))}
           disabled={current >= slides.length - 1}
-          aria-label="Próximo slide"
+          aria-label={t.deck.viewer.next}
         >
           <IconChevronRight size={16} />
         </ActionIcon>
@@ -75,7 +77,7 @@ export function DeckViewer({
             <UnstyledButton
               key={s.key}
               onClick={() => setCurrent(index)}
-              aria-label={`Ir para o slide ${index + 1}`}
+              aria-label={t.deck.viewer.goTo(index + 1)}
               aria-current={index === current ? 'true' : undefined}
               style={{
                 outline: index === current ? '2px solid var(--mantine-primary-color-filled)' : '1px solid var(--border-soft)',

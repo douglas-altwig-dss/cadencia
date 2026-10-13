@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { InkLayer } from '../components/InkLayer';
+import { useT } from '../i18n';
 import { channelName, type AudienceSlide, type Ink, type PresentMessage } from '../lib/presentChannel';
 
 /**
@@ -11,6 +12,7 @@ import { channelName, type AudienceSlide, type Ink, type PresentMessage } from '
  * (the clicker may be plugged into either machine's focus).
  */
 export function AudienceView() {
+  const t = useT();
   const [params] = useSearchParams();
   const id = params.get('canal') ?? '';
   const [slides, setSlides] = useState<AudienceSlide[]>([]);
@@ -38,9 +40,9 @@ export function AudienceView() {
       }
     };
     bc.postMessage({ type: 'hello' } satisfies PresentMessage);
-    document.title = 'Cadência — plateia';
+    document.title = t.deck.audience.documentTitle;
     return () => bc.close();
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -71,11 +73,11 @@ export function AudienceView() {
         <Center>
           <Stack gap={4} align="center">
             <Text c="gray.4" size="lg">
-              {ended ? 'Apresentação encerrada.' : slide ? slide.title : 'Aguardando o apresentador…'}
+              {ended ? t.deck.audience.ended : slide ? slide.title : t.deck.audience.waiting}
             </Text>
             {!ended && (
               <Text c="gray.6" size="sm">
-                Clique duas vezes ou tecle f para tela cheia.
+                {t.deck.audience.fullscreenHint}
               </Text>
             )}
           </Stack>
