@@ -42,7 +42,7 @@ import { ErrorState, Loading, Note, PageHeader, useConfirm } from '../components
 import { NotificationsSettings } from '../components/NotificationsSettings';
 import { PlanParametersSettings } from '../components/PlanParametersSettings';
 import { useFilters } from '../lib/filters';
-import { TIMEZONES, WEEKDAYS, fromNow, plural } from '../lib/format';
+import { TIMEZONES, fromNow, plural, weekdays } from '../lib/format';
 
 function ConnectionTab() {
   const health = useHealth();
@@ -412,7 +412,7 @@ function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void
         <SimpleGrid cols={{ base: 1, md: 4 }}>
           <Select
             label="Dia do checkpoint"
-            data={WEEKDAYS.map((d, i) => ({ value: String(i), label: d }))}
+            data={weekdays().map((d, i) => ({ value: String(i), label: d }))}
             value={String(draft.checkpoint_weekday)}
             onChange={(value) => value && patch('checkpoint_weekday', Number(value))}
             allowDeselect={false}

@@ -4,6 +4,7 @@ import { IconTrash } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 
 import { useAbsences, useAddAbsence, useDeleteAbsence, usePeople } from '../../api/hooks';
+import { collator } from '../../i18n';
 import { fmtDay } from '../../lib/format';
 import { ErrorState, notifyUndo } from '../common';
 
@@ -25,7 +26,7 @@ export function AbsenceEditor({ accountId }: { accountId?: string }) {
     () =>
       (people.data?.items ?? [])
         .map((p) => ({ value: p.account_id, label: p.name }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR')),
+        .sort((a, b) => collator().compare(a.label, b.label)),
     [people.data],
   );
   const columns = accountId ? 4 : 5;

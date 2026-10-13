@@ -1,3 +1,4 @@
+import { currentLocale } from '../i18n/runtime';
 import type { ApiErrorDetail } from './types';
 
 /** An API failure with the backend's human cause and suggested action (RF-35). */
@@ -37,7 +38,8 @@ export function qs(params: Params = {}): string {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, isForm = false): Promise<T> {
-  const init: RequestInit = { method, headers: { Accept: 'application/json' } };
+  // The chosen language travels on every call: the API answers its own text in it (docs/i18n.md).
+  const init: RequestInit = { method, headers: { Accept: 'application/json', 'Accept-Language': currentLocale() } };
   if (body !== undefined) {
     if (isForm) {
       init.body = body as FormData;

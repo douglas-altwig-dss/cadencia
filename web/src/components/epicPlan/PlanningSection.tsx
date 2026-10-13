@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ApiError } from '../../api/client';
 import { useAlgorithms, useGeneratePlan } from '../../api/planHooks';
 import type { EpicPlanView, PlanResult } from '../../api/types';
+import { collator } from '../../i18n';
 import { fmtDateTime, fmtNum } from '../../lib/format';
 import { Note } from '../common';
 import { MemberSelection } from './MemberSelection';
@@ -76,7 +77,7 @@ export function PlanningSection({
           lanes: view.selecao
             .map((id) => members.get(id))
             .filter((m) => m && m.papeis.some((p) => p.papel_id === role.id))
-            .sort((a, b) => a!.nome.localeCompare(b!.nome, 'pt-BR'))
+            .sort((a, b) => collator().compare(a!.nome, b!.nome))
             .map((m) => ({ id: `${role.id}:${m!.id}`, label: <Text size="sm">— {m!.nome}</Text> })),
         }))
     : [];

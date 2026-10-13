@@ -30,7 +30,7 @@ import {
   useTestChannel,
 } from '../api/featureHooks';
 import type { DigestSchedule, NotifyChannel, NotifyEvent } from '../api/types';
-import { TIMEZONES, WEEKDAYS, fmtDateTime, plural } from '../lib/format';
+import { TIMEZONES, fmtDateTime, plural, weekdays } from '../lib/format';
 import { ErrorState, Loading } from './common';
 
 const KINDS = [
@@ -214,7 +214,7 @@ export function NotificationsSettings() {
               </Text>
               <Chip.Group multiple value={schedule.weekdays.map(String)} onChange={(value) => setSchedule({ ...schedule, weekdays: value.map(Number).sort() })}>
                 <Group gap={4}>
-                  {WEEKDAYS.map((day, index) => (
+                  {weekdays().map((day, index) => (
                     <Chip key={day} value={String(index)} size="xs">
                       {day.slice(0, 3)}
                     </Chip>

@@ -1,7 +1,7 @@
 import { Chip, Group, NumberInput, SegmentedControl, Select, Stack, Switch, Text } from '@mantine/core';
 
 import type { DeckSchedule } from '../api/types';
-import { TIMEZONES, WEEKDAYS } from '../lib/format';
+import { TIMEZONES, weekdays } from '../lib/format';
 
 export const DEFAULT_SCHEDULE: DeckSchedule = {
   enabled: false,
@@ -36,7 +36,7 @@ export function ScheduleEditor({
         <>
           <Chip.Group multiple value={schedule.weekdays.map(String)} onChange={(v) => v.length && set({ weekdays: v.map(Number).sort() })}>
             <Group gap={4}>
-              {WEEKDAYS.map((day, index) => (
+              {weekdays().map((day, index) => (
                 <Chip key={day} value={String(index)} size="xs">
                   {day.slice(0, 3)}
                 </Chip>

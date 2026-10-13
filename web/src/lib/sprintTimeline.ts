@@ -1,4 +1,5 @@
 import type { Situation, SprintTimelineNode, TimelineState } from '../api/types';
+import { collator } from '../i18n';
 
 /**
  * The sprint timeline as pure functions: which rows to show, and where each bar goes.
@@ -286,7 +287,7 @@ export function personLanes(nodes: SprintTimelineNode[], filters: Filters): Lane
   return ordered.sort((a, b) => {
     if (a.name === NO_OWNER) return 1;
     if (b.name === NO_OWNER) return -1;
-    return a.name.localeCompare(b.name, 'pt-BR');
+    return collator().compare(a.name, b.name);
   });
 }
 

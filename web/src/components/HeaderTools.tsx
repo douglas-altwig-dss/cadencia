@@ -7,6 +7,7 @@ import {
   Menu,
   Modal,
   SegmentedControl,
+  Select,
   Stack,
   Switch,
   Text,
@@ -15,12 +16,13 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconBookmark, IconBookmarkPlus, IconKeyboard, IconSearch, IconSettings2, IconTrash } from '@tabler/icons-react';
+import { IconBookmark, IconBookmarkPlus, IconKeyboard, IconLanguage, IconSearch, IconSettings2, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 
 import { useDeleteView, useSaveView, useViews } from '../api/featureHooks';
 import type { SavedView } from '../api/types';
+import { LOCALES, LOCALE_NAMES, isLocale, useLocale, useT } from '../i18n';
 import { usePreferences } from '../lib/preferences';
 import { openShortcuts } from '../lib/shortcuts';
 import { notifyUndo, useConfirm } from './common';
@@ -188,13 +190,15 @@ export function SavedViewsList({ onOpen, onDelete }: { onOpen: (url: string) => 
 
 /** RF-95, RF-96, RF-98: how this person reads the screen, kept in this browser. The theme is one of them (M20). */
 export function PreferencesMenu() {
+  const t = useT();
+  const [locale, setLocale] = useLocale();
   const [preferences, set] = usePreferences();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
   return (
     <Menu position="bottom-end" width={290} closeOnItemClick={false} withinPortal>
       <Menu.Target>
-        <Tooltip label="Preferências de exibição">
-          <ActionIcon variant="default" size="lg" aria-label="Preferências de exibição">
+        <Tooltip label={t.shell.preferences.title}>
+          <ActionIcon variant="default" size="lg" aria-label={t.shell.preferences.title}>
             <IconSettings2 size={18} />
           </ActionIcon>
         </Tooltip>
@@ -202,52 +206,70 @@ export function PreferencesMenu() {
       <Menu.Dropdown>
         <Stack gap="sm" p="xs">
           <Stack gap={4}>
+            {/* The icon is for someone who cannot read the current language; the options name themselves. */}
+            <Group gap={6} wrap="nowrap">
+              <IconLanguage size={14} aria-hidden />
+              <Text size="xs" fw={600}>
+                {t.shell.preferences.language}
+              </Text>
+            </Group>
+            <Select
+              size="xs"
+              aria-label={t.shell.preferences.language}
+              value={locale}
+              onChange={(value) => isLocale(value) && setLocale(value)}
+              data={LOCALES.map((value) => ({ value, label: LOCALE_NAMES[value] }))}
+              allowDeselect={false}
+              comboboxProps={{ withinPortal: false }}
+            />
+          </Stack>
+          <Stack gap={4}>
             <Text size="xs" fw={600}>
-              Tema
+              {t.shell.preferences.theme}
             </Text>
             <SegmentedControl
               size="xs"
               value={colorScheme}
               onChange={(value) => setColorScheme(value as 'light' | 'dark' | 'auto')}
               data={[
-                { value: 'light', label: 'Claro' },
-                { value: 'dark', label: 'Escuro' },
-                { value: 'auto', label: 'Sistema' },
+                { value: 'light', label: t.shell.preferences.themeLight },
+                { value: 'dark', label: t.shell.preferences.themeDark },
+                { value: 'auto', label: t.shell.preferences.themeSystem },
               ]}
             />
           </Stack>
           <Stack gap={4}>
             <Text size="xs" fw={600}>
-              Densidade das tabelas
+              {t.shell.preferences.density}
             </Text>
             <SegmentedControl
               size="xs"
               value={preferences.density}
               onChange={(value) => set({ density: value as 'confortavel' | 'compacta' })}
               data={[
-                { value: 'confortavel', label: 'Confortável' },
-                { value: 'compacta', label: 'Compacta' },
+                { value: 'confortavel', label: t.shell.preferences.densityComfortable },
+                { value: 'compacta', label: t.shell.preferences.densityCompact },
               ]}
             />
           </Stack>
           <Switch
             size="xs"
-            label="Padrões nos gráficos"
-            description="hachuras além da cor, para distinguir séries sem depender dela"
+            label={t.shell.preferences.chartPatterns}
+            description={t.shell.preferences.chartPatternsHint}
             checked={preferences.chartPatterns}
             onChange={(event) => set({ chartPatterns: event.currentTarget.checked })}
           />
           <Switch
             size="xs"
-            label="Reduzir animações"
-            description="o sistema operacional também é respeitado"
+            label={t.shell.preferences.reduceMotion}
+            description={t.shell.preferences.reduceMotionHint}
             checked={preferences.reduceMotion}
             onChange={(event) => set({ reduceMotion: event.currentTarget.checked })}
           />
         </Stack>
         <Menu.Divider />
         <Menu.Item leftSection={<IconKeyboard size={14} />} rightSection={<Kbd size="xs">?</Kbd>} onClick={openShortcuts} closeMenuOnClick>
-          Atalhos de teclado
+          {t.shell.preferences.shortcuts}
         </Menu.Item>
       </Menu.Dropdown>
     </Menu>

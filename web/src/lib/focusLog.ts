@@ -6,6 +6,8 @@
  * ISO `aaaa-mm-dd` strings in UTC, so no timezone can move an entry to another day.
  */
 
+import { collator } from '../i18n';
+
 export type Gran = 'dia' | 'semana' | 'mes';
 export type Preset = '14d' | '30d' | '90d' | 'all';
 export type EstiloLinha = 'borda-gradiente' | 'borda-tracejada' | 'borda-dupla' | 'borda-solida';
@@ -533,11 +535,11 @@ export function ordenar(entradas: Entrada[], ordem: Ordem): Entrada[] {
       case 'data':
         return a.dataIso.localeCompare(b.dataIso);
       case 'pessoa':
-        return a.pessoa.localeCompare(b.pessoa, 'pt-BR');
+        return collator().compare(a.pessoa, b.pessoa);
       case 'tipo':
         return a.tipo.localeCompare(b.tipo);
       case 'texto':
-        return a.texto.localeCompare(b.texto, 'pt-BR');
+        return collator().compare(a.texto, b.texto);
       default:
         return 0;
     }

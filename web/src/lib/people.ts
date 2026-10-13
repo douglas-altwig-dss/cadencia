@@ -1,6 +1,7 @@
 import type { Person } from '../api/types';
+import { currentLocale } from '../i18n';
 
-const fold = (text: string) => text.toLocaleLowerCase('pt-BR');
+const fold = (text: string) => text.toLocaleLowerCase(currentLocale());
 
 /**
  * Who to list: the people whose name has the search text in it and — when asked — only those with
