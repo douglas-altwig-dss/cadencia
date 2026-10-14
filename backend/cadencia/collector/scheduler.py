@@ -1,6 +1,11 @@
 """Collector service: incremental collection on an interval, plus a job at each board checkpoint
 (e.g. Friday 18h America/Sao_Paulo) that collects, freezes snapshots and generates the decks whose
-mapping asks for it. APScheduler keeps this free of a queue/broker for a weekly job."""
+mapping asks for it. APScheduler keeps this free of a queue/broker for a weekly job.
+
+Jobs are registered with the *environment's* settings (``base``) and resolve the effective ones —
+with the values saved in the app laid over them — when they fire (docs/config-store.md), so a
+setting changed in the app reaches the next run without a restart. The five-minute sync re-reads
+them too, which is what moves the interval and the default checkpoint."""
 
 from __future__ import annotations
 
@@ -18,8 +23,9 @@ from sqlalchemy.orm import Session, sessionmaker
 from cadencia import notify
 from cadencia.collector.service import run_collection
 from cadencia.config import Settings
+from cadencia.config_store import effective_from
 from cadencia.errors import Invalid, NotFound
-from cadencia.i18n import Msg, using_locale
+from cadencia.i18n import Msg, configure_default_locale, using_locale
 from cadencia.logging import log_event
 from cadencia.report.core.mapping import DeckMapping
 from cadencia.report.service import generate_report, run_boards, run_pdf
@@ -121,9 +127,21 @@ def _checkpoint_boards(session: Session, settings: Settings, weekday: int, hour:
     }
 
 
-def _checkpoint(
-    settings: Settings, sessions: sessionmaker[Session], weekday: int, hour: int, tz: str
-) -> None:
+def _effective(base: Settings, sessions: sessionmaker[Session]) -> Settings:
+    """The settings a job runs with, read when it fires; the environment's if the database cannot
+    answer, so a job still runs rather than dying on its configuration."""
+    try:
+        return effective_from(base, sessions)
+    except Exception:
+        log.exception("saved settings unreadable; the job uses the environment's")
+        return base
+
+
+def _incremental(base: Settings, sessions: sessionmaker[Session]) -> None:
+    _collect(_effective(base, sessions), sessions, "incremental")
+
+
+def _checkpoint(base: Settings, sessions: sessionmaker[Session], weekday: int, hour: int, tz: str) -> None:
     """Collect the boards whose checkpoint this is, then regenerate the decks that show them.
 
     Boards are worked out when the job fires rather than when it was registered, so a board moved to
@@ -132,6 +150,7 @@ def _checkpoint(
     after it.
     """
     log_event(log, "checkpoint agendado", weekday=weekday, hour=hour, timezone=tz)
+    settings = _effective(base, sessions)
     with session_scope(sessions) as session:
         boards = _checkpoint_boards(session, settings, weekday, hour, tz)
         template_ids = [t.id for t in repo.list_templates(session)]
@@ -163,8 +182,12 @@ def _checkpoint(
 
 
 def sync_checkpoint_jobs(
-    scheduler: BlockingScheduler, settings: Settings, sessions: sessionmaker[Session]
+    scheduler: BlockingScheduler, base: Settings, sessions: sessionmaker[Session]
 ) -> None:
+    """One cron job per checkpoint the selected boards use. The board profiles' defaults are the
+    effective settings, so a default checkpoint or time zone changed in the app moves the job at
+    the next sync; the job itself is registered with ``base`` and reads the rest when it fires."""
+    settings = _effective(base, sessions)
     with session_scope(sessions) as session:
         combos = {
             (p.checkpoint_weekday, p.checkpoint_hour, p.timezone)
@@ -183,15 +206,16 @@ def sync_checkpoint_jobs(
             scheduler.add_job(
                 _checkpoint,
                 CronTrigger(day_of_week=WEEKDAYS[weekday], hour=hour, minute=5, timezone=tz),
-                args=[settings, sessions, weekday, hour, tz],
+                args=[base, sessions, weekday, hour, tz],
                 id=job_id,
             )
             log_event(log, "job de checkpoint registrado", job=job_id)
 
 
-def _scheduled_deck(settings: Settings, sessions: sessionmaker[Session], template_id: int) -> None:
+def _scheduled_deck(base: Settings, sessions: sessionmaker[Session], template_id: int) -> None:
     """RF-77: a template's own generation time, independent of the boards' checkpoints."""
     try:
+        settings = _effective(base, sessions)
         with session_scope(sessions) as session:
             row = repo.get_mapping(session, template_id)
             template = session.get(s.TemplateRow, template_id)
@@ -218,8 +242,9 @@ def _scheduled_deck(settings: Settings, sessions: sessionmaker[Session], templat
         log.exception("falha na geração agendada do modelo %s", template_id)
 
 
-def _digest(settings: Settings, sessions: sessionmaker[Session]) -> None:
+def _digest(base: Settings, sessions: sessionmaker[Session]) -> None:
     try:
+        settings = _effective(base, sessions)
         with session_scope(sessions) as session:
             result = notify.send_digest(session, settings, datetime.now(UTC))
         log_event(log, "resumo de riscos enviado", spaces=len(result["sent"]), new=result["total_new_risks"])
@@ -235,11 +260,10 @@ def _replace_jobs(scheduler: BlockingScheduler, prefix: str, wanted: dict[str, t
     return {job_id: spec for job_id, spec in wanted.items() if scheduler.get_job(job_id) is None}
 
 
-def sync_template_jobs(
-    scheduler: BlockingScheduler, settings: Settings, sessions: sessionmaker[Session]
-) -> None:
+def sync_template_jobs(scheduler: BlockingScheduler, base: Settings, sessions: sessionmaker[Session]) -> None:
     """One cron job per scheduled template, and the digest's. The id carries the schedule, so
-    changing a schedule replaces its job at the next sync instead of leaving the old one running."""
+    changing a schedule replaces its job at the next sync instead of leaving the old one running.
+    Jobs get ``base`` and resolve the effective settings when they fire."""
     wanted: dict[str, tuple] = {}
     with session_scope(sessions) as session:
         for template in repo.list_templates(session):
@@ -258,7 +282,7 @@ def sync_template_jobs(
         scheduler.add_job(
             _scheduled_deck,
             CronTrigger(day_of_week=days, hour=hour, minute=minute, timezone=tz),
-            args=[settings, sessions, template_id],
+            args=[base, sessions, template_id],
             id=job_id,
         )
         log_event(log, "geração agendada registrada", job=job_id)
@@ -270,26 +294,40 @@ def sync_template_jobs(
         scheduler.add_job(
             _digest,
             CronTrigger(day_of_week=days, hour=hour, timezone=tz),
-            args=[settings, sessions],
+            args=[base, sessions],
             id=job_id,
         )
         log_event(log, "resumo de riscos agendado", job=job_id)
 
 
-def _sync(scheduler: BlockingScheduler, settings: Settings, sessions: sessionmaker[Session]) -> None:
-    sync_checkpoint_jobs(scheduler, settings, sessions)
-    sync_template_jobs(scheduler, settings, sessions)
+def sync_interval(scheduler: BlockingScheduler, base: Settings, sessions: sessionmaker[Session]) -> None:
+    """Follow ``collect_interval_minutes`` and the process language as saved in the app."""
+    settings = _effective(base, sessions)
+    configure_default_locale(settings.locale)
+    job = scheduler.get_job("incremental")
+    wanted = timedelta(minutes=settings.collect_interval_minutes)
+    if job is not None and getattr(job.trigger, "interval", wanted) != wanted:
+        trigger = IntervalTrigger(minutes=settings.collect_interval_minutes)
+        scheduler.reschedule_job("incremental", trigger=trigger)
+        log_event(log, "collection interval changed", minutes=settings.collect_interval_minutes)
 
 
-def build_scheduler(settings: Settings, sessions: sessionmaker[Session]) -> BlockingScheduler:
+def _sync(scheduler: BlockingScheduler, base: Settings, sessions: sessionmaker[Session]) -> None:
+    sync_interval(scheduler, base, sessions)
+    sync_checkpoint_jobs(scheduler, base, sessions)
+    sync_template_jobs(scheduler, base, sessions)
+
+
+def build_scheduler(base: Settings, sessions: sessionmaker[Session]) -> BlockingScheduler:
+    """``base`` is the environment's settings; every job resolves the effective ones as it fires."""
     scheduler = BlockingScheduler(
         timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1, "misfire_grace_time": 3600}
     )
     now = datetime.now(UTC)
     scheduler.add_job(
-        _collect,
-        IntervalTrigger(minutes=settings.collect_interval_minutes),
-        args=[settings, sessions, "incremental"],
+        _incremental,
+        IntervalTrigger(minutes=_effective(base, sessions).collect_interval_minutes),
+        args=[base, sessions],
         id="incremental",
         next_run_time=now,
     )
@@ -297,7 +335,7 @@ def build_scheduler(settings: Settings, sessions: sessionmaker[Session]) -> Bloc
     scheduler.add_job(
         _sync,
         IntervalTrigger(minutes=5),
-        args=[scheduler, settings, sessions],
+        args=[scheduler, base, sessions],
         id="sync",
         next_run_time=now,
     )

@@ -35,6 +35,14 @@ def _sessions() -> Any:
     return default_sessions()
 
 
+def _settings() -> Any:
+    """The effective settings: the environment with the values saved in the app laid over it
+    (docs/config-store.md). Only bootstrap (database, logging) reads ``get_settings()`` directly."""
+    from cadencia.config_store import effective_from
+
+    return effective_from(get_settings(), _sessions())
+
+
 def cmd_db_upgrade(_args: argparse.Namespace) -> None:
     from cadencia.runtime import prepare_database
 
@@ -47,7 +55,7 @@ def cmd_test_connection(_args: argparse.Namespace) -> None:
     from cadencia.jira.errors import JiraError
 
     try:
-        _print(asyncio.run(run_connection_test(get_settings(), _sessions())))
+        _print(asyncio.run(run_connection_test(_settings(), _sessions())))
     except JiraError as exc:
         _print({"ok": False, "error": exc.as_dict()})
         raise SystemExit(1) from None
@@ -56,7 +64,7 @@ def cmd_test_connection(_args: argparse.Namespace) -> None:
 def cmd_discover(_args: argparse.Namespace) -> None:
     from cadencia.collector.service import run_discovery
 
-    _print(asyncio.run(run_discovery(get_settings(), _sessions())))
+    _print(asyncio.run(run_discovery(_settings(), _sessions())))
 
 
 def cmd_boards(args: argparse.Namespace) -> None:
@@ -120,7 +128,7 @@ def cmd_collect(args: argparse.Namespace) -> None:
 
     result = asyncio.run(
         run_collection(
-            get_settings(), _sessions(), mode="full" if args.full else "incremental", board_ids=args.board
+            _settings(), _sessions(), mode="full" if args.full else "incremental", board_ids=args.board
         )
     )
     _print(result)
@@ -137,7 +145,7 @@ def cmd_checkpoint(args: argparse.Namespace) -> None:
     from cadencia.store import repo
     from cadencia.store.db import session_scope
 
-    settings = get_settings()
+    settings = _settings()
     now = datetime.now(UTC)
     with session_scope(_sessions()) as session:
         data = load_board(session, args.board, repo.profile_defaults(settings), settings.history_days)
@@ -201,7 +209,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
     from cadencia.store import repo
     from cadencia.store.db import session_scope
 
-    settings = get_settings()
+    settings = _settings()
     now = datetime.now(UTC)
     with session_scope(_sessions()) as session:
         sprint = repo.get_sprint(session, args.sprint)
@@ -236,7 +244,7 @@ def cmd_template_add(args: argparse.Namespace) -> None:
 
     path = Path(args.path)
     with session_scope(_sessions()) as session:
-        row = store_template(session, get_settings(), path.name, path.read_bytes(), args.name)
+        row = store_template(session, _settings(), path.name, path.read_bytes(), args.name)
         _print(
             {
                 "id": row.id,
@@ -279,7 +287,7 @@ def cmd_deck(args: argparse.Namespace) -> None:
     with session_scope(_sessions()) as session:
         run = generate_report(
             session,
-            get_settings(),
+            _settings(),
             args.template,
             reference=_instant(args.reference),
             board_ids=args.board,
@@ -308,7 +316,7 @@ def cmd_demo(args: argparse.Namespace) -> None:
         _rows, total = repo.list_boards(session, limit=1)
     if total and not args.force:
         raise SystemExit(tr("cli.error.demo_not_empty"))
-    _print(asyncio.run(seed_demo(get_settings(), sessions)))
+    _print(asyncio.run(seed_demo(_settings(), sessions)))
 
 
 def cmd_check_deck(args: argparse.Namespace) -> None:
@@ -334,7 +342,7 @@ def cmd_check_variables(args: argparse.Namespace) -> None:
     """
     from cadencia.report.service import audit_variables
 
-    settings = get_settings()
+    settings = _settings()
     sessions = _sessions()
     with sessions() as session:
         report = audit_variables(session, settings, args.template)
@@ -382,9 +390,33 @@ def cmd_scheduler(_args: argparse.Namespace) -> None:
     from cadencia.collector.scheduler import build_scheduler
     from cadencia.logging import configure_logging
 
+    # The environment's settings: logging is bootstrap, and every job reads the effective ones as
+    # it fires, so a value saved in the app reaches the scheduler without a restart.
     settings = get_settings()
     configure_logging(settings.log_level, settings.log_json)
     build_scheduler(settings, _sessions()).start()
+
+
+def cmd_config(args: argparse.Namespace) -> None:
+    """The settings saved in the app (docs/config-store.md); every action prints the full view."""
+    from cadencia import config_store
+    from cadencia.errors import Invalid
+    from cadencia.store.db import session_scope
+
+    base = get_settings()
+    try:
+        with session_scope(_sessions()) as session:
+            extra: dict[str, Any] = {}
+            if args.action == "set":
+                config_store.update(base, session, {args.key: args.value})
+            elif args.action == "unset":
+                config_store.forget(session, args.key)
+            elif args.action == "import-env":
+                extra["imported"] = config_store.import_env(base, session)
+            _print({**config_store.view(base, session), **extra})
+    except Invalid as exc:
+        _print({"ok": False, "field": exc.field, "message": exc.msg})
+        raise SystemExit(1) from None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -482,13 +514,32 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("demo", help=tr("cli.help.demo"))
     p.add_argument("--force", action="store_true", help=tr("cli.help.demo.force"))
     p.set_defaults(func=cmd_demo)
+
+    p = sub.add_parser("config", help=tr("cli.help.config"))
+    actions = p.add_subparsers(dest="action", required=True)
+    actions.add_parser("show", help=tr("cli.help.config.show"))
+    q = actions.add_parser("set", help=tr("cli.help.config.set"))
+    q.add_argument("key", help=tr("cli.help.config.key"))
+    q.add_argument("value", help=tr("cli.help.config.value"))
+    q = actions.add_parser("unset", help=tr("cli.help.config.unset"))
+    q.add_argument("key", help=tr("cli.help.config.key"))
+    actions.add_parser("import-env", help=tr("cli.help.config.import_env"))
+    p.set_defaults(func=cmd_config)
     return parser
 
 
+#: Commands that never reach the database: they keep the environment's language and do not create
+#: or migrate a database just to print.
+_OFFLINE = {cmd_db_upgrade, cmd_manifest, cmd_check_deck, cmd_serve}
+
+
 def main(argv: list[str] | None = None) -> None:
-    # Before the parser: help texts and everything printed speak CADENCIA_LOCALE.
+    # Before the parser: help texts speak CADENCIA_LOCALE; the language saved in the app takes over
+    # once a command reaches the database.
     configure_default_locale(get_settings().locale)
     args = build_parser().parse_args(argv)
+    if args.func not in _OFFLINE:
+        configure_default_locale(_settings().locale)
     args.func(args)
 
 

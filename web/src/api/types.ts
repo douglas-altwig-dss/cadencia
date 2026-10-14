@@ -681,6 +681,58 @@ export interface FieldsView {
   missing: string[];
 }
 
+/** docs/config-store.md: how a runtime setting is entered and validated. */
+export type ConfigKind = 'string' | 'url' | 'email' | 'secret' | 'int' | 'float' | 'bool' | 'timezone' | 'locale' | 'weekday' | 'hour';
+
+/** Where the effective value came from: saved in the app, the env/.env/secret file, or the built-in default. */
+export type ConfigSource = 'database' | 'environment' | 'default';
+
+export type ConfigValue = string | number | boolean | null;
+
+export interface ConfigField {
+  key: string;
+  kind: ConfigKind;
+  /** Always null for a secret; `is_set` says whether one exists. */
+  value: ConfigValue;
+  is_set: boolean;
+  source: ConfigSource;
+  default: ConfigValue;
+  min: number | null;
+  max: number | null;
+  env_value_differs: boolean;
+}
+
+export interface ConfigGroup {
+  id: 'jira' | 'calendar' | 'collection' | 'notifications' | 'ai' | 'general' | (string & {});
+  fields: ConfigField[];
+}
+
+/** A setting only the deployment can change (env only), shown read-only. */
+export interface BootstrapEntry {
+  key: string;
+  /** Already masked by the server; `api_token`/`secret_key` say only whether they are set. */
+  value: ConfigValue | string[];
+  source: ConfigSource | (string & {});
+}
+
+/** `GET /config` (and the answer of every config write). */
+export interface ConfigView {
+  groups: ConfigGroup[];
+  bootstrap: BootstrapEntry[];
+  jira_configured: boolean;
+  /** Runtime fields whose value still comes from the environment. */
+  importable: string[];
+  /** Only on `POST /config/import-env`: the keys copied into the database. */
+  imported?: string[];
+}
+
+/** `POST /config/jira/test`: draft credentials laid over the effective ones. */
+export interface JiraDraftTest {
+  jira_base_url?: string;
+  jira_email?: string;
+  jira_api_token?: string;
+}
+
 export interface Health {
   status: string;
   version: string;

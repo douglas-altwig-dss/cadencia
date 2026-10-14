@@ -38,6 +38,7 @@ import { useScrollHints } from './lib/scrollHints';
 import { AudienceView } from './pages/AudienceView';
 import { fmtDateTime, fromNow, setDisplayTimeZone } from './lib/format';
 import { BoardPage } from './pages/BoardPage';
+import { ConfigWizardPage } from './pages/ConfigWizardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DeckPage } from './pages/DeckPage';
 import { EpicPage } from './pages/EpicPage';
@@ -311,6 +312,7 @@ function Shell() {
               <Route path="/timeline-foco" element={<TimelineFocusPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/configuracao" element={<SettingsPage />} />
+              <Route path="/configuracao/assistente" element={<ConfigWizardPage />} />
               <Route path="*" element={<Empty title={t.shell.app.notFoundTitle}>{t.shell.app.notFoundBody}</Empty>} />
             </Routes>
           </div>

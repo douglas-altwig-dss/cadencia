@@ -13,15 +13,12 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cadencia.analytics.data import BoardData, load_board
 from cadencia.config import Settings
+from cadencia.config_store import effective_settings
 from cadencia.domain.models import Sprint
 from cadencia.errors import NotFound
 from cadencia.i18n import tr
 from cadencia.store import repo
 from cadencia.store.db import session_scope
-
-
-def settings_dep(request: Request) -> Settings:
-    return request.app.state.settings
 
 
 def sessions_dep(request: Request) -> sessionmaker[Session]:
@@ -33,6 +30,19 @@ def session_dep(request: Request) -> Iterator[Session]:
         yield session
 
 
+SessionsDep = Annotated[sessionmaker[Session], Depends(sessions_dep)]
+# scope="function": commit before the response is sent, so a follow-up request (e.g. downloading
+# the deck just generated) always sees the write.
+SessionDep = Annotated[Session, Depends(session_dep, scope="function")]
+
+
+def settings_dep(request: Request, session: SessionDep) -> Settings:
+    """The effective settings for this request: the environment (``app.state.settings``) with the
+    values saved in the app laid over it (docs/config-store.md). It reads through the request's
+    own session, so a request that also saves configuration sees what it saved."""
+    return effective_settings(request.app.state.settings, session)
+
+
 def clock() -> datetime:
     """Request time, to the minute: every view a page loads at once then asks about the same
     instant, so they share the board's memoised risk context instead of each building its own."""
@@ -40,10 +50,6 @@ def clock() -> datetime:
 
 
 SettingsDep = Annotated[Settings, Depends(settings_dep)]
-SessionsDep = Annotated[sessionmaker[Session], Depends(sessions_dep)]
-# scope="function": commit before the response is sent, so a follow-up request (e.g. downloading
-# the deck just generated) always sees the write.
-SessionDep = Annotated[Session, Depends(session_dep, scope="function")]
 Now = Annotated[datetime, Depends(clock)]
 
 

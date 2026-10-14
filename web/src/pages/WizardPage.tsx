@@ -1,6 +1,6 @@
-import { Alert, Anchor, Button, Code, Group, List, MultiSelect, Paper, Stack, Stepper, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Code, Group, MultiSelect, Paper, Stack, Stepper, Text, Title } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { IconCheck, IconPlugConnected } from '@tabler/icons-react';
+import { IconCheck, IconPlugConnected, IconSettings } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
@@ -58,17 +58,15 @@ export function WizardPage() {
             <Stack gap="sm" mt="md">
               {!configured ? (
                 <Alert color="yellow" variant="light" title={m.notConfigured}>
-                  <Text size="sm">
-                    {m.setThreeBefore} <Code>.env</Code> {m.setThreeAfter}
-                  </Text>
-                  <List size="sm" mt={4}>
-                    <List.Item><Code>CADENCIA_JIRA_BASE_URL</Code> {m.baseUrlHint}</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_EMAIL</Code> {m.emailHint}</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_API_TOKEN</Code> {m.tokenHint} <Code>secrets/jira_api_token</Code></List.Item>
-                  </List>
-                  <Text size="sm" mt={4}>
-                    {m.noCredentialsBefore} <Code>make demo</Code> {m.noCredentialsAfter}
-                  </Text>
+                  <Stack gap="sm" align="flex-start">
+                    <Text size="sm">{m.notConfiguredBody}</Text>
+                    <Button component={Link} to="/configuracao/assistente" leftSection={<IconSettings size={16} />}>
+                      {m.configure}
+                    </Button>
+                    <Text size="sm">
+                      {m.noCredentialsBefore} <Code>make demo</Code> {m.noCredentialsAfter}
+                    </Text>
+                  </Stack>
                 </Alert>
               ) : (
                 <Text size="sm">

@@ -48,4 +48,11 @@ MESSAGES: dict[str, Entry] = {
     "help.scheduler": "geplanter Abrufdienst",
     "help.demo": "füllt die Datenbank mit der fiktiven Demo-Instanz",
     "help.demo.force": "akzeptiert eine Datenbank, die bereits Boards enthält",
+    "help.config": "die in der App gespeicherten Einstellungen (die Datenbank geht der Umgebung vor)",
+    "help.config.show": "zeigt alle Einstellungen, Geheimnisse nur als is_set",
+    "help.config.set": "speichert eine Einstellung in der Datenbank",
+    "help.config.unset": "vergisst eine gespeicherte Einstellung (zurück zur Umgebung oder zum Standard)",
+    "help.config.import_env": "übernimmt die in der Umgebung gesetzten Werte in die Datenbank",
+    "help.config.key": "Name der Einstellung, z. B. timezone",
+    "help.config.value": "neuer Wert",
 }

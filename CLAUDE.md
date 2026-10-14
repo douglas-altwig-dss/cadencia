@@ -14,7 +14,8 @@ Run everything from the repo root unless noted. The backend venv is `backend/.ve
 - Frontend: `cd web && npm run typecheck` (tsc), `npm test` (vitest, pure logic in `src/**/*.test.ts` only: components are checked in the browser) and `npm run build`. Dev server: `npm run dev`, which proxies `/api` to `:8000` or `$CADENCIA_API_URL`.
 - API: `backend/.venv/bin/cadencia serve --reload`. Scheduler: `cadencia scheduler`. Every other CLI command prints JSON; see `cadencia --help`.
 - Demo data without Jira: `cadencia demo`. It refuses a non-empty DB without `--force`, so point `CADENCIA_DATABASE_URL` at a scratch SQLite file.
-- Config comes only from `CADENCIA_*` env vars, `.env`, or `/run/secrets/cadencia_<field>`. The defaults are SQLite `./cadencia.db` and data dir `./data`.
+- Config is seeded from `CADENCIA_*` env vars, `.env`, or `/run/secrets/cadencia_<field>`; the runtime fields (Jira, calendar, collection, notifications, AI, locale) can be saved in the app, and a saved value wins. The defaults are SQLite `./cadencia.db` and data dir `./data`.
+- `config_store.py` (docs/config-store.md) stores those in `app_setting` `config.values`, secrets Fernet-encrypted (`CADENCIA_SECRET_KEY` or `<data_dir>/secret.key`). Read settings through `effective_settings` (`SettingsDep`, the scheduler's jobs as they fire, `cli._settings()`); `get_settings()` alone is right only for bootstrap fields (database, data dir, API token, CORS, logging).
 
 Work now happens inside the `.devcontainer` (compose service `workspace`), which ships Python 3.12, Node 24 and LibreOffice. `docker-compose.yml` (the execution stack) has never been started here.
 

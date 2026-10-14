@@ -13,6 +13,9 @@ import type {
   BoardTree,
   CatalogField,
   Cfd,
+  ConfigValue,
+  ConfigView,
+  JiraDraftTest,
   ConnectionResult,
   CvdRow,
   Dashboard,
@@ -385,6 +388,50 @@ export function useCollect() {
 }
 
 export const useConnectionTest = () => useMutation({ mutationFn: () => api.post<ConnectionResult>('/connection/test') });
+
+// ---- runtime configuration (docs/config-store.md)
+
+export const useConfig = () => useQuery({ queryKey: ['config'], queryFn: () => api.get<ConfigView>('/config') });
+
+/**
+ * Every config write answers the whole view, so it lands in the cache at once; health and status
+ * read the effective settings (Jira configured, time zone), so they are read again too.
+ */
+function refreshConfig(client: ReturnType<typeof useQueryClient>, view: ConfigView) {
+  client.setQueryData(['config'], view);
+  return Promise.all(['config', 'health', 'status'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/** `PUT /config` with only the changed keys; a secret sent as `""` is cleared. */
+export function useSaveConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Record<string, ConfigValue>) => api.put<ConfigView>('/config', { values }),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Forget a saved value: the field goes back to the environment or the default. */
+export function useResetConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.del<ConfigView>(`/config/${encodeURIComponent(key)}`),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Copy every value that still comes from `.env` into the database. */
+export function useImportEnv() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ConfigView>('/config/import-env'),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Test a Jira credential before it is saved; nothing is written. */
+export const useTestJiraDraft = () =>
+  useMutation({ mutationFn: (body: JiraDraftTest) => api.post<ConnectionResult>('/config/jira/test', body) });
 
 export function useDiscovery() {
   const client = useQueryClient();
