@@ -69,10 +69,10 @@ describe('the catalogue and the default', () => {
     expect(ids(defaultMosaic().tiles)).toEqual(DEFAULT_TYPES);
   });
 
-  it('carries over what the old customiser hid, and the table columns', () => {
+  it('carries over what the old customiser hid', () => {
     const mosaic = defaultMosaic({ hidden: ['kpi:progress', 'trend'], order: ['sprint', 'space'] });
     expect(ids(mosaic.tiles)).not.toContain('kpi:progress');
-    expect(mosaic.tiles.find((t) => t.type === 'boards')?.config).toEqual({ order: ['sprint', 'space'], hidden: ['trend'] });
+    expect(ids(mosaic.tiles)).toContain('spaces');
     // People and pulse tiles are new: hiding a KPI before they existed cannot have hidden them.
     expect(ids(mosaic.tiles)).toContain('team:load');
   });
@@ -143,6 +143,17 @@ describe('reading a stored layout', () => {
   it('keeps a tile of a type it does not know, so an older client never deletes it', () => {
     const mosaic = normalize({ tiles: [{ id: 'x', type: 'future:thing', size: 'G', config: { a: 1 } }] });
     expect(mosaic?.tiles).toEqual([{ id: 'x', type: 'future:thing', size: 'G', config: { a: 1 } }]);
+  });
+
+  it('drops the tiles that were taken out, which the Boards page now shows', () => {
+    const mosaic = normalize({
+      tiles: [
+        { id: 'sprint:elapsed', type: 'sprint:elapsed', size: 'M' },
+        { id: 'kanban:boards', type: 'kanban:boards', size: 'M' },
+        { id: 'boards', type: 'boards', size: 'G' },
+      ],
+    });
+    expect(ids(mosaic!.tiles)).toEqual(['boards']);
   });
 
   it('round-trips a layout it wrote', () => {

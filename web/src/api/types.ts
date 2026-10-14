@@ -186,7 +186,7 @@ export interface BoardOverview {
 }
 
 export interface BoardSprints {
-  board: { id: number; name: string; type: string };
+  board: { id: number; name: string; type: string; space: { key: string; name: string } | null };
   current_sprint_id: number | null;
   sprints: (Sprint & { windows: WindowInfo[]; warnings: string[]; current: boolean })[];
   freshness: Freshness;
@@ -251,15 +251,26 @@ export interface SprintTimelineView {
 
 export interface RiskItem extends IssueBrief {
   risk: Risk;
+  /** On a space's list, which of its boards the item is on. */
+  board?: { id: number; name: string };
 }
 
 export interface RiskList {
   items: RiskItem[];
-  freshness: Freshness;
+  /** A space's list answers with its stalest board's freshness, or none when it tracks no board. */
+  freshness: Freshness | null;
+}
+
+/** `GET /spaces/{key}`: a space (team) and its boards. */
+export interface SpaceDetail {
+  space: { key: string; name: string };
+  boards: BoardListItem[];
 }
 
 export interface EpicView {
   epic: IssueBrief;
+  /** The board the epic was read from: the page's way back to it. */
+  board: { id: number; name: string };
   /** Plain text, headings kept as `#` lines. Empty when the Jira item has no description. */
   description: string;
   tree: TreeNode | null;
@@ -679,6 +690,58 @@ export interface FieldsView {
   overrides: Partial<FieldMap>;
   effective: FieldMap;
   missing: string[];
+}
+
+/** docs/config-store.md: how a runtime setting is entered and validated. */
+export type ConfigKind = 'string' | 'url' | 'email' | 'secret' | 'int' | 'float' | 'bool' | 'timezone' | 'locale' | 'weekday' | 'hour';
+
+/** Where the effective value came from: saved in the app, the env/.env/secret file, or the built-in default. */
+export type ConfigSource = 'database' | 'environment' | 'default';
+
+export type ConfigValue = string | number | boolean | null;
+
+export interface ConfigField {
+  key: string;
+  kind: ConfigKind;
+  /** Always null for a secret; `is_set` says whether one exists. */
+  value: ConfigValue;
+  is_set: boolean;
+  source: ConfigSource;
+  default: ConfigValue;
+  min: number | null;
+  max: number | null;
+  env_value_differs: boolean;
+}
+
+export interface ConfigGroup {
+  id: 'jira' | 'calendar' | 'collection' | 'notifications' | 'ai' | 'general' | (string & {});
+  fields: ConfigField[];
+}
+
+/** A setting only the deployment can change (env only), shown read-only. */
+export interface BootstrapEntry {
+  key: string;
+  /** Already masked by the server; `api_token`/`secret_key` say only whether they are set. */
+  value: ConfigValue | string[];
+  source: ConfigSource | (string & {});
+}
+
+/** `GET /config` (and the answer of every config write). */
+export interface ConfigView {
+  groups: ConfigGroup[];
+  bootstrap: BootstrapEntry[];
+  jira_configured: boolean;
+  /** Runtime fields whose value still comes from the environment. */
+  importable: string[];
+  /** Only on `POST /config/import-env`: the keys copied into the database. */
+  imported?: string[];
+}
+
+/** `POST /config/jira/test`: draft credentials laid over the effective ones. */
+export interface JiraDraftTest {
+  jira_base_url?: string;
+  jira_email?: string;
+  jira_api_token?: string;
 }
 
 export interface Health {
@@ -1762,6 +1825,8 @@ export interface ChangesView {
   board: { id: number; name: string };
   since: { id: number; at: string } | null;
   until: { id: number | null; at: string };
+  /** Whether "now" is a valid end: false for a sprint that is not running. */
+  live: boolean;
   checkpoints: { id: number; at: string; sprint_id: number | null }[];
   entered: ChangeEntry[];
   left: ChangeEntry[];
@@ -1923,7 +1988,7 @@ export interface PlanRole {
   cor: string;
   ordem: number;
   rotulos: string[];
-  /** Only on GET /papeis: who covers it. */
+  /** Only on GET /roles: who covers it. */
   membros?: string[];
 }
 

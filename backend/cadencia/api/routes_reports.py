@@ -65,7 +65,7 @@ from cadencia.report.service import (
 from cadencia.store import repo
 from cadencia.store import schema as s
 
-router = APIRouter(prefix="/reports", tags=["apresentação"])
+router = APIRouter(prefix="/reports", tags=["presentation"])
 PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 ASSET_MAX_BYTES = 20 * 1024 * 1024
 
@@ -487,7 +487,7 @@ class CloneMappingBody(BaseModel):
     aplicar: bool = False
 
 
-@router.post("/templates/{template_id}/clonar-mapeamento")
+@router.post("/templates/{template_id}/clone-mapping")
 def clone_mapping(
     template_id: int, body: CloneMappingBody, session: SessionDep, request: Request
 ) -> JSONDict:
@@ -563,7 +563,7 @@ def write_palette(body: PaletteBody, session: SessionDep) -> JSONDict:
     return {"palette": palette, "status_labels": labels, "statuses": list(DECK_STATUSES)}
 
 
-@router.get("/palette/acessivel")
+@router.get("/palette/accessible")
 def suggest_accessible_palette() -> JSONDict:
     """#5: a suggestion only — the person still reviews and saves it with `PUT /palette`."""
     return {"palette": dict(COLORBLIND_SAFE_PALETTE)}
@@ -621,7 +621,7 @@ class ReassociateBody(BaseModel):
     template_id: int
 
 
-@router.post("/runs/{run_id}/reassociar")
+@router.post("/runs/{run_id}/reassociate")
 def reassociate_run_route(run_id: str, body: ReassociateBody, session: SessionDep) -> JSONDict:
     """#12: relink an orphaned run (its template deleted) to a re-uploaded one."""
     row = session.get(s.ReportRunRow, run_id)
@@ -770,6 +770,17 @@ def runs(session: SessionDep, template_id: int | None = None, kind: str = "entre
     if template_id is not None:
         stmt = stmt.where(s.ReportRunRow.template_id == template_id)
     return {"items": [run_dict(r) for r in session.scalars(stmt)]}
+
+
+@router.get("/runs/{run_id}")
+def run(run_id: str, session: SessionDep) -> JSONDict:
+    """One generation, of any kind: what its own page (`/presentation/runs/<id>`) opens."""
+    row = session.get(s.ReportRunRow, run_id)
+    if row is None:
+        raise not_found(
+            tr("deck_api.deck_not_found.cause"), tr("deck_api.deck_not_found.message", run_id=run_id)
+        )
+    return run_dict(row)
 
 
 @router.get("/runs/{run_id}/download")

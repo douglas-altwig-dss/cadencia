@@ -1398,3 +1398,105 @@ body.is-resizing * {
   padding: 8px 0;
   border-bottom: 1px solid var(--border-soft);
 }
+
+/* Settings: a sticky section index beside one section at a time; on a phone the index is a tab row. */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--mantine-spacing-xl);
+  align-items: start;
+}
+
+@media (max-width: 48em) {
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+.settings-nav {
+  position: sticky;
+  top: 76px;
+}
+
+.settings-nav-link {
+  border-radius: var(--mantine-radius-md);
+  margin-block: 1px;
+  font-size: var(--mantine-font-size-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.settings-nav-link[data-active] {
+  background: var(--nav-active-bg);
+  color: var(--mantine-primary-color-filled);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--mantine-primary-color-filled);
+}
+
+/* A configuration card's collapsed extras, set off by a hairline. */
+.config-advanced {
+  border-top: 1px solid var(--border-soft);
+  padding-top: var(--mantine-spacing-md);
+}
+
+.config-advanced-toggle {
+  color: var(--mantine-color-text);
+  max-width: 100%;
+}
+
+/* The save bar sticks to the foot of its card (padding lg) while the card scrolls past. */
+.config-savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: var(--mantine-spacing-lg) calc(-1 * var(--mantine-spacing-lg)) calc(-1 * var(--mantine-spacing-lg));
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-lg);
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border-soft);
+  border-radius: 0 0 var(--mantine-radius-default) var(--mantine-radius-default);
+}
+
+/* The read-only environment: a two-column definition list. */
+.config-env {
+  margin: 0;
+}
+
+.config-env-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+  gap: var(--mantine-spacing-md);
+  padding-block: var(--mantine-spacing-xs);
+  border-top: 1px solid var(--border-soft);
+}
+
+.config-env-row:first-child {
+  border-top: 0;
+}
+
+.config-env-row dd {
+  margin: 0;
+  min-width: 0;
+}
+
+@media (max-width: 48em) {
+  .config-env-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}
+
+/* Boards page: a card is a flex column so its footer sits at the bottom and footers line up along a
+   row; its edge answers the pointer (or focus inside it) with the accent, quietly;
+   the flow metrics section clears the sticky header when it is scrolled to, with a hairline above. */
+.mantine-Paper-root[data-with-border].board-card {
+  display: flex;
+  flex-direction: column;
+  transition: border-color 120ms ease;
+}
+
+.mantine-Paper-root[data-with-border].board-card:hover,
+.mantine-Paper-root[data-with-border].board-card:focus-within {
+  border-color: color-mix(in srgb, var(--mantine-primary-color-filled) 45%, var(--border-soft));
+}
+

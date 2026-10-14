@@ -1150,8 +1150,8 @@ def share_dict(row: s.DeckShareRow, settings: Settings) -> dict[str, Any]:
         "created_by": row.created_by,
         "revoked": row.revoked_at is not None,
         "views": row.views,
-        "path": f"/compartilhado/{row.token}",
-        "url": f"{base}/compartilhado/{row.token}" if base else None,
+        "path": f"/shared/{row.token}",
+        "url": f"{base}/shared/{row.token}" if base else None,
     }
 
 

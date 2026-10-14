@@ -69,7 +69,7 @@ export function NotificationsSettings() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(data.channels);
 
   return (
-    <Stack gap="lg" maw={1100}>
+    <Stack gap="lg">
       {!data.public_url && (
         <Alert color="yellow" variant="light" title={w.linksTitle}>
           {w.linksBody(<code key="variable">CADENCIA_PUBLIC_URL</code>)}

@@ -52,7 +52,7 @@ export function PlanParametersSettings() {
     });
 
   return (
-    <Stack gap="md" maw={1000}>
+    <Stack gap="md">
       <Text size="sm" c="dimmed">
         {m.intro}
       </Text>

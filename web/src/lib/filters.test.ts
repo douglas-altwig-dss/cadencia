@@ -12,11 +12,11 @@ describe('linkWith', () => {
   });
 
   it('merges into a query the path already has, instead of appending a second "?"', () => {
-    expect(linkWith('/boards/1?tab=riscos', { person: 'x' })).toBe('/boards/1?person=x&tab=riscos');
+    expect(linkWith('/boards/1?tab=risks', { person: 'x' })).toBe('/boards/1?person=x&tab=risks');
   });
 
   it('lets the path own key win over a carried one', () => {
-    expect(linkWith('/boards/1?tab=riscos', { tab: 'visao', board: '1' })).toBe('/boards/1?tab=riscos&board=1');
+    expect(linkWith('/boards/1?tab=risks', { tab: 'overview', board: '1' })).toBe('/boards/1?tab=risks&board=1');
   });
 
   it('keeps the hash', () => {

@@ -84,10 +84,45 @@ export function FreshnessCell({ row }: { row: DashboardRow }) {
   );
 }
 
-export function Sparkline({ values, label }: { values: number[]; label: string }) {
+/**
+ * A board's freshness for a card's corner, in the states of the page-level `Freshness`: a teal dot
+ * when fresh, the warning triangle when stale, the unplugged icon when the last collection failed —
+ * the same marks as `FreshnessCell`, so the shape says the state as well as the colour. When and why
+ * are in its tooltip and its name.
+ */
+export function FreshnessDot({ freshness }: { freshness: DashboardRow['freshness'] }) {
+  const t = useT();
+  const m = t.tracking.home;
+  const when =t.shell.common.collectedAt(fromNow(freshness.last_success_at));
+  const said = freshness.last_error ? m.lastFailed(freshness.last_error) : freshness.stale ? m.maybeStale : null;
+  const full = freshness.last_success_at ? `${when} · ${fmtDateTime(freshness.last_success_at)}` : m.neverCollected;
+  const mark = freshness.last_error ? (
+    <IconPlugConnectedX size={16} color="var(--mantine-color-red-6)" aria-hidden />
+  ) : freshness.stale ? (
+    <IconAlertTriangle size={16} color="var(--mantine-color-yellow-6)" aria-hidden />
+  ) : (
+    <span aria-hidden style={{ display: 'block', width: 8, height: 8, borderRadius: 99, background: 'var(--mantine-color-teal-6)' }} />
+  );
+  return (
+    <Tooltip label={said ? `${said} · ${full}` : full} multiline maw={300} withinPortal>
+      <Group gap={0} wrap="nowrap" justify="center" w={18} h={22} style={{ flexShrink: 0 }} tabIndex={0} role="img" aria-label={said ? `${said} · ${full}` : full}>
+        {mark}
+      </Group>
+    </Tooltip>
+  );
+}
+
+/** How far through a running sprint the board is, 0 to 1 (M25: the mark on the progress bar). */
+export function elapsedOf(row: DashboardRow, now = Date.now()): number | null {
+  if (row.sprint?.state !== 'active' || !row.sprint.start || !row.sprint.end) return null;
+  const start = Date.parse(row.sprint.start);
+  const end = Date.parse(row.sprint.end);
+  if (!(end > start)) return null;
+  return Math.min(Math.max((now - start) / (end - start), 0), 1);
+}
+
+export function Sparkline({ values, label, width = 96, height = 28 }: { values: number[]; label: string; width?: number; height?: number }) {
   if (values.length < 2) return null;
-  const width = 96;
-  const height = 28;
   const max = Math.max(1, ...values);
   const min = Math.min(...values);
   const span = Math.max(1, max - min);

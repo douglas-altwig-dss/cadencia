@@ -10,7 +10,7 @@ from cadencia.focus_log.model import Documento
 from cadencia.focus_log.service import RevisionConflict
 from cadencia.i18n import tr
 
-router = APIRouter(prefix="/focus-log", tags=["timeline de foco"])
+router = APIRouter(prefix="/focus-log", tags=["focus timeline"])
 
 
 class SaveBody(Documento):

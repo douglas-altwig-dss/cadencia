@@ -49,7 +49,7 @@ export function ScheduleSection({
   const t = useT();
   const m = t.epicPlan.schedule;
   const count = t.epicPlan.count;
-  const [tab, setTab] = useState<string | null>('tarefa');
+  const [tab, setTab] = useState<string | null>('task');
   const base = view.base;
   if (!base) return <PlanReadiness view={view} onGo={onGo} title={m.noBaseline} />;
   const roles = roleIndex(view);
@@ -118,10 +118,10 @@ export function ScheduleSection({
       <ScheduleHeader view={view} duration={base.duracao.rotulo} weeks={base.semanas} />
       <Tabs value={tab} onChange={setTab} variant="pills">
         <Tabs.List mb="sm">
-          <Tabs.Tab value="tarefa">{m.byTask}</Tabs.Tab>
-          <Tabs.Tab value="subtarefa">{m.bySubtask}</Tabs.Tab>
+          <Tabs.Tab value="task">{m.byTask}</Tabs.Tab>
+          <Tabs.Tab value="subtask">{m.bySubtask}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="tarefa">
+        <Tabs.Panel value="task">
           <WeeklyGantt
             groups={byTask}
             bars={taskBars}
@@ -130,7 +130,7 @@ export function ScheduleSection({
             caption={m.byTaskCaption}
           />
         </Tabs.Panel>
-        <Tabs.Panel value="subtarefa">
+        <Tabs.Panel value="subtask">
           <WeeklyGantt
             groups={bySubtask}
             bars={subtaskBars}

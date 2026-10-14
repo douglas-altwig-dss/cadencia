@@ -109,7 +109,7 @@ UI gets translated labels overlaid at the API boundary. D9 becomes `Msg` + pt-BR
 | `domain/commitment.py:106` — `"Sem responsável"` owner name | 1 | commitment views (the deck has its own `NO_OWNER` literal) | memo `("people", now)` stores numbers only |
 | `domain/models.py` — `BoardProfile` settings validation (`Invalid("key: problem; …")`) | 7 | `PUT` board settings → 400 | no |
 | `domain/epic_plan/from_jira.py` — `Problem`s (`sem_papel` with nested per-subtask *reasons* `"X não está na equipe"`, `"X cobre N papéis"`, …), `_listing(" e mais N")` | 14 | `analytics/epic_plan.plan_view` (`problemas`, `diagnostico`) | no |
-| `domain/epic_plan/schedule.py` — `validate()` errors (`list[str]`), cycle/coverage `Invalid`s | 14 | plan generation (`invalido`), `POST /api/planejamento` | no |
+| `domain/epic_plan/schedule.py` — `validate()` errors (`list[str]`), cycle/coverage `Invalid`s | 14 | plan generation (`invalido`), `POST /api/planning` | no |
 | `domain/epic_plan/hours.py` — reconciliation problems; `fmt_hours` (always comma), `hours_label` `"19h · 3d 1h"` | 3 (+ formatting) | plan page `rotulo_horas`, timeline segments `rotulo` | no |
 | `domain/epic_plan/timeline.py` — `Duration.label` | 1 | D6 | no |
 | `domain/epic_plan/model.py` — `Parameters.validated()` errors | 4 | 400 | no |

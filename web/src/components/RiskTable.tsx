@@ -1,5 +1,6 @@
-import { Button, Chip, Collapse, Group, Select, Stack, Table, Text } from '@mantine/core';
+import { Anchor, Button, Chip, Collapse, Group, Select, Stack, Table, Text } from '@mantine/core';
 import { Fragment, useMemo, useState } from 'react';
+import { Link } from 'react-router';
 
 import { useRisks } from '../api/hooks';
 import { collator, useT } from '../i18n';
@@ -9,15 +10,18 @@ import { Empty, ErrorState, ExportMenu, IssueLink, Loading, Note } from './commo
 import { OpenInJira } from './OpenInJira';
 import { EvidenceList, RiskBadge, SITUATIONS } from './risk';
 
-/** Items by risk situation with the evidence behind each classification (RF-15 … RF-19). */
-export function RiskTable({ sprintId, boardId }: { sprintId?: number; boardId?: number }) {
+/**
+ * Items by risk situation with the evidence behind each classification (RF-15 … RF-19): a sprint's,
+ * a board's open work, or a space's across its boards (which adds a Board column).
+ */
+export function RiskTable({ sprintId, boardId, spaceKey }: { sprintId?: number; boardId?: number; spaceKey?: string }) {
   const t = useT();
   const w = t.shell.riskTable;
   const { get, set } = useFilters();
   const situation = get('situation');
   const person = get('person');
   const type = get('type');
-  const risks = useRisks({ sprintId, boardId }, { situation, person, type });
+  const risks = useRisks({ sprintId, boardId, spaceKey }, { situation, person, type });
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
   const people = useMemo(() => {
@@ -51,7 +55,7 @@ export function RiskTable({ sprintId, boardId }: { sprintId?: number; boardId?: 
         </Stack>
         <Select label={w.person} placeholder={w.all} data={people} value={person ?? null} onChange={(value) => set({ person: value })} clearable searchable w={200} />
         <Select label={w.type} placeholder={w.allTypes} data={types} value={type ?? null} onChange={(value) => set({ type: value })} clearable w={160} />
-        <ExportMenu dataset="risks" params={{ sprint_id: sprintId, board_id: boardId, person, type }} />
+        {spaceKey === undefined && <ExportMenu dataset="risks" params={{ sprint_id: sprintId, board_id: boardId, person, type }} />}
         <OpenInJira keys={(risks.data?.items ?? []).map((i) => i.key)} sampleUrl={risks.data?.items[0]?.url} />
       </Group>
       {risks.isLoading && <Loading />}
@@ -66,6 +70,7 @@ export function RiskTable({ sprintId, boardId }: { sprintId?: number; boardId?: 
               <Table.Tr>
                 <Table.Th>{w.situation}</Table.Th>
                 <Table.Th>{w.item}</Table.Th>
+                {spaceKey !== undefined && <Table.Th>{w.board}</Table.Th>}
                 <Table.Th>{w.column}</Table.Th>
                 <Table.Th>{w.assignee}</Table.Th>
                 <Table.Th>{w.whatHappened}</Table.Th>
@@ -83,6 +88,17 @@ export function RiskTable({ sprintId, boardId }: { sprintId?: number; boardId?: 
                     <Table.Td>
                       <IssueLink issue={item} />
                     </Table.Td>
+                    {spaceKey !== undefined && (
+                      <Table.Td>
+                        {item.board ? (
+                          <Anchor component={Link} to={`/boards/${item.board.id}`} size="sm">
+                            {item.board.name}
+                          </Anchor>
+                        ) : (
+                          '—'
+                        )}
+                      </Table.Td>
+                    )}
                     <Table.Td>
                       <Text size="sm">{item.risk.column ?? item.status}</Text>
                     </Table.Td>
@@ -115,7 +131,7 @@ export function RiskTable({ sprintId, boardId }: { sprintId?: number; boardId?: 
                   </Table.Tr>
                   {open[item.key] && (
                     <Table.Tr>
-                      <Table.Td colSpan={7}>
+                      <Table.Td colSpan={spaceKey !== undefined ? 8 : 7}>
                         <Collapse expanded>
                           <EvidenceList risk={item.risk} />
                         </Collapse>

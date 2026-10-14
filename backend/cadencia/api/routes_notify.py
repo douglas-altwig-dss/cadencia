@@ -12,7 +12,7 @@ from cadencia.api.deps import JSONDict, Now, SessionDep, SettingsDep
 from cadencia.errors import NotFound
 from cadencia.i18n import Msg, localize
 
-router = APIRouter(prefix="/notifications", tags=["notificações"])
+router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 def _view(session: SessionDep, settings: SettingsDep) -> JSONDict:

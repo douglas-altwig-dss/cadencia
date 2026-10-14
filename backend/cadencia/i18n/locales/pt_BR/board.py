@@ -24,6 +24,7 @@ MESSAGES: dict[str, Entry] = {
     "cfd.done": "Concluído",
     "no_owner": "Sem responsável",
     "no_space": "Sem espaço",
+    "space_not_found": "O espaço {key} não existe.",
     "forecast.no_pace": "Nenhum item concluído no período de amostra: não há ritmo para projetar.",
     "forecast.beyond": "Parte das simulações passa de {days} dias úteis.",
     "forecast.epic_caveat": (

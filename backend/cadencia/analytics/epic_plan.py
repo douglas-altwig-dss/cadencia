@@ -2,7 +2,7 @@
 
 The only place the plan meets the store. The numbers all come from ``domain.epic_plan``; this
 module chooses the inputs (which roles, which people, which epic) and shapes the output. JSON keys
-are Portuguese because the planning contract (``POST /api/planejamento``) was specified that way,
+are Portuguese because the planning contract (``POST /api/planning``) was specified that way,
 and one feature speaking two languages on the wire would be worse than either.
 
 The domain hands back messages (problems, labels, validator findings); the views end with

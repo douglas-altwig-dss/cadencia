@@ -75,7 +75,8 @@ export const shell: Messages['shell'] = {
     deliver: 'Liefern',
     system: 'System',
     home: 'Start',
-    flow: 'Fluss',
+    spaces: 'Bereiche',
+    boards: 'Boards',
     people: 'Personen',
     focusTimeline: 'Fokus-Zeitleiste',
     presentation: 'Präsentation',
@@ -85,6 +86,8 @@ export const shell: Messages['shell'] = {
     dataHygiene: 'Datenpflege',
     notifications: 'Benachrichtigungen',
     gettingStarted: 'Erste Schritte',
+    generations: 'Generierungen',
+    variables: 'Präsentationsvariablen',
   },
 
   api: {
@@ -476,6 +479,7 @@ export const shell: Messages['shell'] = {
     noteBody:
       'Jede Markierung beschreibt eine Tatsache aus dem Jira-Verlauf und zeigt die Regel, die sie erzeugt hat. Klicken Sie auf „Beleg“, um den letzten Übergang, das Datum und die Person zu sehen.',
     situation: 'Lage',
+    board: 'Board',
     person: 'Person',
     all: 'Alle',
     type: 'Typ',
@@ -571,8 +575,7 @@ export const shell: Messages['shell'] = {
       'pulse:recent': { label: 'Letzte Lieferungen', description: 'Lieferungen pro Tag in den letzten 7 Tagen, gegenüber den 7 davor.' },
       'pulse:feed': { label: 'Gerade passiert', description: 'Was in den letzten 48 Stunden geliefert, blockiert oder in den Sprint aufgenommen wurde.' },
       'pulse:due': { label: 'Fällig in 7 Tagen', description: 'Vorgänge, die nächste Woche fällig sind, und die bereits überfälligen.' },
-      'sprint:elapsed': { label: 'Laufender Sprint', description: 'Wie viel vom Sprint vergangen und wie viel erledigt ist, pro Board.' },
-      'kanban:boards': { label: 'Kanban-Boards', description: 'Durchsatz der Woche und Vorgänge mit Risiko, pro verfolgtem Kanban-Board.' },
+      spaces: { label: 'Bereiche', description: 'Eine Zeile pro Team: verfolgte Boards, gefährdete Vorgänge, Lieferungen der Woche und Sprint-Fortschritt.' },
       boards: { label: 'Board-Tabelle', description: 'Eine Zeile pro Board: Fortschritt, Risiko, Durchsatz, Trend und Datenabruf.' },
       'saude:pontos': {
         label: 'Datenpflege',
@@ -592,10 +595,6 @@ export const shell: Messages['shell'] = {
       'Wie viel vom zu Sprintbeginn Zugesagten geliefert wurde: geliefert ÷ zugesagt, Sprint für Sprint über die Boards summiert. Nur abgeschlossene Sprints; was nach dem Start hinzukam, bleibt außen vor. Die Veränderung ist in Prozentpunkten gegenüber dem vorherigen Sprint.',
     'tile:sprint:scope':
       'Vorgänge (Storys, Aufgaben und Bugs), die nach dem Start in den Sprint kamen und noch darin sind, summiert über die Boards mit laufendem Sprint. Bereits erledigte zählen ebenfalls.',
-    'tile:sprint:elapsed':
-      'Zeit: (heute − Start) ÷ (Ende − Start) des Sprints. Vorgänge: erledigt ÷ Sprint-Vorgänge. „Hinter der Zeit“ erscheint, wenn die erledigten Vorgänge mehr als 20 Prozentpunkte unter der bereits vergangenen Zeit liegen.',
-    'tile:kanban:boards':
-      'Ein Kanban-Board hat keinen Sprint und erscheint daher hier statt unter "Laufender Sprint": Das Fenster ist die Kalenderwoche (Checkpoint zu Checkpoint), nicht Start und Ende eines Sprints. "In der Woche" ist, was im aktuellen Fenster erledigt wurde (Storys, Aufgaben und Bugs); der Pfeil vergleicht mit der Vorwoche. "Mit Risiko" summiert die offenen Vorgänge des Boards in jeder Risikolage — übertragen, überfällig, blockiert, Stillstand oder alternd.',
     'tile:team:load': `Summe der offenen Stunden ÷ Summe der verbleibenden Kapazität, für die Personen mit Kapazität im Zeitraum.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES}`,
     'tile:team:overloaded':
       'Personen, deren Auslastung über 110% der verbleibenden Kapazität liegt (die Toleranz von 10% ist die des Boards). Ein Signal, früh zu sprechen, keine Bewertung: Es setzt voraus, dass Schätzungen existieren und die Verfügbarkeit jeder Person erfasst ist.',
@@ -608,6 +607,8 @@ export const shell: Messages['shell'] = {
       'Was in den letzten 48 Stunden passiert ist: erledigter Vorgang, Vorgang, der in einen blockierenden Status kam oder als Hindernis markiert wurde, und Vorgang, der nach dem ersten Sprinttag in einen Sprint kam. Die neuesten zuerst, bis zu 30.',
     'tile:pulse:due':
       'Offene Vorgänge (Storys, Aufgaben und Bugs) mit Fälligkeitsdatum in den nächsten 7 Tagen. Die kleinere Zahl sind die offenen Vorgänge, deren Fälligkeitsdatum schon vorbei ist.',
+    'tile:spaces':
+      'Eine Zeile pro Bereich (Team), über seine verfolgten Boards. Gefährdet: offene Vorgänge in einer Risikolage, jeder einmal, in seiner schwersten. Geliefert: Storys, Aufgaben und Bugs, die im aktuellen Wochenfenster erledigt wurden, gegenüber dem vorigen Fenster. Sprint-Fortschritt: erledigt ÷ Vorgänge in den laufenden Sprints der Boards des Bereichs, als Summe der Vorgänge statt als Mittel der Boards; ein Board ohne laufenden Sprint zählt nicht.',
     'tile:boards': 'Eine Zeile pro verfolgtem Board. Zeigen Sie auf die Spaltenköpfe oder fokussieren Sie sie, um zu sehen, wie jede berechnet wird.',
     'tile:saude:pontos':
       'Hinweise zur Datenpflege in den verfolgten Boards — Vorgänge ohne Schätzung, wenig erledigte Historie und Ähnliches. Keiner verhindert den Datenabruf, aber jeder macht einen Indikator weniger verlässlich. Die Details pro Board stehen unter Abrufstatus → Datenpflege.',
@@ -642,6 +643,11 @@ export const shell: Messages['shell'] = {
     'history:lead': `Die Zahl ist das P85 von der Erstellung des Vorgangs bis zur Erledigung, für das, was die Person im Zeitraum erledigt hat. ${PERCENTILE}`,
     'history:unplanned': 'Vorgänge, die nach dem Start in die Sprints der Person kamen, summiert über die letzten Sprints.',
 
+    'space:risk': 'Die offenen Vorgänge der verfolgten Boards des Bereichs nach Risikolage, jeder in seiner schwersten: übertragen, überfällig, blockiert, Stillstand oder alternd. Über die Boards summiert.',
+    'space:delivered':
+      'Storys, Aufgaben und Bugs, die im aktuellen Wochenfenster auf den verfolgten Boards des Bereichs erledigt wurden, und daneben wie viele im Fenster davor. Unteraufgaben zählen nicht.',
+    'space:progress':
+      'Erledigt ÷ Vorgänge in den laufenden Sprints der Boards des Bereichs (Storys, Aufgaben und Bugs), als Summe der Vorgänge aller Boards statt als Mittel der Boards, sodass ein großes Board mehr wiegt. Ein Board ohne laufenden Sprint bleibt außen vor.',
     'sprint:progress':
       'Erledigt ÷ Sprint-Vorgänge (Storys, Aufgaben und Bugs), nach Anzahl und nach Summe der Schätzungen. Die Abdeckung ist der Anteil der Vorgänge mit Schätzung.',
     'sprint:risk': 'Sprint-Vorgänge nach Risikolage, jeder in seiner schwersten: übertragen, überfällig, blockiert, Stillstand oder alternd; die ohne ausgelöste Regel sind im Plan.',
@@ -665,6 +671,13 @@ export const shell: Messages['shell'] = {
     'flow:carryover': 'Median der Übertragungsquote (übrig gebliebene zugesagte ÷ zugesagte) der im Zeitraum abgeschlossenen Sprints.',
     'flow:reopen':
       'Erledigte Vorgänge, die jemals wieder geöffnet wurden ÷ erledigte Vorgänge. Darunter, wie viele Wechsel in eine frühere Spalte es insgesamt gab.',
+
+    'boards:progress':
+      'Erledigt ÷ Vorgänge des laufenden Sprints (Storys, Aufgaben und Bugs; Unteraufgaben und Epics zählen nicht), nach Anzahl. Die senkrechte Marke zeigt, wie viel von der Sprintzeit vergangen ist, um den Balken daran zu messen.',
+    'boards:delivered':
+      'Storys, Aufgaben und Bugs, die im aktuellen Wochenfenster erledigt wurden — die Kalenderwoche auf einem Board ohne laufenden Sprint — und daneben, wie viele im Fenster davor.',
+    'boards:trend':
+      'Gelieferte Vorgänge in jedem der letzten Zeiträume, der älteste links: pro Sprint (die letzten vier abgeschlossenen und der laufende), wenn ein Sprint läuft, sonst pro Wochenfenster (die letzten vier).',
 
     'issue:lead': 'Von der Erstellung bis zur Erledigung. Gibt es erst, wenn der Vorgang erledigt ist.',
     'issue:cycle': 'Vom ersten Moment in einem In-Arbeit-Status bis zur Erledigung. Gibt es nur, wenn der Vorgang begonnen wurde.',

@@ -25,6 +25,7 @@ dependencies = [
   "tzdata",
   "ortools>=9.10",
   "anthropic>=1.9,<2",
+  "cryptography>=42",
 ]
 
 [project.optional-dependencies]

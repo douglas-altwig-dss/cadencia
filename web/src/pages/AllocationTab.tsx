@@ -40,7 +40,7 @@ function PlanResult({ view }: { view: PlanView }) {
           fmtNum(Number(view.plan.parameters.hours_per_point ?? 0)),
           fmtNum(Number(view.plan.parameters.unestimated_item_hours ?? 0)),
         )}{' '}
-        <Anchor component={Link} to="/configuracao?tab=perfil" size="sm">
+        <Anchor component={Link} to="/settings?tab=profile" size="sm">
           {m.profileLink}
         </Anchor>
       </Text>
@@ -167,7 +167,7 @@ function SimulationPanel({ sprintId, people }: { sprintId: number; people: { val
 }
 
 /** RF-25 … RF-29: theoretical capacity, greedy distribution and comparison with reality. */
-export function PlanningTab({ sprintId }: { sprintId: number }) {
+export function AllocationTab({ sprintId }: { sprintId: number }) {
   const capacity = useCapacity(sprintId);
   const allocation = useAllocation(sprintId);
   const create = useCreateAllocation(sprintId);

@@ -18,7 +18,7 @@ import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
 import { fmtDate, fmtPct } from '../lib/format';
-import { PlanningTab } from './PlanningTab';
+import { AllocationTab } from './AllocationTab';
 
 /** Numbers first, then the forecast, then the weeks that explain them. */
 function OverviewTab({ data, forecast, onCommitment }: { data: SprintOverview; forecast: ReactNode; onCommitment: () => void }) {
@@ -155,9 +155,9 @@ export function SprintPage() {
   const forecast = useSprintForecast(sprintId);
   const t = useT();
   const m = t.tracking.sprint;
-  const SPRINT_TABS = ['visao', 'arvore', 'timeline', 'riscos', 'mudancas', 'compromisso', 'planejamento'] as const;
+  const SPRINT_TABS = ['overview', 'work-tree', 'timeline', 'risks', 'changes', 'commitment', 'allocation'] as const;
   const requestedTab = get('tab');
-  const tab = (SPRINT_TABS as readonly string[]).includes(requestedTab ?? '') ? requestedTab! : 'visao';
+  const tab = (SPRINT_TABS as readonly string[]).includes(requestedTab ?? '') ? requestedTab! : 'overview';
 
   const selector = (
     <Select
@@ -177,8 +177,7 @@ export function SprintPage() {
   if (overview.error) return <ErrorState error={overview.error} />;
   const data = overview.data;
   if (!data) return null;
-  // The board's own page opens its current sprint, so from that sprint the board crumb is just text.
-  const onCurrentSprint = sprints.data?.current_sprint_id === sprintId;
+  const space = sprints.data?.board.space;
 
   return (
     <>
@@ -192,7 +191,8 @@ export function SprintPage() {
         }
         crumbs={[
           { label: t.tracking.crumbs.home, to: '/' },
-          { label: data.board.name, to: onCurrentSprint ? undefined : `/boards/${boardId}` },
+          ...(space ? [{ label: space.name, to: `/spaces/${encodeURIComponent(space.key)}` }] : []),
+          { label: data.board.name, to: `/boards/${boardId}` },
           { label: data.sprint.name },
         ]}
         actions={selector}
@@ -200,34 +200,34 @@ export function SprintPage() {
       <Freshness freshness={data.freshness} />
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
-          <Tabs.Tab value="arvore">{m.tabTree}</Tabs.Tab>
+          <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="work-tree">{m.tabTree}</Tabs.Tab>
           <Tabs.Tab value="timeline">{m.tabTimeline}</Tabs.Tab>
-          <Tabs.Tab value="riscos">{m.tabOpen}</Tabs.Tab>
-          <Tabs.Tab value="mudancas">{m.tabChanges}</Tabs.Tab>
-          <Tabs.Tab value="compromisso">{m.tabCommitment}</Tabs.Tab>
-          <Tabs.Tab value="planejamento">{m.tabPlanning}</Tabs.Tab>
+          <Tabs.Tab value="risks">{m.tabOpen}</Tabs.Tab>
+          <Tabs.Tab value="changes">{m.tabChanges}</Tabs.Tab>
+          <Tabs.Tab value="commitment">{m.tabCommitment}</Tabs.Tab>
+          <Tabs.Tab value="allocation">{m.tabAllocation}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="visao">
-          <OverviewTab data={data} forecast={<ForecastCard query={forecast} />} onCommitment={() => set({ tab: 'compromisso' })} />
+        <Tabs.Panel value="overview">
+          <OverviewTab data={data} forecast={<ForecastCard query={forecast} />} onCommitment={() => set({ tab: 'commitment' })} />
         </Tabs.Panel>
-        <Tabs.Panel value="arvore">
+        <Tabs.Panel value="work-tree">
           <TreeTab sprintId={sprintId} boardId={boardId} />
         </Tabs.Panel>
         <Tabs.Panel value="timeline">
           <TimelineTab sprintId={sprintId} />
         </Tabs.Panel>
-        <Tabs.Panel value="riscos">
+        <Tabs.Panel value="risks">
           <RiskTable sprintId={sprintId} />
         </Tabs.Panel>
-        <Tabs.Panel value="mudancas">
-          <ChangesPanel boardId={boardId} />
+        <Tabs.Panel value="changes">
+          <ChangesPanel scope={{ sprintId }} />
         </Tabs.Panel>
-        <Tabs.Panel value="compromisso">
+        <Tabs.Panel value="commitment">
           <CommitmentTab data={data} />
         </Tabs.Panel>
-        <Tabs.Panel value="planejamento">
-          <PlanningTab sprintId={sprintId} />
+        <Tabs.Panel value="allocation">
+          <AllocationTab sprintId={sprintId} />
         </Tabs.Panel>
       </Tabs>
     </>

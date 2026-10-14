@@ -39,7 +39,7 @@ export function ParametersSummary({ parameters }: { parameters: PlanParameters }
           {m.appliesToAll}
         </Text>
       </Stack>
-      <Button component={Link} to="/configuracao?tab=plano-epico" variant="default" leftSection={<IconSettings size={16} />}>
+      <Button component={Link} to="/settings?tab=epic-plan" variant="default" leftSection={<IconSettings size={16} />}>
         {m.edit}
       </Button>
     </Group>

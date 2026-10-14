@@ -47,4 +47,11 @@ MESSAGES: dict[str, Entry] = {
     "help.scheduler": "serviço coletor agendado",
     "help.demo": "preenche o banco com a instância fictícia de demonstração",
     "help.demo.force": "aceita um banco que já tem boards",
+    "help.config": "as configurações salvas no app (o banco vale mais que o ambiente)",
+    "help.config.show": "mostra todas as configurações; segredos só como is_set",
+    "help.config.set": "salva uma configuração no banco",
+    "help.config.unset": "esquece uma configuração salva (volta ao ambiente ou ao padrão)",
+    "help.config.import_env": "copia para o banco os valores definidos no ambiente",
+    "help.config.key": "nome da configuração, por exemplo timezone",
+    "help.config.value": "novo valor",
 }

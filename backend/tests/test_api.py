@@ -106,6 +106,27 @@ def test_tree_epic_and_item_drill_down(client):
     assert detail["issue"]["url"] == "https://demo.atlassian.net/browse/CAD-22"
     assert isinstance(detail["description"], str)
     assert isinstance(epic["description"], str)
+    # The epic page lives at /epics/<key>: the view names its board so the page can link back to it.
+    assert epic["board"] == {"id": 1, "name": "Plataforma"}
+
+
+def test_a_space_lists_its_boards_and_its_risks_across_them(client):
+    space = ok(client.get("/api/spaces/CAD"))
+    assert space["space"] == {"key": "CAD", "name": "Produto Digital"}
+    assert [b["name"] for b in space["boards"]] == ["Plataforma", "Suporte"]
+
+    risks = ok(client.get("/api/spaces/CAD/risks"))
+    keys = [i["key"] for i in risks["items"]]
+    assert len(keys) == len(set(keys)) and "CAD-14" in keys
+    assert {i["board"]["name"] for i in risks["items"]} <= {"Plataforma", "Suporte"}
+    severities = [i["risk"]["severity"] for i in risks["items"]]
+    assert severities == sorted(severities, reverse=True)
+    assert risks["freshness"] is not None
+    only = ok(client.get("/api/spaces/CAD/risks", params={"situation": "atrasado"}))
+    assert only["items"] and {i["risk"]["situation"] for i in only["items"]} == {"atrasado"}
+
+    assert client.get("/api/spaces/NOPE").status_code == 404
+    assert client.get("/api/spaces/NOPE/risks").status_code == 404
 
 
 def test_a_kanban_board_gets_the_same_shape_of_tree_a_sprint_does(client):
@@ -255,6 +276,10 @@ def test_report_template_mapping_generation_and_download(client, tmp_path):
     assert run["validation"]["slides"] >= 8
     download = client.get(f"/api/reports/runs/{run['id']}/download")
     assert download.status_code == 200 and download.content[:2] == b"PK"
+    # A generation has its own page, so it can be read alone.
+    alone = ok(client.get(f"/api/reports/runs/{run['id']}"))
+    assert alone["id"] == run["id"] and alone["template_id"] == uploaded["id"]
+    assert client.get("/api/reports/runs/nope").status_code == 404
     bad = client.put(
         f"/api/reports/templates/{uploaded['id']}/mapping",
         json={"slides": {"1": {"bindings": [{"target": "s1/sh999", "mode": "text", "field": "board.nome"}]}}},
@@ -710,22 +735,22 @@ def test_an_orphaned_run_can_be_reassociated_with_a_re_uploaded_template(client,
     ok(client.delete(f"/api/reports/templates/{original['id']}"))
     assert ok(client.get(f"/api/reports/runs/{run['id']}/scene"))["template_deleted"] is True
     assert (
-        client.post(f"/api/reports/runs/{run['id']}/reassociar", json={"template_id": 999999}).status_code
+        client.post(f"/api/reports/runs/{run['id']}/reassociate", json={"template_id": 999999}).status_code
         == 404
     )
     assert (
         client.post(
-            "/api/reports/runs/naoexiste/reassociar", json={"template_id": replacement["id"]}
+            "/api/reports/runs/naoexiste/reassociate", json={"template_id": replacement["id"]}
         ).status_code
         == 404
     )
 
     relinked = ok(
-        client.post(f"/api/reports/runs/{run['id']}/reassociar", json={"template_id": replacement["id"]})
+        client.post(f"/api/reports/runs/{run['id']}/reassociate", json={"template_id": replacement["id"]})
     )
     assert relinked["template_deleted"] is False and relinked["template_id"] == replacement["id"]
     # A run that already has a template cannot be relinked out from under it.
-    again = client.post(f"/api/reports/runs/{run['id']}/reassociar", json={"template_id": replacement["id"]})
+    again = client.post(f"/api/reports/runs/{run['id']}/reassociate", json={"template_id": replacement["id"]})
     assert again.status_code == 400
 
 
@@ -764,7 +789,7 @@ def test_a_mapping_can_be_cloned_to_a_redesigned_template(client, tmp_path):
 
     plan = ok(
         client.post(
-            f"/api/reports/templates/{redesigned['id']}/clonar-mapeamento",
+            f"/api/reports/templates/{redesigned['id']}/clone-mapping",
             json={"from_template_id": original["id"]},
         )
     )
@@ -774,7 +799,7 @@ def test_a_mapping_can_be_cloned_to_a_redesigned_template(client, tmp_path):
 
     applied = ok(
         client.post(
-            f"/api/reports/templates/{redesigned['id']}/clonar-mapeamento",
+            f"/api/reports/templates/{redesigned['id']}/clone-mapping",
             json={"from_template_id": original["id"], "aplicar": True},
         )
     )
@@ -787,7 +812,7 @@ def test_a_mapping_can_be_cloned_to_a_redesigned_template(client, tmp_path):
 
     assert (
         client.post(
-            f"/api/reports/templates/{redesigned['id']}/clonar-mapeamento", json={"from_template_id": 999999}
+            f"/api/reports/templates/{redesigned['id']}/clone-mapping", json={"from_template_id": 999999}
         ).status_code
         == 404
     )
@@ -1022,7 +1047,7 @@ def test_the_status_colours_are_configured_once_for_every_template(client, tmp_p
 
 def test_an_accessible_palette_can_be_suggested_but_is_never_applied_on_its_own(client):
     """#5: Okabe-Ito, offered as a suggestion — saving it still goes through `PUT /palette`."""
-    suggestion = ok(client.get("/api/reports/palette/acessivel"))["palette"]
+    suggestion = ok(client.get("/api/reports/palette/accessible"))["palette"]
     assert set(suggestion) == {"concluido", "em_dia", "risco", "atrasado"}
     assert len(set(suggestion.values())) == 4  # every status gets its own colour
     # Fetching the suggestion changes nothing until it is actually saved.

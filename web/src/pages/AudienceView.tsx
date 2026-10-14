@@ -14,7 +14,7 @@ import { channelName, type AudienceSlide, type Ink, type PresentMessage } from '
 export function AudienceView() {
   const t = useT();
   const [params] = useSearchParams();
-  const id = params.get('canal') ?? '';
+  const id = params.get('channel') ?? '';
   const [slides, setSlides] = useState<AudienceSlide[]>([]);
   const [index, setIndex] = useState(0);
   const [ended, setEnded] = useState(false);

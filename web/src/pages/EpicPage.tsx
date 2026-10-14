@@ -14,16 +14,21 @@ import { useFilters } from '../lib/filters';
 import { fmtDay, fmtNum } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
 
-/** Épico across every sprint: how much has shipped and how much is left, and its plan. */
+/**
+ * An epic across every sprint and every board: how much has shipped, how much is left, and its plan.
+ * It lives at `/epics/<key>` because its children can sit on several boards; `?board=` says which
+ * board it was opened from (and is read from), and `?sprint=` which sprint, for the way back.
+ */
 export function EpicPage() {
-  const params = useParams();
-  const boardId = Number(params.boardId);
-  const key = params.epicKey!;
+  const key = useParams().epicKey!;
   const { get, set } = useFilters();
   const sprintId = get('sprint');
+  const requestedBoard = get('board');
+  const fromBoard = requestedBoard && /^\d+$/.test(requestedBoard) ? Number(requestedBoard) : undefined;
+  const epic = useEpic(key, fromBoard);
+  const boardId = fromBoard ?? epic.data?.board.id;
   const board = useBoardSprints(boardId);
-  const epic = useEpic(key, boardId);
-  const forecast = useEpicForecast(key, boardId);
+  const forecast = useEpicForecast(key, fromBoard);
   const t = useT();
   const m = t.tracking.epic;
 
@@ -31,15 +36,17 @@ export function EpicPage() {
   if (epic.error) return <ErrorState error={epic.error} />;
   if (!epic.data) return null;
   const data = epic.data;
+  const home = boardId ?? data.board.id;
   const sprint = board.data?.sprints.find((s) => String(s.id) === sprintId);
   const crumbs = [
     { label: t.tracking.crumbs.home, to: '/' },
-    { label: board.data?.board.name ?? t.tracking.crumbs.board(boardId), to: `/boards/${boardId}` },
-    ...(sprint ? [{ label: sprint.name, to: `/boards/${boardId}/sprints/${sprint.id}?tab=arvore` }] : []),
+    ...(board.data?.board.space ? [{ label: board.data.board.space.name, to: `/spaces/${encodeURIComponent(board.data.board.space.key)}` }] : []),
+    { label: board.data?.board.name ?? data.board.name, to: `/boards/${home}` },
+    ...(sprint ? [{ label: sprint.name, to: `/boards/${home}/sprints/${sprint.id}?tab=work-tree` }] : []),
     { label: key },
   ];
 
-  const tab = get('tab') ?? 'visao';
+  const tab = get('tab') ?? 'overview';
   const estimate = data.tree?.estimate_rollup;
 
   return (
@@ -59,13 +66,13 @@ export function EpicPage() {
       </Box>
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
-          <Tabs.Tab value="plano">{m.tabPlan}</Tabs.Tab>
+          <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="plan">{m.tabPlan}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="plano">
+        <Tabs.Panel value="plan">
           <EpicPlanTab epicKey={key} />
         </Tabs.Panel>
-        <Tabs.Panel value="visao">
+        <Tabs.Panel value="overview">
           <Stack gap="md">
             {/* Numbers first, then the forecast, then the items they add up from. */}
             <SimpleGrid cols={{ base: 1, md: 3 }}>
@@ -83,7 +90,7 @@ export function EpicPage() {
             </SimpleGrid>
             <ForecastCard query={forecast} />
             {data.tree && data.tree.children.length ? (
-              <TreeTable nodes={data.tree.children} boardId={boardId} sprintId={sprintId ? Number(sprintId) : undefined} />
+              <TreeTable nodes={data.tree.children} boardId={home} sprintId={sprintId ? Number(sprintId) : undefined} />
             ) : (
               <Empty title={m.empty} />
             )}

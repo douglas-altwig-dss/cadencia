@@ -569,14 +569,14 @@ export function VariablesDrawer({
   const fromSource = new Set(data.from_source ?? []);
 
   return (
-    <Tabs defaultValue="variaveis" keepMounted={false}>
+    <Tabs defaultValue="variables" keepMounted={false}>
       {confirmDialog}
       <Tabs.List mb="sm">
-        <Tabs.Tab value="variaveis" leftSection={<IconBraces size={14} />}>
+        <Tabs.Tab value="variables" leftSection={<IconBraces size={14} />}>
           {vt.tabVariables}
         </Tabs.Tab>
         <Tabs.Tab
-          value="campos"
+          value="fields"
           leftSection={<IconDatabase size={14} />}
           rightSection={
             <Badge size="xs" variant="light" circle>
@@ -586,12 +586,12 @@ export function VariablesDrawer({
         >
           {vt.tabFields}
         </Tabs.Tab>
-        <Tabs.Tab value="cores" leftSection={<IconPalette size={14} />}>
+        <Tabs.Tab value="colors" leftSection={<IconPalette size={14} />}>
           {vt.tabColors}
         </Tabs.Tab>
       </Tabs.List>
 
-      <Tabs.Panel value="cores">
+      <Tabs.Panel value="colors">
         <Stack gap="sm">
           <Note title={vt.colorsNoteTitle}>
             {vt.colorsNote}
@@ -600,7 +600,7 @@ export function VariablesDrawer({
         </Stack>
       </Tabs.Panel>
 
-      <Tabs.Panel value="campos">
+      <Tabs.Panel value="fields">
         <Stack gap="sm">
           <Note title={vt.fieldsNoteTitle}>
             {vt.fieldsNote(bold)}
@@ -609,7 +609,7 @@ export function VariablesDrawer({
         </Stack>
       </Tabs.Panel>
 
-      <Tabs.Panel value="variaveis">
+      <Tabs.Panel value="variables">
     <Stack gap="md">
       {conflicts.length > 0 && (
         <Alert variant="light" color="yellow" title={vt.conflictsTitle}>

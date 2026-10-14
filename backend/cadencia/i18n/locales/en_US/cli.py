@@ -48,4 +48,11 @@ MESSAGES: dict[str, Entry] = {
     "help.scheduler": "scheduled collector service",
     "help.demo": "fills the database with the fictional demo instance",
     "help.demo.force": "accepts a database that already has boards",
+    "help.config": "the settings saved in the app (the database wins over the environment)",
+    "help.config.show": "prints every setting, secrets only as is_set",
+    "help.config.set": "saves one setting in the database",
+    "help.config.unset": "forgets a saved setting (back to the environment or the default)",
+    "help.config.import_env": "copies the values the environment sets into the database",
+    "help.config.key": "setting name, e.g. timezone",
+    "help.config.value": "new value",
 }

@@ -21,7 +21,7 @@ MESSAGES: dict[str, Entry] = {
     # Slack/Teams link to the app.
     "open_in_app": "Open in Cadência",  # i18n: out of scope (product name)
     # Delivery failures (`body` is the channel's own answer).
-    "error.smtp_missing": "SMTP not configured (CADENCIA_SMTP_HOST)",
+    "error.smtp_missing": "SMTP not configured: set the mail server in Settings → E-mail & links",
     "error.http": "HTTP {status}: {body}",
     # A deck was generated.
     "deck.title": "Deck generated: {name}",

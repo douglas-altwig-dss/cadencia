@@ -453,7 +453,7 @@ class SavedViewRow(Base):
     __tablename__ = "saved_view"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(120))
-    path: Mapped[str] = mapped_column(String(255))  # the screen, e.g. "/fluxo"
+    path: Mapped[str] = mapped_column(String(255))  # the screen, e.g. "/flow"
     query: Mapped[str] = mapped_column(Text, default="")  # its URL filters, without the "?"
     pinned: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime]

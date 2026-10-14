@@ -99,8 +99,7 @@ export const CATALOG: CatalogEntry[] = [
   entry('pulse:recent', 'acontecendo', 'P'),
   entry('pulse:feed', 'acontecendo', 'M'),
   entry('pulse:due', 'acontecendo', 'P'),
-  entry('sprint:elapsed', 'boards', 'M'),
-  entry('kanban:boards', 'boards', 'M'),
+  entry('spaces', 'boards', 'G'),
   entry('boards', 'boards', 'G'),
   entry('saude:pontos', 'sistema', 'P'),
 ];
@@ -115,9 +114,16 @@ const tile = (type: string, config?: Record<string, unknown>): TileState => ({
 });
 
 /**
- * What the page shows until somebody arranges it: the indicators, people and what is happening, then the
- * boards once. The board's own progress, sprint time and kanban rows are all in the table already (M25),
- * so they are catalogue entries, not defaults. A layout saved before this keeps its tiles.
+ * Tiles that were taken out: "Sprint in progress" and "Kanban boards" said per board what each board's
+ * card on the Boards page says, so Home stopped repeating it. A stored layout drops them on read;
+ * unlike an unknown type, these are known to be gone, so nobody is shown an empty "unknown tile".
+ */
+export const RETIRED_TYPES: ReadonlySet<string> = new Set(['sprint:elapsed', 'kanban:boards']);
+
+/**
+ * What the page shows until somebody arranges it: the indicators, people and what is happening, then
+ * one row per team (space). The per-board table stays in the catalogue for whoever wants it, but the
+ * board-by-board detail is the Boards page's job. A layout saved before this keeps its tiles.
  */
 export const DEFAULT_TYPES = [
   'kpi:risk',
@@ -128,7 +134,7 @@ export const DEFAULT_TYPES = [
   'team:overloaded',
   'team:blocks',
   'pulse:feed',
-  'boards',
+  'spaces',
 ];
 
 /** The pre-mosaic layout (RF-97), kept in the browser: which KPIs were hidden and how the table's columns were. */
@@ -137,18 +143,10 @@ export interface LegacyLayout {
   hidden?: string[];
 }
 
-/** The default arrangement, honouring what somebody had already hidden in the old customiser. */
+/** The default arrangement, honouring which indicators somebody had already hidden in the old customiser. */
 export function defaultMosaic(legacy?: LegacyLayout | null): Mosaic {
   const hidden = new Set(legacy?.hidden ?? []);
-  const tiles = DEFAULT_TYPES.filter((type) => !hidden.has(type)).map((type) =>
-    type === 'boards' && legacy
-      ? tile(type, {
-          ...(legacy.order?.length ? { order: legacy.order } : {}),
-          hidden: (legacy.hidden ?? []).filter((id) => !id.includes(':')),
-        })
-      : tile(type),
-  );
-  return { version: 1, tiles };
+  return { version: 1, tiles: DEFAULT_TYPES.filter((type) => !hidden.has(type)).map((type) => tile(type)) };
 }
 
 const isSize = (value: unknown): value is TileSize => value === 'P' || value === 'M' || value === 'G';
@@ -165,7 +163,7 @@ export function normalize(raw: unknown): Mosaic | null {
   for (const item of (raw as { tiles: unknown[] }).tiles) {
     if (!item || typeof item !== 'object') continue;
     const { id, type, size, config } = item as Record<string, unknown>;
-    if (typeof id !== 'string' || typeof type !== 'string' || !id || !type || seen.has(id)) continue;
+    if (typeof id !== 'string' || typeof type !== 'string' || !id || !type || seen.has(id) || RETIRED_TYPES.has(type)) continue;
     seen.add(id);
     tiles.push({
       id,

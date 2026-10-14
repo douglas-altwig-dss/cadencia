@@ -13,6 +13,9 @@ import type {
   BoardTree,
   CatalogField,
   Cfd,
+  ConfigValue,
+  ConfigView,
+  JiraDraftTest,
   ConnectionResult,
   CvdRow,
   Dashboard,
@@ -35,6 +38,7 @@ import type {
   PlanView,
   ReportRun,
   RiskList,
+  SpaceDetail,
   Scatter,
   SprintOverview,
   SprintTimelineView,
@@ -109,16 +113,21 @@ export const useBoardTree = (boardId?: number) =>
     enabled: boardId !== undefined,
   });
 
-export const useRisks = (scope: { sprintId?: number; boardId?: number }, filters: { situation?: string; person?: string; type?: string }) =>
+export const useRisks = (
+  scope: { sprintId?: number; boardId?: number; spaceKey?: string },
+  filters: { situation?: string; person?: string; type?: string },
+) =>
   useQuery({
     queryKey: ['risks', scope, filters],
     queryFn: () =>
       api.get<RiskList>(
         scope.sprintId !== undefined
           ? `/sprints/${scope.sprintId}/risks${qs(filters)}`
-          : `/boards/${scope.boardId}/risks${qs(filters)}`,
+          : scope.spaceKey !== undefined
+            ? `/spaces/${encodeURIComponent(scope.spaceKey)}/risks${qs(filters)}`
+            : `/boards/${scope.boardId}/risks${qs(filters)}`,
       ),
-    enabled: scope.sprintId !== undefined || scope.boardId !== undefined,
+    enabled: scope.sprintId !== undefined || scope.boardId !== undefined || scope.spaceKey !== undefined,
   });
 
 export const useIssue = (key?: string) =>
@@ -131,8 +140,9 @@ export const useEpic = (key?: string, boardId?: number) =>
     enabled: !!key,
   });
 
-export const useFlow = (filters: FlowFilters) =>
+export const useFlow = (filters: FlowFilters, enabled = true) =>
   useQuery({
+    enabled,
     queryKey: ['flow', filters],
     queryFn: () =>
       api.get<FlowView>(`/flow${qs({ board_id: filters.board, person: filters.person, type: filters.type, start: filters.start, end: filters.end })}`),
@@ -165,8 +175,12 @@ export const useCvd = (boardId?: number) =>
 export const usePeople = () => useQuery({ queryKey: ['people'], queryFn: () => api.get<PeopleView>('/people') });
 
 /** Workload, deliveries, blocks and past deliveries for everyone: the cards and the Home tiles share it. */
-export const usePeopleOverview = () =>
-  useQuery({ queryKey: ['people-overview'], queryFn: () => api.get<PeopleOverview>('/people/overview'), staleTime: 60_000 });
+export const usePeopleOverview = (boardIds?: number[]) =>
+  useQuery({
+    queryKey: ['people-overview', boardIds?.join(',') ?? null],
+    queryFn: () => api.get<PeopleOverview>(`/people/overview${qs({ board_id: boardIds?.join(',') })}`),
+    staleTime: 60_000,
+  });
 
 
 export const usePerson = (accountId?: string, weeks = 12) =>
@@ -319,8 +333,8 @@ export const useDeckPalette = () =>
 /** #5: Okabe-Ito, safe under every common colour blindness — a suggestion, never applied on its own. */
 export const useAccessiblePalette = () =>
   useQuery({
-    queryKey: ['reports', 'palette', 'acessivel'],
-    queryFn: () => api.get<{ palette: Record<string, string> }>('/reports/palette/acessivel'),
+    queryKey: ['reports', 'palette', 'accessible'],
+    queryFn: () => api.get<{ palette: Record<string, string> }>('/reports/palette/accessible'),
     staleTime: Infinity,
     enabled: false,
   });
@@ -359,7 +373,7 @@ export const useRunScene = (runId?: string) =>
 export function useReassociateRun(runId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (templateId: number) => api.post<DeckScene>(`/reports/runs/${runId}/reassociar`, { template_id: templateId }),
+    mutationFn: (templateId: number) => api.post<DeckScene>(`/reports/runs/${runId}/reassociate`, { template_id: templateId }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['run', runId, 'scene'] }),
   });
 }
@@ -370,6 +384,18 @@ export const useDeckEdits = (templateId?: number) =>
     queryFn: () => api.get<EditsView>(`/reports/templates/${templateId}/edits`),
     enabled: templateId !== undefined,
   });
+
+/** A space (team) and every board under it, tracked or not. */
+export const useSpace = (key?: string) =>
+  useQuery({
+    queryKey: ['space', key],
+    queryFn: () => api.get<SpaceDetail>(`/spaces/${encodeURIComponent(key!)}`),
+    enabled: !!key,
+  });
+
+/** One generation, whatever its template: what `/presentation/runs/:runId` opens. */
+export const useRun = (runId?: string) =>
+  useQuery({ queryKey: ['run', runId], queryFn: () => api.get<ReportRun>(`/reports/runs/${runId}`), enabled: !!runId });
 
 export const useRuns = (templateId?: number) =>
   useQuery({ queryKey: ['runs', templateId], queryFn: () => api.get<{ items: ReportRun[] }>(`/reports/runs${qs({ template_id: templateId })}`) });
@@ -385,6 +411,50 @@ export function useCollect() {
 }
 
 export const useConnectionTest = () => useMutation({ mutationFn: () => api.post<ConnectionResult>('/connection/test') });
+
+// ---- runtime configuration (docs/config-store.md)
+
+export const useConfig = () => useQuery({ queryKey: ['config'], queryFn: () => api.get<ConfigView>('/config') });
+
+/**
+ * Every config write answers the whole view, so it lands in the cache at once; health and status
+ * read the effective settings (Jira configured, time zone), so they are read again too.
+ */
+function refreshConfig(client: ReturnType<typeof useQueryClient>, view: ConfigView) {
+  client.setQueryData(['config'], view);
+  return Promise.all(['config', 'health', 'status'].map((key) => client.invalidateQueries({ queryKey: [key] })));
+}
+
+/** `PUT /config` with only the changed keys; a secret sent as `""` is cleared. */
+export function useSaveConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Record<string, ConfigValue>) => api.put<ConfigView>('/config', { values }),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Forget a saved value: the field goes back to the environment or the default. */
+export function useResetConfig() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.del<ConfigView>(`/config/${encodeURIComponent(key)}`),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Copy every value that still comes from `.env` into the database. */
+export function useImportEnv() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<ConfigView>('/config/import-env'),
+    onSuccess: (view) => refreshConfig(client, view),
+  });
+}
+
+/** Test a Jira credential before it is saved; nothing is written. */
+export const useTestJiraDraft = () =>
+  useMutation({ mutationFn: (body: JiraDraftTest) => api.post<ConnectionResult>('/config/jira/test', body) });
 
 export function useDiscovery() {
   const client = useQueryClient();
@@ -496,7 +566,7 @@ export function useCloneMapping(templateId: number) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ fromTemplateId, apply }: { fromTemplateId: number; apply?: boolean }) =>
-      api.post<CloneMappingPlan>(`/reports/templates/${templateId}/clonar-mapeamento`, {
+      api.post<CloneMappingPlan>(`/reports/templates/${templateId}/clone-mapping`, {
         from_template_id: fromTemplateId,
         aplicar: apply ?? false,
       }),

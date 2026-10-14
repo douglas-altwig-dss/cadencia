@@ -1,12 +1,18 @@
 """Runtime configuration.
 
-Every value comes from ``CADENCIA_*`` environment variables, an optional ``.env`` file, or a
+These values come from ``CADENCIA_*`` environment variables, an optional ``.env`` file, or a
 secret file mounted in ``/run/secrets`` (file named after the variable, e.g.
 ``/run/secrets/cadencia_jira_api_token``). Credentials never live in the repository.
+
+This is the *seed*: the runtime fields can also be saved in the app, and a saved value wins
+(``cadencia.config_store``, docs/config-store.md). Read them through ``effective_settings``;
+``get_settings()`` is the environment alone, which is right only for the bootstrap fields.
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -79,6 +85,23 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
     log_level: str = "INFO"
     log_json: bool = True
+
+    # Fernet key for the secrets saved in the app (docs/config-store.md). Empty: a key generated
+    # once into <data_dir>/secret.key.
+    secret_key: SecretStr = SecretStr("")
+
+    @field_validator("secret_key")
+    @classmethod
+    def _fernet_key(cls, value: SecretStr) -> SecretStr:
+        raw = value.get_secret_value()
+        if raw:
+            try:
+                valid = len(base64.urlsafe_b64decode(raw.encode())) == 32
+            except (ValueError, binascii.Error):
+                valid = False
+            if not valid:
+                raise ValueError("CADENCIA_SECRET_KEY must be 32 bytes in urlsafe base64 (a Fernet key)")
+        return value
 
     @field_validator("timezone")
     @classmethod

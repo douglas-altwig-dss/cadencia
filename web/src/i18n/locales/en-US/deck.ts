@@ -541,6 +541,7 @@ export const deck = {
   /** `pages/DeckPage`'s run result (`RunResult`, `fixLink`). */
   page: {
     openInEditor: 'open in the editor',
+    openPage: 'open the page',
     openVariables: 'open Variables',
     validationOk: 'validation ok',
     validationErrors: (n: number) => `validation with ${plural(n, 'error', 'errors')}`,
@@ -681,10 +682,33 @@ export const deck = {
     inheritsPath: 'Variables → Status colors',
     inherits: (path: ReactNode): ReactNode[] => ['Empty inherits from ', path, '. Fill in only what this template does differently.'],
   },
+  /** `pages/DeckPage.tsx`'s `RunsPage` and `RunPage`: the generations, outside the editor. */
+  runsPage: {
+    title: 'Generations',
+    subtitle: 'Every deck generated, newest first: review, approve, share and present it without opening the editor.',
+    template: 'Template',
+    allTemplates: 'all templates',
+    emptyTitle: 'Nothing generated yet',
+    emptyBody: 'Generate a deck from a template in the editor; it shows here.',
+    templateDeleted: 'template deleted',
+    runTitle: (date: string) => `Generation of ${date}`,
+    runOf: (template: string) => `From the template “${template}”`,
+    openInEditor: 'Open in the editor',
+  },
+  /** `pages/DeckPage.tsx`'s `VariablesPage`. */
+  variablesPage: {
+    title: 'Variables',
+    subtitle: 'The texts a deck fills in by name, with their values per slide, board, space or for everyone.',
+    template: 'Template',
+    templateHint: 'Variables belong to a template or are shared by all; the resolved values are this template’s.',
+    noTemplates: 'Variables belong to templates: upload one first.',
+  },
   /** `DeckPage`, the gallery screen. */
   home: {
     title: 'End-of-sprint presentation',
     subtitle: 'The .pptx template is the visual contract: Cadência fills its areas and never redraws the slides.',
+    generations: 'Generations',
+    variables: 'Variables',
     emptyTitle: 'No templates yet',
     emptyBody: 'Upload the .pptx used in Friday’s meeting: Cadência extracts the manifest and suggests the mapping.',
   },

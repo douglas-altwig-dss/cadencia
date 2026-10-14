@@ -88,7 +88,8 @@ export const shell = {
     deliver: 'Deliver',
     system: 'System',
     home: 'Home',
-    flow: 'Flow',
+    spaces: 'Spaces',
+    boards: 'Boards',
     people: 'People',
     focusTimeline: 'Focus timeline',
     presentation: 'Presentation',
@@ -98,6 +99,8 @@ export const shell = {
     dataHygiene: 'Data hygiene',
     notifications: 'Notifications',
     gettingStarted: 'Getting started',
+    generations: 'Generations',
+    variables: 'Deck variables',
   },
 
   /** `api/client.ts` and the hooks: failures the client words itself. */
@@ -508,6 +511,7 @@ export const shell = {
     noteBody:
       'Each mark describes a fact from the Jira history and shows the rule that produced it. Click “evidence” to see the last transition, its date and its author.',
     situation: 'Situation',
+    board: 'Board',
     person: 'Person',
     all: 'All',
     type: 'Type',
@@ -607,8 +611,7 @@ export const shell = {
       'pulse:recent': { label: 'Recent deliveries', description: 'Deliveries per day over the last 7 days, against the 7 before.' },
       'pulse:feed': { label: 'Happening now', description: 'What was delivered, blocked or entered the sprint in the last 48 hours.' },
       'pulse:due': { label: 'Due in 7 days', description: 'Items due next week and the ones already overdue.' },
-      'sprint:elapsed': { label: 'Current sprint', description: 'How much of the sprint has passed and how much is done, per board.' },
-      'kanban:boards': { label: 'Kanban boards', description: 'The week’s throughput and items at risk, per followed kanban board.' },
+      spaces: { label: 'Spaces', description: 'One row per team: tracked boards, items at risk, deliveries this week and sprint progress.' },
       boards: { label: 'Boards table', description: 'One row per board: progress, risk, throughput, trend and collection.' },
       'saude:pontos': {
         label: 'Data hygiene',
@@ -634,10 +637,6 @@ export const shell = {
       'Of what was committed at the start of the sprint, how much was delivered: delivered ÷ committed, summing the boards sprint by sprint. Closed sprints only; what entered after the start is left out. The change is in percentage points against the previous sprint.',
     'tile:sprint:scope':
       'Items (stories, tasks and bugs) that entered the sprint after it started and are still in it, summed across boards with a running sprint. Those already done count too.',
-    'tile:sprint:elapsed':
-      'Time: (today − start) ÷ (end − start) of the sprint. Items: done ÷ sprint items. “Behind time” shows when the items done are more than 20 percentage points below the time already passed.',
-    'tile:kanban:boards':
-      'A kanban board has no sprint, so it shows here instead of under "Current sprint": the window is the calendar week (checkpoint to checkpoint), not a sprint start and end. "This week" is what was done in the current window (stories, tasks and bugs); the arrow compares with the previous week. "At risk" sums the board’s open items in any risk situation — carried over, overdue, blocked, stalled or aging.',
     'tile:team:load': `Sum of open hours ÷ sum of the capacity left, for the people who have capacity in the period.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES}`,
     'tile:team:overloaded':
       'People whose load is over 110% of the capacity left (the 10% tolerance is the board’s). It is a signal to talk early, not an evaluation: it depends on estimates existing and on each person’s availability being recorded.',
@@ -650,6 +649,8 @@ export const shell = {
       'What happened in the last 48 hours: an item done, an item that entered a blocking status or was flagged as an impediment, and an item that entered a sprint after its first day. Most recent first, up to 30.',
     'tile:pulse:due':
       'Open items (stories, tasks and bugs) with a due date in the next 7 days. The smaller number is the open items whose due date has already passed.',
+    'tile:spaces':
+      'One row per space (team), over its tracked boards. At risk: open items in any risk situation, each once, in its most severe one. Delivered: stories, tasks and bugs done in the current weekly window, against the window before. Sprint progress: done ÷ items over the running sprints of the space’s boards, summing items rather than averaging boards; a board with no sprint running does not count.',
     'tile:boards': 'One row per followed board. Hover over or focus the column headers to see how each one is calculated.',
     'tile:saude:pontos':
       'Data hygiene points of attention on the followed boards — unestimated items, little done history and the like. None stops collection, but each makes some indicator less reliable. The detail, per board, is under Collection status → Data hygiene.',
@@ -689,6 +690,12 @@ export const shell = {
     'history:lead': `The number is the P85 from the item’s creation to done, for what the person completed in the period. ${PERCENTILE}`,
     'history:unplanned': 'Items that entered the person’s sprints after they started, summed over the latest sprints.',
 
+    // ---- a space (team)
+    'space:risk': 'The open items of the space’s tracked boards by risk situation, each in its most severe one: carried over, overdue, blocked, stalled or aging. Summed over the boards.',
+    'space:delivered':
+      'Stories, tasks and bugs done in the current weekly window on the space’s tracked boards, and beside it how many in the window before. Subtasks do not count.',
+    'space:progress':
+      'Done ÷ items over the running sprints of the space’s boards (stories, tasks and bugs), summing the items of every board rather than averaging the boards, so a big board weighs more. A board with no sprint running is left out.',
     // ---- a sprint
     'sprint:progress':
       'Done ÷ sprint items (stories, tasks and bugs), by count and by sum of estimates. Coverage is the share of items that have an estimate.',
@@ -714,6 +721,14 @@ export const shell = {
     'flow:carryover': 'Median carry-over rate (committed left over ÷ committed) of the sprints closed in the period.',
     'flow:reopen':
       'Done items that were ever reopened ÷ done items. Below, how many moves back to an earlier column there were in total.',
+
+    // ---- a board's card on the Boards page
+    'boards:progress':
+      'Done ÷ items in the running sprint (stories, tasks and bugs; subtasks and epics are left out), by count. The vertical mark is how much of the sprint’s time has passed, to read the bar against.',
+    'boards:delivered':
+      'Stories, tasks and bugs done in the current weekly window — the calendar week on a board with no sprint running — and, beside it, how many in the window before.',
+    'boards:trend':
+      'Items delivered in each of the last periods, oldest on the left: per sprint (the last four closed and the running one) when a sprint is running, otherwise per weekly window (the last four).',
 
     // ---- an issue
     'issue:lead': 'From creation until done. Exists only once the item is done.',

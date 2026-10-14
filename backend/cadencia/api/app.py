@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cadencia import __version__
 from cadencia.api import (
+    routes_config,
     routes_deck,
     routes_epic_plan,
     routes_export,
@@ -24,8 +25,10 @@ from cadencia.api import (
     routes_setup,
     routes_views,
 )
+from cadencia.api.legacy import LegacyApiPaths
 from cadencia.api.security import SecurityHeaders, TokenAuth
 from cadencia.config import Settings, get_settings
+from cadencia.config_store import effective_from
 from cadencia.errors import Invalid, NotFound
 from cadencia.i18n import Msg, configure_default_locale, render, using_locale
 from cadencia.i18n.middleware import LocaleMiddleware, locale_of
@@ -37,15 +40,26 @@ from cadencia.store.db import make_engine, make_session_factory
 log = logging.getLogger(__name__)
 
 
+def _startup_locale(settings: Settings, sessions: sessionmaker[Session]) -> str:
+    """The saved language when the database answers, else the environment's."""
+    try:
+        return effective_from(settings, sessions).locale
+    except Exception:
+        log.warning("saved settings unreadable at startup; using the environment's", exc_info=True)
+        return settings.locale
+
+
 def create_app(settings: Settings | None = None, sessions: sessionmaker[Session] | None = None) -> FastAPI:
+    # The environment's settings: the bootstrap fields, and the seed the values saved in the app are
+    # laid over on every request (deps.settings_dep, docs/config-store.md).
     settings = settings or get_settings()
-    # The language of what this process produces outside a request (scheduler jobs it starts).
-    configure_default_locale(settings.locale)
     if sessions is None:
         configure_logging(settings.log_level, settings.log_json)
         engine = make_engine(settings.database_url)
         prepare_database(settings, engine)
         sessions = make_session_factory(engine)
+    # The language of what this process produces outside a request (scheduler jobs it starts).
+    configure_default_locale(_startup_locale(settings, sessions))
 
     app = FastAPI(
         title="Cadência API",
@@ -57,7 +71,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     token = settings.api_token.get_secret_value()
     register_secret(token)
     # Last added runs first: CORS answers a preflight (which never carries credentials) before the
-    # token check sees it, and both CORS and nosniff headers also reach a 401.
+    # token check sees it, and both CORS and nosniff headers also reach a 401. The old Portuguese
+    # paths redirect inside the token check, so only an authenticated caller learns the new path.
+    app.add_middleware(LegacyApiPaths)
     app.add_middleware(TokenAuth, token=token)
     app.add_middleware(SecurityHeaders)
     app.add_middleware(
@@ -93,15 +109,13 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     @app.exception_handler(Invalid)
     async def bad_request(request: Request, exc: Invalid) -> JSONResponse:
         locale = locale_of(request)
-        return JSONResponse(
-            status_code=400,
-            content={
-                "detail": {
-                    "cause": render(Msg("common.error.invalid"), locale),
-                    "message": render(exc.msg, locale),
-                }
-            },
-        )
+        detail = {
+            "cause": render(Msg("common.error.invalid"), locale),
+            "message": render(exc.msg, locale),
+        }
+        if exc.field is not None:
+            detail["field"] = exc.field
+        return JSONResponse(status_code=400, content={"detail": detail})
 
     @app.exception_handler(Exception)
     async def internal_error(request: Request, exc: Exception) -> JSONResponse:
@@ -126,6 +140,7 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
 
     for module in (
         routes_setup,
+        routes_config,
         # Before routes_views: /people/overview must not be read as /people/{account_id}.
         routes_people,
         routes_views,

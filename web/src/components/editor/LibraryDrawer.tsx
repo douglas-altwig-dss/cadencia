@@ -48,15 +48,15 @@ export function LibraryDrawer({
   const t = useT();
   return (
     <Drawer opened={opened} onClose={onClose} position="right" size="lg" title={t.editor.library.title}>
-      <Tabs defaultValue="imagens" keepMounted={false}>
+      <Tabs defaultValue="images" keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="imagens">{t.editor.library.images}</Tabs.Tab>
-          <Tabs.Tab value="blocos">{t.editor.library.blocks}</Tabs.Tab>
+          <Tabs.Tab value="images">{t.editor.library.images}</Tabs.Tab>
+          <Tabs.Tab value="blocks">{t.editor.library.blocks}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="imagens">
+        <Tabs.Panel value="images">
           <Images onInsert={onInsertImage} />
         </Tabs.Panel>
-        <Tabs.Panel value="blocos">
+        <Tabs.Panel value="blocks">
           <Blocks selection={selection} onInsert={onInsertBlock} />
         </Tabs.Panel>
       </Tabs>

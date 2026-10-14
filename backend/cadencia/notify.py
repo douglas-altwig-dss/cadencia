@@ -337,7 +337,7 @@ def deck_message(settings: Settings, run: Any, template_name: str) -> Message:
         event="deck",
         title=Msg("notify.deck.title", name=template_name),
         text=Msg("notify.deck.approved") if ok else Msg("notify.deck.refused", errors=errors),
-        link=app_link(settings, f"/apresentacao?modelo={run.template_id}&run={run.id}"),
+        link=app_link(settings, f"/presentation/runs/{run.id}"),
         fields={
             Msg("notify.deck.field.reference"): Msg(
                 "notify.deck.reference_at", at=run.reference_at.astimezone(UTC).isoformat()

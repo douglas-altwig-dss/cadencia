@@ -13,15 +13,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cadencia.analytics.data import BoardData, load_board
 from cadencia.config import Settings
+from cadencia.config_store import effective_settings
 from cadencia.domain.models import Sprint
 from cadencia.errors import NotFound
-from cadencia.i18n import tr
+from cadencia.i18n import Msg, tr
 from cadencia.store import repo
+from cadencia.store import schema as s
 from cadencia.store.db import session_scope
-
-
-def settings_dep(request: Request) -> Settings:
-    return request.app.state.settings
 
 
 def sessions_dep(request: Request) -> sessionmaker[Session]:
@@ -33,6 +31,19 @@ def session_dep(request: Request) -> Iterator[Session]:
         yield session
 
 
+SessionsDep = Annotated[sessionmaker[Session], Depends(sessions_dep)]
+# scope="function": commit before the response is sent, so a follow-up request (e.g. downloading
+# the deck just generated) always sees the write.
+SessionDep = Annotated[Session, Depends(session_dep, scope="function")]
+
+
+def settings_dep(request: Request, session: SessionDep) -> Settings:
+    """The effective settings for this request: the environment (``app.state.settings``) with the
+    values saved in the app laid over it (docs/config-store.md). It reads through the request's
+    own session, so a request that also saves configuration sees what it saved."""
+    return effective_settings(request.app.state.settings, session)
+
+
 def clock() -> datetime:
     """Request time, to the minute: every view a page loads at once then asks about the same
     instant, so they share the board's memoised risk context instead of each building its own."""
@@ -40,10 +51,6 @@ def clock() -> datetime:
 
 
 SettingsDep = Annotated[Settings, Depends(settings_dep)]
-SessionsDep = Annotated[sessionmaker[Session], Depends(sessions_dep)]
-# scope="function": commit before the response is sent, so a follow-up request (e.g. downloading
-# the deck just generated) always sees the write.
-SessionDep = Annotated[Session, Depends(session_dep, scope="function")]
 Now = Annotated[datetime, Depends(clock)]
 
 
@@ -149,6 +156,24 @@ def csv_ints(value: str | None) -> list[int]:
 
 def csv_strs(value: str | None) -> list[str]:
     return [v.strip() for v in (value or "").split(",") if v.strip()]
+
+
+def space_or_404(session: Session, key: str, *, tracked: bool = False) -> tuple[JSONDict, list[s.BoardRow]]:
+    """A space (team) and its boards, alphabetical; only the tracked ones with ``tracked``.
+
+    A space exists when the space table knows it or a board names it, so one whose boards were all
+    untracked still answers, with no boards.
+    """
+    rows, _ = repo.list_boards(session, selected=True if tracked else None, limit=1000)
+    boards = sorted((r for r in rows if r.space_key == key), key=lambda r: r.name.casefold())
+    known = {r.key: r.name for r in repo.list_spaces(session)}
+    named = repo.spaces_of_boards(session, boards).get(key)
+    if named is None and key not in known:
+        everywhere, _ = repo.list_boards(session, limit=1000)
+        if not any(r.space_key == key for r in everywhere):
+            raise NotFound(key, Msg("board.space_not_found", key=key))
+    name = named.label if named is not None else known.get(key) or key
+    return {"key": key, "name": name}, boards
 
 
 def selected_or(session: Session, settings: Settings, ids: list[int]) -> list[BoardData]:

@@ -45,9 +45,11 @@ class NotFound(KeyError):
 class Invalid(ValueError):
     """The request is well formed but its content is refused (HTTP 400)."""
 
-    def __init__(self, message: str | Msg) -> None:
+    def __init__(self, message: str | Msg, *, field: str | None = None) -> None:
         super().__init__(message)
         self.msg: Msg | str = message
+        #: The input the refusal is about, when it is one (the API adds it to the 400's detail).
+        self.field = field
 
     def __str__(self) -> str:
         return _render(self.msg)

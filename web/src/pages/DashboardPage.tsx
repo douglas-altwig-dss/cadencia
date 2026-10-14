@@ -62,8 +62,8 @@ export function DashboardPage() {
       {data && data.rows.length === 0 && !error && (
         <Empty
           title={m.noBoardsTitle}
-          action={{ label: m.gettingStarted, to: '/inicio' }}
-          secondary={{ label: m.chooseBoards, to: '/configuracao' }}
+          action={{ label: m.gettingStarted, to: '/setup' }}
+          secondary={{ label: m.chooseBoards, to: '/settings' }}
         >
           {m.noBoardsBody}
         </Empty>

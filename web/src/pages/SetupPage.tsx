@@ -1,30 +1,70 @@
-import { Alert, Anchor, Button, Code, Group, List, MultiSelect, Paper, Stack, Stepper, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Code, Group, MultiSelect, Paper, Stack, Stepper, Text, Title } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
-import { IconCheck, IconPlugConnected } from '@tabler/icons-react';
+import { IconSettings } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 
-import { useBoards, useCollect, useConnectionTest, useDiscovery, useHealth, useSaveSelection, useStatus } from '../api/hooks';
+import { useBoards, useCollect, useDiscovery, useHealth, useSaveSelection, useStatus } from '../api/hooks';
 import { CollectionProgress } from '../components/CollectionProgress';
-import { ErrorState, PageHeader } from '../components/common';
+import { ErrorState, Loading, PageHeader } from '../components/common';
+import { ConfigWizard } from '../components/setup/ConfigWizard';
 import { useT } from '../i18n';
+import { useFilters } from '../lib/filters';
+
+type Phase = 'configure' | 'first-run';
 
 /**
- * RF-79: the first run as a guided path — connect, discover, choose boards, collect, then the deck —
- * instead of a README and a terminal (the M0 milestone). Each step unlocks the next and says what
- * it did; the position is remembered, and a step already satisfied (Jira configured, boards chosen,
- * a collection done) is recognised rather than asked again.
+ * RF-79: setting Cadência up, as one guided path at `/setup`. Two phases: *configure* (the runtime
+ * settings — Jira, calendar, collection, e-mail, AI — reviewed and saved at once) and *first run*
+ * (discover, choose boards, collect, then the deck). It replaces the getting-started guide and the
+ * configuration wizard, which both began by asking for Jira. `?phase=` says which phase is open;
+ * without it, a Jira already configured opens on the first run.
  */
-export function WizardPage() {
+export function SetupPage() {
+  const t = useT();
+  const m = t.tracking.wizard;
+  const navigate = useNavigate();
+  const { get, set } = useFilters();
+  const health = useHealth();
+  const requested = get('phase');
+  if (health.isLoading && requested !== 'configure' && requested !== 'first-run') return <Loading />;
+  const phase: Phase =
+    requested === 'configure' || requested === 'first-run' ? requested : health.data?.jira_configured ? 'first-run' : 'configure';
+  const phases: Phase[] = ['configure', 'first-run'];
+
+  return (
+    <>
+      <PageHeader
+        title={m.title}
+        subtitle={m.subtitle}
+        actions={
+          <Button variant="subtle" size="xs" onClick={() => navigate('/')}>
+            {m.skip}
+          </Button>
+        }
+      />
+      <Stepper active={phases.indexOf(phase)} onStepClick={(index) => set({ phase: phases[index] })} size="sm" mb="lg">
+        <Stepper.Step label={m.phaseConfigure} description={m.phaseConfigureHint} />
+        <Stepper.Step label={m.phaseFirstRun} description={m.phaseFirstRunHint} />
+      </Stepper>
+      {phase === 'configure' ? (
+        <ConfigWizard onDone={() => set({ phase: 'first-run' })} />
+      ) : (
+        <FirstRun onConfigure={() => set({ phase: 'configure' })} />
+      )}
+    </>
+  );
+}
+
+function FirstRun({ onConfigure }: { onConfigure: () => void }) {
   const navigate = useNavigate();
   const health = useHealth();
   const status = useStatus();
-  const test = useConnectionTest();
   const discover = useDiscovery();
   const boards = useBoards('', 1, 200);
   const select = useSaveSelection();
   const collect = useCollect();
-  const [step, setStep] = useLocalStorage({ key: 'cadencia-inicio-passo', defaultValue: 0, getInitialValueInEffect: false });
+  const [step, setStep] = useLocalStorage({ key: 'cadencia-setup-passo', defaultValue: 0, getInitialValueInEffect: false });
   const [chosen, setChosen] = useState<string[]>([]);
   const m = useT().tracking.wizard;
 
@@ -43,68 +83,29 @@ export function WizardPage() {
 
   return (
     <>
-      <PageHeader
-        title={m.title}
-        subtitle={m.subtitle}
-        actions={
-          <Button variant="subtle" size="xs" onClick={() => navigate('/')}>
-            {m.skip}
-          </Button>
-        }
-      />
+      {!configured && health.data && (
+        <Alert color="yellow" variant="light" title={m.notConfigured} mb="md">
+          <Stack gap="sm" align="flex-start">
+            <Text size="sm">{m.notConfiguredBody}</Text>
+            <Button onClick={onConfigure} leftSection={<IconSettings size={16} />}>
+              {m.configure}
+            </Button>
+            <Text size="sm">
+              {m.noCredentialsBefore} <Code>make demo</Code> {m.noCredentialsAfter}
+            </Text>
+          </Stack>
+        </Alert>
+      )}
       <Paper withBorder p="lg">
         <Stepper active={step} onStepClick={setStep} allowNextStepsSelect={false} size="sm">
-          <Stepper.Step label={m.stepConnection} description={m.stepConnectionHint} completedIcon={<IconCheck size={16} />}>
-            <Stack gap="sm" mt="md">
-              {!configured ? (
-                <Alert color="yellow" variant="light" title={m.notConfigured}>
-                  <Text size="sm">
-                    {m.setThreeBefore} <Code>.env</Code> {m.setThreeAfter}
-                  </Text>
-                  <List size="sm" mt={4}>
-                    <List.Item><Code>CADENCIA_JIRA_BASE_URL</Code> {m.baseUrlHint}</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_EMAIL</Code> {m.emailHint}</List.Item>
-                    <List.Item><Code>CADENCIA_JIRA_API_TOKEN</Code> {m.tokenHint} <Code>secrets/jira_api_token</Code></List.Item>
-                  </List>
-                  <Text size="sm" mt={4}>
-                    {m.noCredentialsBefore} <Code>make demo</Code> {m.noCredentialsAfter}
-                  </Text>
-                </Alert>
-              ) : (
-                <Text size="sm">
-                  {m.instance} <b>{health.data?.jira_base_url ?? m.configured}</b>. {m.testHint}
-                </Text>
-              )}
-              <Group>
-                <Button leftSection={<IconPlugConnected size={16} />} onClick={() => test.mutate()} loading={test.isPending} disabled={!configured}>
-                  {m.test}
-                </Button>
-                <Button variant="default" disabled={!test.data?.ok} onClick={() => setStep(1)}>
-                  {m.continue}
-                </Button>
-              </Group>
-              {test.data?.ok && (
-                <Alert color="teal" variant="light">
-                  {m.connectedAs(test.data.identity?.name ?? '', Boolean(test.data.permissions?.BROWSE_PROJECTS))}
-                </Alert>
-              )}
-              {test.data && !test.data.ok && (
-                <Alert color="red" variant="light" title={test.data.error?.cause ?? m.failed}>
-                  {test.data.error?.message} {test.data.error?.action}
-                </Alert>
-              )}
-              {test.error && <ErrorState error={test.error} />}
-            </Stack>
-          </Stepper.Step>
-
           <Stepper.Step label={m.stepDiscovery} description={m.stepDiscoveryHint}>
             <Stack gap="sm" mt="md">
               <Text size="sm">{m.discoveryBody}</Text>
               <Group>
-                <Button onClick={() => discover.mutate()} loading={discover.isPending}>
+                <Button onClick={() => discover.mutate()} loading={discover.isPending} disabled={!configured}>
                   {m.discover}
                 </Button>
-                <Button variant="default" disabled={!discover.data && !(boards.data?.total ?? 0)} onClick={() => setStep(2)}>
+                <Button variant="default" disabled={!discover.data && !(boards.data?.total ?? 0)} onClick={() => setStep(1)}>
                   {m.continue}
                 </Button>
               </Group>
@@ -115,7 +116,7 @@ export function WizardPage() {
                     <>
                       {' '}
                       {m.missingFields(discover.data.missing_fields.join(', '))}{' '}
-                      <Anchor component={Link} to="/configuracao?tab=campos">
+                      <Anchor component={Link} to="/settings?tab=fields">
                         {m.fillManually}
                       </Anchor>
                       .
@@ -142,7 +143,7 @@ export function WizardPage() {
                 <Button
                   disabled={!chosen.length}
                   loading={select.isPending}
-                  onClick={() => select.mutate(chosen.map(Number), { onSuccess: () => setStep(3) })}
+                  onClick={() => select.mutate(chosen.map(Number), { onSuccess: () => setStep(2) })}
                 >
                   {m.saveAndContinue}
                 </Button>
@@ -158,7 +159,7 @@ export function WizardPage() {
                 <Button onClick={() => collect.mutate({ mode: 'full' })} loading={collect.isPending} disabled={status.data?.collecting}>
                   {m.collectNow}
                 </Button>
-                <Button variant="default" disabled={!collected} onClick={() => setStep(4)}>
+                <Button variant="default" disabled={!collected} onClick={() => setStep(3)}>
                   {m.continue}
                 </Button>
               </Group>
@@ -173,10 +174,10 @@ export function WizardPage() {
               <Title order={5}>{m.deckTitle}</Title>
               <Text size="sm">{m.deckBody}</Text>
               <Group>
-                <Button component={Link} to="/apresentacao" onClick={() => setStep(5)}>
+                <Button component={Link} to="/presentation" onClick={() => setStep(4)}>
                   {m.openDeck}
                 </Button>
-                <Button variant="default" onClick={() => (setStep(5), navigate('/'))}>
+                <Button variant="default" onClick={() => (setStep(4), navigate('/'))}>
                   {m.later}
                 </Button>
               </Group>

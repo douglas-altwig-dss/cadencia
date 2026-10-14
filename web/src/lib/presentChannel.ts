@@ -30,7 +30,7 @@ export type PresentMessage =
 
 export const channelName = (id: string) => `cadencia-apresentacao-${id}`;
 
-export const audienceUrl = (id: string) => `/apresentar/plateia?canal=${encodeURIComponent(id)}`;
+export const audienceUrl = (id: string) => `/present/audience?channel=${encodeURIComponent(id)}`;
 
 export const supportsAudience = () => typeof window !== 'undefined' && 'BroadcastChannel' in window;
 

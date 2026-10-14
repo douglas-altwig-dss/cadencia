@@ -30,7 +30,7 @@ In development, set `CADENCIA_API_TOKEN` in `.env` and the Vite proxy forwards i
 
 **No Jira credentials yet?** `make demo` fills the database with a fictional instance: two spaces over three boards, and items built to trigger every risk rule. It also loads a sample template with its mapping.
 
-The first time you open the app, **Primeiros passos** (`/inicio`) walks through the same path in the browser: connect, discover, choose boards, run the first collection with live progress, then upload the template.
+The first time you open the app, **Setup** (`/setup`) walks through the same path in the browser: configure Jira and the defaults, then discover, choose boards, run the first collection with live progress, and upload the template.
 
 ## First steps with a real instance (milestone M0)
 

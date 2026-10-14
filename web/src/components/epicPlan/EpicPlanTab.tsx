@@ -89,7 +89,7 @@ function Problems({ problems }: { problems: PlanProblem[] }) {
 
 /**
  * The epic plan: roles, capacity, hours per role, dependencies, the baseline schedule, the
- * generated plan and the task cards — every number from ``GET /epics/{key}/plano``.
+ * generated plan and the task cards — every number from ``GET /epics/{key}/plan``.
  */
 export function EpicPlanTab({ epicKey }: { epicKey: string }) {
   const t = useT();

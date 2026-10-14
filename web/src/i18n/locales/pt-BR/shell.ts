@@ -75,7 +75,8 @@ export const shell: Messages['shell'] = {
     deliver: 'Entregar',
     system: 'Sistema',
     home: 'Painel',
-    flow: 'Fluxo',
+    spaces: 'Espaços',
+    boards: 'Boards',
     people: 'Pessoas',
     focusTimeline: 'Timeline de foco',
     presentation: 'Apresentação',
@@ -85,6 +86,8 @@ export const shell: Messages['shell'] = {
     dataHygiene: 'Saúde dos dados',
     notifications: 'Notificações',
     gettingStarted: 'Primeiros passos',
+    generations: 'Gerações',
+    variables: 'Variáveis da apresentação',
   },
 
   api: {
@@ -476,6 +479,7 @@ export const shell: Messages['shell'] = {
     noteBody:
       'Cada marcação descreve um fato do histórico do Jira e mostra a regra que a gerou. Clique em “evidência” para ver a última transição, a data e o autor.',
     situation: 'Situação',
+    board: 'Board',
     person: 'Pessoa',
     all: 'Todas',
     type: 'Tipo',
@@ -571,8 +575,7 @@ export const shell: Messages['shell'] = {
       'pulse:recent': { label: 'Entregas recentes', description: 'Entregas por dia nos últimos 7 dias, contra os 7 anteriores.' },
       'pulse:feed': { label: 'Acontecendo agora', description: 'O que foi entregue, bloqueado ou entrou na sprint nas últimas 48 horas.' },
       'pulse:due': { label: 'Vencendo em 7 dias', description: 'Itens com prazo na próxima semana e os que já venceram.' },
-      'sprint:elapsed': { label: 'Sprint em curso', description: 'Quanto da sprint já passou e quanto já foi concluído, por board.' },
-      'kanban:boards': { label: 'Boards kanban', description: 'Vazão da semana e itens em risco, por board kanban acompanhado.' },
+      spaces: { label: 'Espaços', description: 'Uma linha por time: boards acompanhados, itens em risco, entregas da semana e progresso da sprint.' },
       boards: { label: 'Tabela de boards', description: 'Uma linha por board: progresso, risco, vazão, tendência e coleta.' },
       'saude:pontos': {
         label: 'Saúde dos dados',
@@ -592,10 +595,6 @@ export const shell: Messages['shell'] = {
       'Do que se comprometeu no início da sprint, quanto foi entregue: entregues ÷ comprometidos, somando os boards sprint a sprint. Só sprints encerradas; o que entrou depois do início fica de fora. A variação é em pontos percentuais contra a sprint anterior.',
     'tile:sprint:scope':
       'Itens (histórias, tarefas e bugs) que entraram na sprint depois do início e continuam nela, somados nos boards com sprint em curso. Os que já foram concluídos também contam.',
-    'tile:sprint:elapsed':
-      'Tempo: (hoje − início) ÷ (fim − início) da sprint. Itens: concluídos ÷ itens da sprint. “Atrás do tempo” aparece quando os itens concluídos estão mais de 20 pontos percentuais abaixo do tempo que já passou.',
-    'tile:kanban:boards':
-      'Um board kanban não tem sprint, então aparece aqui em vez de em "Sprint em curso": a janela é a semana de calendário (checkpoint a checkpoint), não um início e fim de sprint. "Na semana" é o que foi concluído na janela atual (histórias, tarefas e bugs); a seta compara com a semana anterior. "Em risco" soma os itens abertos do board em qualquer situação de risco — arrastado, atrasado, bloqueado, parado ou envelhecido.',
     'tile:team:load': `Soma das horas abertas ÷ soma da capacidade que resta, para as pessoas que têm capacidade no período.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES}`,
     'tile:team:overloaded':
       'Pessoas cuja carga passa de 110% da capacidade que resta (a tolerância de 10% é a do board). É um sinal para conversar cedo, não uma avaliação: depende de as estimativas existirem e de a disponibilidade de cada um estar registrada.',
@@ -608,6 +607,8 @@ export const shell: Messages['shell'] = {
       'O que aconteceu nas últimas 48 horas: item concluído, item que entrou em status de bloqueio ou foi sinalizado como impedimento, e item que entrou numa sprint depois do primeiro dia dela. Os mais recentes primeiro, até 30.',
     'tile:pulse:due':
       'Itens abertos (histórias, tarefas e bugs) com data limite nos próximos 7 dias. O número menor é o dos itens abertos cuja data limite já passou.',
+    'tile:spaces':
+      'Uma linha por espaço (time), sobre os boards acompanhados dele. Em risco: itens abertos em alguma situação de risco, cada um uma vez, na mais grave. Entregues: histórias, tarefas e bugs concluídos na janela semanal atual, contra a anterior. Progresso da sprint: concluídos ÷ itens nas sprints em andamento dos boards do espaço, somando itens em vez de fazer média dos boards; board sem sprint em andamento não conta.',
     'tile:boards': 'Uma linha por board acompanhado. Passe o mouse ou foque nos títulos das colunas para ver como cada uma é calculada.',
     'tile:saude:pontos':
       'Pontos de atenção de higiene de dados nos boards acompanhados — itens sem estimativa, pouco histórico concluído e afins. Nenhum impede a coleta, mas cada um deixa algum indicador menos confiável. O detalhe, por board, fica em Status da coleta → Saúde dos dados.',
@@ -642,6 +643,11 @@ export const shell: Messages['shell'] = {
     'history:lead': `O número é o P85 da criação do item à conclusão, para o que a pessoa concluiu no período. ${PERCENTILE}`,
     'history:unplanned': 'Itens que entraram nas sprints da pessoa depois do início, somados nas últimas sprints.',
 
+    'space:risk': 'Itens abertos dos boards acompanhados do espaço por situação de risco, cada um na mais grave: carregado, atrasado, bloqueado, parado ou envelhecendo. Somados entre os boards.',
+    'space:delivered':
+      'Histórias, tarefas e bugs concluídos na janela semanal atual nos boards acompanhados do espaço e, ao lado, quantos na janela anterior. Subtarefas não contam.',
+    'space:progress':
+      'Concluídos ÷ itens nas sprints em andamento dos boards do espaço (histórias, tarefas e bugs), somando os itens de todos os boards em vez de fazer média dos boards, então um board grande pesa mais. Board sem sprint em andamento fica de fora.',
     'sprint:progress':
       'Concluídos ÷ itens da sprint (histórias, tarefas e bugs), pela contagem e pela soma das estimativas. A cobertura é a parte dos itens que tem estimativa.',
     'sprint:risk': 'Itens da sprint por situação de risco, cada um na mais grave: arrastado, atrasado, bloqueado, parado ou envelhecido; os que não disparam regra ficam em dia.',
@@ -665,6 +671,13 @@ export const shell: Messages['shell'] = {
     'flow:carryover': 'Mediana da taxa de arrasto (comprometidos que sobraram ÷ comprometidos) das sprints encerradas no período.',
     'flow:reopen':
       'Itens concluídos que já foram reabertos alguma vez ÷ itens concluídos. Abaixo, quantas mudanças para uma coluna anterior houve no total.',
+
+    'boards:progress':
+      'Concluídos ÷ itens da sprint em andamento (histórias, tarefas e bugs; subtarefas e épicos ficam de fora), pela contagem. A marca vertical é quanto do tempo da sprint já passou, para ler a barra contra ela.',
+    'boards:delivered':
+      'Histórias, tarefas e bugs concluídos na janela semanal atual — a semana do calendário num board sem sprint em andamento — e, ao lado, quantos na janela anterior.',
+    'boards:trend':
+      'Itens entregues em cada um dos últimos períodos, do mais antigo à esquerda: por sprint (as quatro últimas encerradas e a em andamento) quando há sprint em andamento; senão, por janela semanal (as quatro últimas).',
 
     'issue:lead': 'Da criação até a conclusão. Só existe depois de o item concluir.',
     'issue:cycle': 'Do primeiro momento em status de andamento até a conclusão. Só existe se o item chegou a começar.',

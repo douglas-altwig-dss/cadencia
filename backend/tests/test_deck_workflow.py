@@ -284,7 +284,7 @@ def test_share_links_open_one_deck_without_the_api_token(sessions, tmp_path, dem
             headers=auth,
         ).json()
         share = client.post(f"/api/reports/runs/{run['id']}/shares", json={"dias": 7}, headers=auth).json()
-        assert share["url"] == f"https://cadencia.example/compartilhado/{share['token']}"
+        assert share["url"] == f"https://cadencia.example/shared/{share['token']}"
         public = client.get(f"/api/public/decks/{share['token']}")  # no token at all
         assert public.status_code == 200
         body = public.json()

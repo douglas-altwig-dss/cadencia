@@ -53,9 +53,9 @@ function Check({ check }: { check: HealthCheck }) {
  * RF-78: Jira hygiene problems that quietly skew the numbers — unestimated work, statuses outside
  * every column, sprints without dates, owners outside the team — each with who fixes it and where.
  */
-export function HealthPanel() {
+export function HealthPanel({ boardIds }: { boardIds?: number[] } = {}) {
   const t = useT();
-  const health = useHealthCheck();
+  const health = useHealthCheck(boardIds);
   if (health.isLoading) return <Loading rows={4} />;
   if (health.error) return <ErrorState error={health.error} />;
   const data = health.data;

@@ -44,7 +44,7 @@ export function StatusPage() {
   const collect = useCollect();
   const data = status.data;
   const { get, set } = useFilters();
-  const tab = get('tab') ?? 'coleta';
+  const tab = get('tab') ?? 'collection';
   const { confirm, dialog: confirmDialog } = useConfirm();
   const m = useT().tracking.status;
   const start = (mode: 'incremental' | 'full') =>
@@ -98,13 +98,13 @@ export function StatusPage() {
       )}
       <Tabs value={tab} onChange={(value) => set({ tab: value })} mb="md" keepMounted={false}>
         <Tabs.List>
-          <Tabs.Tab value="coleta">{m.tabCollection}</Tabs.Tab>
-          <Tabs.Tab value="saude">{m.tabHealth}</Tabs.Tab>
+          <Tabs.Tab value="collection">{m.tabCollection}</Tabs.Tab>
+          <Tabs.Tab value="health">{m.tabHealth}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="saude">
+        <Tabs.Panel value="health">
           <HealthPanel />
         </Tabs.Panel>
-        <Tabs.Panel value="coleta">
+        <Tabs.Panel value="collection">
         {data && (
           <Stack gap="lg">
             <CollectionProgress />
