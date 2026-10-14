@@ -64,7 +64,9 @@ export function EpicPage() {
       <Box mb="md">
         <ItemDescription text={data.description} />
       </Box>
-      <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
+      {/* Keyed by the epic: switching to another one remounts the tabs, so no tab keeps the
+          previous one's state (picked checkpoints, a what-if result, an open detail). */}
+      <Tabs key={key} value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
           <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
           <Tabs.Tab value="plan">{m.tabPlan}</Tabs.Tab>

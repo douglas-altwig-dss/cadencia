@@ -168,7 +168,9 @@ export function BoardPage() {
         ]}
       />
       <Freshness freshness={data.freshness} />
-      <Tabs value={tab} onChange={(value) => void goTo(value)} keepMounted={false}>
+      {/* Keyed by the board: switching to another one remounts the tabs, so no tab keeps the
+          previous one's state (picked checkpoints, a what-if result, an open detail). */}
+      <Tabs key={boardId} value={tab} onChange={(value) => void goTo(value)} keepMounted={false}>
         <Tabs.List mb="md" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
           {visible.map((id) => (
             <Tabs.Tab key={id} value={id}>

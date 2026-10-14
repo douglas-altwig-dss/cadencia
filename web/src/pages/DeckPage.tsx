@@ -1325,6 +1325,7 @@ export function RunPage() {
     <>
       {header}
       <RunResult
+        key={current.id}
         run={current}
         standalone
         context={{ data, draft, runs: runs.data?.items ?? [] }}

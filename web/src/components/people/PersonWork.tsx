@@ -4,14 +4,14 @@ import { Link } from 'react-router';
 
 import type { PersonDetail, PersonItem } from '../../api/types';
 import { t as catalog, useT } from '../../i18n';
-import { fmtDate, fmtNum } from '../../lib/format';
+import { fmtDay, fmtNum } from '../../lib/format';
 import { blockSeverity } from '../../lib/people';
 import { Empty, IssueLink } from '../common';
 import { RiskBadge } from '../risk';
 import { SeverityBadge } from './indicators';
 
 const dueText = (item: PersonItem) => {
-  if (!item.open || item.due_in_days == null) return item.due_date ? fmtDate(item.due_date) : '—';
+  if (!item.open || item.due_in_days == null) return item.due_date ? fmtDay(item.due_date) : '—';
   const tw = catalog().people.work;
   if (item.due_in_days < 0) return tw.dueAgo(-item.due_in_days);
   if (item.due_in_days === 0) return tw.dueToday;

@@ -167,7 +167,7 @@ export function SpacePage() {
           {m.noTrackedBody}
         </Empty>
       ) : (
-        <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
+        <Tabs key={key} value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
           <Tabs.List mb="md" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
             {TABS.map((id) => (
               <Tabs.Tab key={id} value={id}>

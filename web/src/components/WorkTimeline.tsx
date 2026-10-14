@@ -35,7 +35,7 @@ import { Link } from 'react-router';
 import type { Situation, SprintTimelineNode, SprintTimelineView, TimelineCounts, TimelineState } from '../api/types';
 import { type Messages, useT } from '../i18n';
 import { useFilters } from '../lib/filters';
-import { fmtDate } from '../lib/format';
+import { fmtDate, fmtDay } from '../lib/format';
 import { HELP } from '../lib/indicatorHelp';
 import {
   activeAt,
@@ -562,7 +562,7 @@ function ItemDetail({
         <DetailLine label={m.start} value={node.start ? fmtDate(node.start, true) : m.notStartedYet} />
         <DetailLine label={m.end} value={node.end ? fmtDate(node.end, true) : node.start ? m.open : '—'} />
         <DetailLine label={m.duration} value={days != null ? m.days(days) : '—'} />
-        {due && <DetailLine label={m.due} value={m.dueValue(fmtDate(due, true), late)} />}
+        {due && <DetailLine label={m.due} value={m.dueValue(fmtDay(due), late)} />}
         <DetailLine label={m.assignee} value={issue?.assignee ?? m.unassigned} />
         {issue?.status && <DetailLine label={m.jiraStatus} value={issue.status} />}
         {issue?.estimate != null && <DetailLine label={m.estimate} value={m.points(issue.estimate)} />}
@@ -791,8 +791,8 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, sprint, o
             className={`tl-due${late ? ' is-late' : ''}`}
             style={{ left: `${position(due, axis)}%` }}
             role="img"
-            aria-label={m.dueMark(fmtDate(node.issue!.due_date, true), late)}
-            title={m.dueMark(fmtDate(node.issue!.due_date, true), late)}
+            aria-label={m.dueMark(fmtDay(node.issue!.due_date), late)}
+            title={m.dueMark(fmtDay(node.issue!.due_date), late)}
           />
         )}
       </div>
