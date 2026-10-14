@@ -257,9 +257,15 @@ def test_a_channel_test_goes_out_in_cadencia_locale_whatever_the_request_says(
         view = client.get("/api/notifications", headers=PT_BR).json()
     assert posted[0]["text"].startswith("*Test von Cadência*\nWenn Sie dies lesen")
     # The outcome is for the person who clicked: their language, on the spot and on the screen.
-    assert mail["error"] == "SMTP not configured (CADENCIA_SMTP_HOST)" and "error_msg" not in mail
+    assert (
+        mail["error"] == "SMTP not configured: set the mail server in Settings → E-mail & links"
+        and "error_msg" not in mail
+    )
     last = next(c for c in view["channels"] if c["id"] == "mail")["last"]
-    assert last["error"] == "SMTP não configurado (CADENCIA_SMTP_HOST)" and "error_msg" not in last
+    assert (
+        last["error"] == "SMTP não configurado: informe o servidor em Configuração → E-mail e links"
+        and "error_msg" not in last
+    )
     assert [e["label"] for e in view["events"]] == [
         "apresentação gerada",
         "resumo de riscos",

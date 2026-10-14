@@ -13,7 +13,7 @@ MESSAGES: dict[str, Entry] = {
     "channel.bad_url": "o destino de um webhook precisa ser uma URL http(s)",
     "channel.not_found": "O canal {id} não existe.",
     "open_in_app": "Abrir na Cadência",
-    "error.smtp_missing": "SMTP não configurado (CADENCIA_SMTP_HOST)",
+    "error.smtp_missing": "SMTP não configurado: informe o servidor em Configuração → E-mail e links",
     "error.http": "HTTP {status}: {body}",
     "deck.title": "Apresentação gerada: {name}",
     "deck.approved": "Aprovada na validação e pronta para baixar.",

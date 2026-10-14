@@ -13,7 +13,9 @@ MESSAGES: dict[str, Entry] = {
     "channel.bad_url": "das Ziel eines Webhooks muss eine HTTP- oder HTTPS-URL sein",
     "channel.not_found": "Der Kanal {id} existiert nicht.",
     "open_in_app": "In Cadência öffnen",  # i18n: out of scope (product name)
-    "error.smtp_missing": "SMTP nicht konfiguriert (CADENCIA_SMTP_HOST)",
+    "error.smtp_missing": (
+        "SMTP nicht konfiguriert: Mailserver unter Einstellungen → E-Mail & Links eintragen"
+    ),
     "error.http": "HTTP {status}: {body}",
     "deck.title": "Foliensatz erstellt: {name}",
     "deck.approved": "Validierung bestanden und bereit zum Herunterladen.",
