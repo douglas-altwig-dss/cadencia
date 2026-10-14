@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from cadencia.analytics.data import BoardData
-from cadencia.analytics.serialize import evidence_dict
+from cadencia.analytics.serialize import evidence_record
 from cadencia.domain.calendar import last_checkpoints, sprint_timeline
 from cadencia.domain.commitment import committed_at_start
 from cadencia.domain.models import HierarchyLevel, Sprint
@@ -63,7 +63,8 @@ def snapshot_rows(data: BoardData, at: datetime, sprint: Sprint | None) -> list[
                 "last_transition_at": last.at if last else None,
                 "last_transition_author": last.author_name if last else None,
                 "situation": assessment.situation.value,
-                "evidence": [evidence_dict(e) for e in assessment.evidence],
+                # Records, not text: a reader renders them in its own language (RF-08, R4).
+                "evidence": [evidence_record(e) for e in assessment.evidence],
             }
         )
     return rows

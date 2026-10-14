@@ -30,7 +30,7 @@ def test_missing_end_date_is_assumed_and_warned():
     timeline = sprint_timeline(sprint, PROFILE)
     assert timeline.assumed_end
     assert len(timeline.windows) == 2
-    assert any("sem data de fim" in w for w in timeline.warnings)
+    assert any("sem data de fim" in str(w) for w in timeline.warnings)
 
 
 def test_trailing_partial_window_is_its_own_window_with_real_duration():
@@ -39,7 +39,7 @@ def test_trailing_partial_window_is_its_own_window_with_real_duration():
     assert len(timeline.windows) == 2
     last = timeline.windows[-1]
     assert last.partial and last.business_days == 3
-    assert any("parcial" in w for w in timeline.warnings)
+    assert any("parcial" in str(w) for w in timeline.warnings)
 
 
 def test_checkpoint_uses_board_time_zone():

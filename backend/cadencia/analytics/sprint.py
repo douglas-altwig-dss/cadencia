@@ -13,17 +13,19 @@ from cadencia.analytics.serialize import (
     iso,
     issue_brief,
     node_dict,
+    progress_dict,
     sprint_dict,
     window_dict,
 )
 from cadencia.domain.calendar import calendar_windows, sprint_timeline
-from cadencia.domain.commitment import CommitmentReport, commitment_report
+from cadencia.domain.commitment import NO_OWNER_ID, CommitmentReport, commitment_report
 from cadencia.domain.compare import compare_window
 from cadencia.domain.hierarchy import build_tree, find_node, progress_of
 from cadencia.domain.metrics import item_metrics
 from cadencia.domain.models import HierarchyLevel, Sprint
 from cadencia.domain.risk import SEVERITY, RiskAssessment
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg, render, tr
 
 
 def risk_counts(assessments: Iterable[RiskAssessment]) -> dict[str, int]:
@@ -33,12 +35,17 @@ def risk_counts(assessments: Iterable[RiskAssessment]) -> dict[str, int]:
 
 def commitment_dict(report: CommitmentReport, data: BoardData, base_url: str | None) -> dict[str, Any]:
     keys = set(report.committed) | set(report.added)
+    people = [p.as_dict() for p in report.people]
+    for line in people:  # the domain leaves the no-assignee line unnamed: name it for the reader
+        if line["owner_id"] == NO_OWNER_ID:
+            line["owner_name"] = tr("board.no_owner")
+    people.sort(key=lambda p: str(p["owner_name"]).casefold())
     return {
         "reference": iso(report.reference),
         "closed": report.closed,
         "carryover_rate": report.carryover_rate,
         "board": report.board.as_dict(),
-        "people": [p.as_dict() for p in report.people],
+        "people": people,
         "sets": {
             "committed": report.committed,
             "delivered": report.delivered,
@@ -111,11 +118,11 @@ def sprint_overview(
             "start": iso(timeline.start),
             "end": iso(timeline.end),
             "assumed_end": timeline.assumed_end,
-            "warnings": list(timeline.warnings),
+            "warnings": [render(w) for w in timeline.warnings],
             "windows": windows,
             "current_window": current_window.index if current_window else None,
         },
-        "progress": progress.as_dict(),
+        "progress": progress_dict(progress),
         "risk_counts": risk_counts(assessments.values()),
         "commitment": commitment_dict(report, data, base_url),
         "items": {k: issue_brief(data.issues[k], base_url) for k in sorted(referenced) if k in data.issues},
@@ -252,12 +259,12 @@ def sprint_timeline_view(
         ended = [c["end"] for c in children]
         out: dict[str, Any] = {
             "key": node.key,
-            "label": node.label,
+            "label": render(node.label),
             "synthetic": node.synthetic,
             "missing": node.missing,
             "issue": issue_brief(issue, base_url) if issue else None,
             "member": node.key in members,
-            "progress": node.progress.as_dict() if node.progress else None,
+            "progress": progress_dict(node.progress),
             "risk": None,
             "blocked": False,
             "carried": False,
@@ -338,7 +345,7 @@ def sprint_timeline_view(
 
 def epic_view(data: BoardData, epic_key: str, now: datetime, base_url: str | None = None) -> dict[str, Any]:
     if epic_key not in data.issues:
-        raise NotFound(epic_key, f"O épico {epic_key} não está neste board.")
+        raise NotFound(epic_key, Msg("board.not_found.epic", key=epic_key))
     keys = {epic_key}
     frontier = [epic_key]
     while frontier:
@@ -404,7 +411,7 @@ def risk_list(
 def issue_detail(data: BoardData, key: str, now: datetime, base_url: str | None = None) -> dict[str, Any]:
     history = data.histories.get(key)
     if history is None:
-        raise NotFound(key, f"O item {key} não está neste board.")
+        raise NotFound(key, Msg("board.not_found.item", key=key))
     issue = history.issue
     profile = data.profile
     assessment = data.assess([history], now)[key]

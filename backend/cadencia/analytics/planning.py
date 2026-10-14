@@ -27,6 +27,7 @@ from cadencia.domain.capacity import (
     sprint_dates,
 )
 from cadencia.domain.models import HierarchyLevel, Person, Sprint
+from cadencia.i18n import Msg, localize
 
 
 def sprint_people(data: BoardData, sprint: Sprint, names: Mapping[str, str], now: datetime) -> list[Person]:
@@ -175,7 +176,8 @@ def plan_from_dict(payload: Mapping[str, Any]) -> AllocationPlan:
         capacity={k: float(v) for k, v in (payload.get("capacity") or {}).items()},
         load={k: float(v) for k, v in (payload.get("load") or {}).items()},
         parameters=dict(payload.get("parameters") or {}),
-        warnings=tuple(payload.get("warnings") or ()),
+        # `$msg` records since messages exist; plain pt-BR strings in plans stored before.
+        warnings=tuple(Msg.from_json(w) if Msg.is_json(w) else str(w) for w in payload.get("warnings") or ()),
     )
 
 
@@ -215,10 +217,12 @@ def plan_view(
         overload_threshold=data.profile.overload_threshold,
         idle_threshold=data.profile.idle_threshold,
     )
-    return {
-        "plan": plan.as_dict(),
-        "capacity": [c.as_dict() for c in capacities],
-        "items": rows,
-        "comparison": comparison.as_dict(),
-        "disclaimer": DISCLAIMER,
-    }
+    return localize(
+        {
+            "plan": plan.as_dict(),
+            "capacity": [c.as_dict() for c in capacities],
+            "items": rows,
+            "comparison": comparison.as_dict(),
+            "disclaimer": DISCLAIMER,
+        }
+    )

@@ -16,6 +16,9 @@ from cadencia.domain.history import IssueHistory
 from cadencia.domain.models import HierarchyLevel, Sprint
 
 BOARD = "__board__"  # the board-wide roll-up line, beside the one line per person
+#: The line of the items nobody holds. Its ``owner_name`` is empty: the view names it in the
+#: reader's language (this module renders no text).
+NO_OWNER_ID = "__sem_responsavel__"
 
 
 @dataclass
@@ -102,8 +105,8 @@ def commitment_report(
 
     def line(history: IssueHistory, at: datetime) -> CommitmentLine:
         person = history.assignee_at(at)
-        key = person.account_id if person else "__sem_responsavel__"
-        name = person.display_name if person else "Sem responsável"
+        key = person.account_id if person else NO_OWNER_ID
+        name = person.display_name if person else ""
         return people.setdefault(key, CommitmentLine(key, name))
 
     buckets: dict[str, list[str]] = defaultdict(list)

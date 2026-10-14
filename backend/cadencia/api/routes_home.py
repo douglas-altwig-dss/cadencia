@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from cadencia.analytics.pulse import pulse
 from cadencia.api.deps import JSONDict, Now, SessionDep, SettingsDep, author_of, csv_ints, selected_or
 from cadencia.errors import Invalid
+from cadencia.i18n import Msg
 from cadencia.store import repo
 
 router = APIRouter(tags=["painel"])
@@ -47,10 +48,10 @@ class LayoutBody(BaseModel):
 @router.put("/home/layout")
 def put_layout(body: LayoutBody, request: Request, session: SessionDep) -> JSONDict:
     if len({t.id for t in body.tiles}) != len(body.tiles):
-        raise Invalid("Dois tiles do painel têm o mesmo identificador.")
+        raise Invalid(Msg("board.home.duplicate_tiles"))
     for tile in body.tiles:
         if len(json.dumps(tile.config)) > MAX_CONFIG:
-            raise Invalid(f"As configurações do tile {tile.type} são grandes demais.")
+            raise Invalid(Msg("board.home.config_too_large", tile=tile.type))
     key, user = _key(request)
     repo.set_setting(session, key, body.model_dump())
     return {"layout": body.model_dump(), "user": user, "shared": user is None}

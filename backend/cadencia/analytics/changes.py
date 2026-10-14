@@ -20,15 +20,22 @@ from cadencia.analytics.serialize import iso, issue_url
 from cadencia.collector.snapshots import snapshot_rows
 from cadencia.domain.risk import SEVERITY, Situation
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, render, stored_text, tr
 from cadencia.store import repo
 from cadencia.store import schema as s
 
 #: What the digest reports as a new risk: the situations somebody has to act on this week.
 DIGEST_SITUATIONS = frozenset({Situation.STAGNANT.value, Situation.BLOCKED.value, Situation.OVERDUE.value})
 _RANK = {situation.value: index for index, situation in enumerate(SEVERITY)}
-_LABEL = {situation.value: situation.label for situation in SEVERITY}
+_SITUATIONS = {situation.value: situation for situation in SEVERITY}
 
 State = dict[str, dict[str, Any]]
+
+
+def _label(situation: str) -> str:
+    """A situation's name in the ambient locale; an unknown code passes through as itself."""
+    known = _SITUATIONS.get(situation)
+    return render(known.label) if known is not None else situation
 
 
 def _entry(
@@ -48,7 +55,8 @@ def _entry(
         "assignee": assignee,
         "estimate": estimate,
         "situation": situation,
-        "reason": first.get("message") if isinstance(first, Mapping) else None,
+        # A stored row from before messages existed has only its pt-BR text, shown as it is.
+        "reason": stored_text(first.get("msg"), first.get("message")) if isinstance(first, Mapping) else None,
     }
 
 
@@ -139,7 +147,7 @@ def _enrich(result: dict[str, Any], data: BoardData, base_url: str | None) -> di
                 issue = data.issues.get(entry["key"])
                 entry["summary"] = issue.summary if issue else ""
                 entry["url"] = issue_url(base_url, entry["key"])
-                entry["label"] = _LABEL.get(entry["situation"], entry["situation"])
+                entry["label"] = _label(entry["situation"])
         result[name] = value
     return result
 
@@ -166,11 +174,11 @@ def board_changes(
     by_id = {c.id: c for c in marks}
     for wanted in (since, until):
         if wanted is not None and wanted not in by_id:
-            raise NotFound(wanted, f"O checkpoint {wanted} não existe neste board ou não tem snapshot.")
+            raise NotFound(wanted, Msg("changes.checkpoint.not_found", checkpoint=wanted))
     start = by_id[since] if since is not None else (marks[-1] if marks else None)
     end = by_id[until] if until is not None else None
     if start is not None and end is not None and end.at <= start.at:
-        raise Invalid("O checkpoint final precisa ser posterior ao inicial.")
+        raise Invalid(Msg("changes.checkpoint.order"))
     after = state_at_checkpoint(session, end.id) if end else state_now(data, now)
     before = state_at_checkpoint(session, start.id) if start else {}
     result = _enrich(compare(before, after), data, base_url)
@@ -196,7 +204,11 @@ def digest(
         total += len(risks)
         key = data.board.space_key
         space = spaces.setdefault(
-            key, {"space": {"key": key, "name": data.board.space_name or key or "Sem espaço"}, "boards": []}
+            key,
+            {
+                "space": {"key": key, "name": data.board.space_name or key or tr("board.no_space")},
+                "boards": [],
+            },
         )
         space["boards"].append(
             {
@@ -211,16 +223,20 @@ def digest(
 
 
 def digest_text(space: Mapping[str, Any], fmt_since: Any) -> str:
-    """One space's digest as plain text, for a chat message or an e-mail body."""
+    """One space's digest as plain text, for a chat message or an e-mail body, in the ambient
+    locale. The entries' labels and reasons were rendered by `digest`, so both must run in the
+    same locale."""
     lines: list[str] = []
     for board in space["boards"]:
-        since = fmt_since(board["since"]["at"]) if board["since"] else "o início"
+        since = fmt_since(board["since"]["at"]) if board["since"] else tr("changes.digest.since_start")
         risks, resolved = board["new_risks"], board["resolved"]
-        if not risks and not resolved:
-            lines.append(f"{board['board']['name']}: nada novo desde {since}.")
-            continue
         name = board["board"]["name"]
-        lines.append(f"{name}: {len(risks)} novo(s) risco(s), {len(resolved)} resolvido(s) desde {since}.")
+        if not risks and not resolved:
+            lines.append(tr("changes.digest.nothing_new", board=name, since=since))
+            continue
+        lines.append(
+            tr("changes.digest.summary", board=name, risks=len(risks), resolved=len(resolved), since=since)
+        )
         for entry in risks:
             reason = f" — {entry['reason']}" if entry.get("reason") else ""
             lines.append(f"  • {entry['key']} {entry['label']}: {entry['summary']}{reason}")

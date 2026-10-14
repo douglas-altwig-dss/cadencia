@@ -14,6 +14,7 @@ from typing import Any
 from cadencia.analytics.data import BoardData
 from cadencia.domain.metrics import LOW_CONFIDENCE_SAMPLE
 from cadencia.domain.models import HierarchyLevel, StatusCategory
+from cadencia.i18n import tr
 from cadencia.jira.fields import FieldMap
 
 EXAMPLES = 8
@@ -22,20 +23,20 @@ EXAMPLES = 8
 def _check(
     check_id: str,
     severity: str,
-    title: str,
     keys: Sequence[str],
-    action: str,
     link: str | None = None,
     count: int | None = None,
 ) -> dict[str, Any]:
+    """One problem. Its title and action are ``health.<check_id>.title``/``.action``, in the
+    ambient locale (pt-BR when the deck's appendix is built)."""
     return {
         "id": check_id,
         "severity": severity,  # erro | aviso | info
-        "title": title,
+        "title": tr(f"health.{check_id}.title"),
         "count": len(keys) if count is None else count,
         "examples": list(keys)[:EXAMPLES],
         "all": list(keys),
-        "action": action,
+        "action": tr(f"health.{check_id}.action"),
         "link": link,
     }
 
@@ -60,9 +61,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "campos_ausentes",
                 "erro",
-                "Campos do Jira não encontrados",
                 missing,
-                "Informe o id do campo em Configuração → Campos.",
                 "/configuracao?tab=campos",
             )
         )
@@ -72,9 +71,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "coleta_desatualizada",
                 "erro",
-                "Coleta desatualizada",
                 [],
-                "Rode uma coleta na página Status; se ela falhar, a causa aparece lá.",
                 "/status",
                 count=1,
             )
@@ -86,9 +83,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "sem_estimativa",
                 "aviso",
-                "Itens abertos sem estimativa",
                 unestimated,
-                "Estime no Jira: sem isso o progresso em pontos e a capacidade ficam subestimados.",
             )
         )
 
@@ -101,9 +96,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "status_sem_coluna",
                 "aviso",
-                "Status fora de qualquer coluna do board",
                 outside,
-                "Mapeie esses status numa coluna do board no Jira; fora dela o item some do WIP.",
             )
         )
 
@@ -117,9 +110,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "sprint_sem_datas",
                 "aviso",
-                "Sprints sem data de início ou fim",
                 undated,
-                "Preencha as datas da sprint no Jira; sem elas as janelas semanais são estimadas.",
             )
         )
 
@@ -135,9 +126,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "em_andamento_sem_responsavel",
                 "aviso",
-                "Itens em andamento sem responsável",
                 unowned,
-                "Atribua um responsável no Jira: a alocação e a visão por pessoa não os enxergam.",
             )
         )
 
@@ -155,9 +144,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
                 _check(
                     "fora_do_time",
                     "info",
-                    "Responsáveis que não estão no time do board",
                     strangers,
-                    "Inclua a pessoa nos membros do board, ou confira se o item é mesmo deste time.",
                     f"/configuracao?tab=boards&board={data.board.id}",
                 )
             )
@@ -168,9 +155,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
             _check(
                 "historico_curto",
                 "info",
-                "Pouco histórico concluído",
                 [],
-                "Envelhecimento e previsão ficam com baixa confiança até haver mais itens concluídos.",
                 count=len(completed),
             )
         )

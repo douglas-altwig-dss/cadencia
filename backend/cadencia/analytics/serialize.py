@@ -1,4 +1,8 @@
-"""JSON-ready views of domain objects, shared by the API, exports and the CLI."""
+"""JSON-ready views of domain objects, shared by the API, exports and the CLI.
+
+Text is rendered here, in the ambient locale (the request's, else ``CADENCIA_LOCALE``, pt-BR while
+the deck's data is built): the domain hands over ``Msg`` values.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +12,10 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from cadencia.domain.calendar import Window
-from cadencia.domain.hierarchy import TreeNode
+from cadencia.domain.hierarchy import Progress, TreeNode
 from cadencia.domain.models import Issue, Sprint
 from cadencia.domain.risk import Evidence, RiskAssessment, Situation
+from cadencia.i18n import STORAGE_LOCALE, localize, render
 
 
 def iso(value: datetime | date | None) -> str | None:
@@ -70,33 +75,59 @@ def window_dict(window: Window) -> dict[str, Any]:
     }
 
 
+def _last_transition(evidence: Evidence) -> dict[str, Any] | None:
+    if not evidence.last_transition_at:
+        return None
+    return {
+        "at": iso(evidence.last_transition_at),
+        "author": evidence.last_transition_author,
+        "from": evidence.last_transition_from,
+        "to": evidence.last_transition_to,
+    }
+
+
 def evidence_dict(evidence: Evidence) -> dict[str, Any]:
+    """One piece of evidence for the wire: text in the ambient locale, plus ``code``, the message
+    key, for a client that wants to tell the messages apart without reading them."""
     return {
         "rule": evidence.rule,
-        "rule_description": evidence.description,
+        "rule_description": render(evidence.description),
         "situation": evidence.situation.value,
-        "label": evidence.situation.label,
-        "message": evidence.message,
+        "label": render(evidence.situation.label),
+        "message": render(evidence.msg),
+        "code": evidence.msg.key,
         "days": evidence.days,
-        "last_transition": {
-            "at": iso(evidence.last_transition_at),
-            "author": evidence.last_transition_author,
-            "from": evidence.last_transition_from,
-            "to": evidence.last_transition_to,
-        }
-        if evidence.last_transition_at
-        else None,
-        "details": list(evidence.details),
+        "last_transition": _last_transition(evidence),
+        "details": [render(d) for d in evidence.details],
+    }
+
+
+def evidence_record(evidence: Evidence) -> dict[str, Any]:
+    """One piece of evidence for storage (``issue_snapshot.evidence``) and for the live side of a
+    comparison, which must be measured like the stored one.
+
+    ``msg``/``detail_msgs`` are the ``$msg`` records a reader renders in its own language;
+    ``message``/``details`` are the pt-BR mirror older readers and ad-hoc SQL see (R4). The label
+    and the rule description are not stored: the codes beside them say both."""
+    return {
+        "rule": evidence.rule,
+        "situation": evidence.situation.value,
+        "days": evidence.days,
+        "last_transition": _last_transition(evidence),
+        "msg": evidence.msg.to_json(),
+        "detail_msgs": [d.to_json() for d in evidence.details],
+        "message": render(evidence.msg, STORAGE_LOCALE),
+        "details": [render(d, STORAGE_LOCALE) for d in evidence.details],
     }
 
 
 def assessment_dict(assessment: RiskAssessment | None) -> dict[str, Any]:
     if assessment is None:
         situation = Situation.ON_TRACK
-        return {"situation": situation.value, "label": situation.label, "severity": 0, "evidence": []}
+        return {"situation": situation.value, "label": render(situation.label), "severity": 0, "evidence": []}
     return {
         "situation": assessment.situation.value,
-        "label": assessment.situation.label,
+        "label": render(assessment.situation.label),
         "severity": assessment.situation.severity,
         "column": assessment.column,
         "stalled_checkpoints": assessment.stalled_checkpoints,
@@ -106,18 +137,23 @@ def assessment_dict(assessment: RiskAssessment | None) -> dict[str, Any]:
     }
 
 
+def progress_dict(progress: Progress | None) -> dict[str, Any] | None:
+    """``Progress.as_dict()`` with its coverage warning rendered."""
+    return localize(progress.as_dict()) if progress is not None else None
+
+
 def node_dict(
     node: TreeNode, assessments: Mapping[str, RiskAssessment], base_url: str | None = None
 ) -> dict[str, Any]:
     issue = node.issue
     return {
         "key": node.key,
-        "label": node.label,
+        "label": render(node.label),
         "synthetic": node.synthetic,
         "missing": node.missing,
         "issue": issue_brief(issue, base_url) if issue else None,
         "risk": assessment_dict(assessments.get(node.key)) if issue else None,
-        "progress": node.progress.as_dict() if node.progress else None,
+        "progress": progress_dict(node.progress),
         "estimate_rollup": node.estimate_rollup,
         "children": [node_dict(c, assessments, base_url) for c in node.children],
     }

@@ -18,15 +18,16 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
+from cadencia.i18n.message import Msg
+
 TIER_EXPLICIT = "afinidade_explicita"
 TIER_HISTORY = "afinidade_historica"
 TIER_CAPACITY = "capacidade"
 NO_CAPACITY = "sem_capacidade"
 
-DISCLAIMER = (
-    "Alocação teórica por heurística gulosa: é uma linha de base para conversa, não uma verdade. "
-    "Ignora conhecimento tácito, pareamento, mentoria e interrupções."
-)
+#: Repeated wherever the allocation numbers appear; ``as_dict`` emits it as a ``$msg`` record and
+#: the view renders it.
+DISCLAIMER = Msg("board.allocation.disclaimer")
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,8 @@ class AllocationPlan:
     capacity: Mapping[str, float]
     load: Mapping[str, float]
     parameters: Mapping[str, object] = field(default_factory=dict)
-    warnings: tuple[str, ...] = ()
+    #: Messages; a plan stored before messages existed brings plain strings back (``plan_from_dict``).
+    warnings: tuple[Msg | str, ...] = ()
 
     @property
     def residual(self) -> dict[str, float]:
@@ -81,8 +83,8 @@ class AllocationPlan:
             "load": dict(self.load),
             "residual": self.residual,
             "parameters": dict(self.parameters),
-            "warnings": list(self.warnings),
-            "disclaimer": DISCLAIMER,
+            "warnings": [w.to_json() if isinstance(w, Msg) else w for w in self.warnings],
+            "disclaimer": DISCLAIMER.to_json(),
         }
 
 
@@ -109,7 +111,7 @@ def allocate(
     pending = sorted(items, key=lambda i: (i.rank or "~", i.key))
     visited: set[str] = set()
     assignments: list[Assignment] = []
-    warnings: list[str] = []
+    warnings: list[Msg] = []
 
     while pending:
         ready = next(
@@ -118,7 +120,7 @@ def allocate(
         )
         if ready is None:
             ready = pending[0]
-            warnings.append(f"Dependência circular de bloqueio envolvendo {ready.key}.")
+            warnings.append(Msg("board.allocation.cycle", key=ready.key))
         pending.remove(ready)
 
         open_pool = [p for p in pool if held[p.account_id] < max_items_per_person]
@@ -152,7 +154,7 @@ def allocate(
     load = {acc: round(capacity[acc] - residual[acc], 2) for acc in capacity}
     unallocated = [a.key for a in assignments if a.account_id is None]
     if unallocated:
-        warnings.append(f"{len(unallocated)} item(ns) sem capacidade disponível: {', '.join(unallocated)}.")
+        warnings.append(Msg("board.allocation.no_capacity", count=len(unallocated), keys=unallocated))
     return AllocationPlan(
         assignments=tuple(assignments),
         capacity=capacity,
@@ -211,7 +213,7 @@ class PlanComparison:
                 }
                 for p in self.people
             ],
-            "disclaimer": DISCLAIMER,
+            "disclaimer": DISCLAIMER.to_json(),
         }
 
 

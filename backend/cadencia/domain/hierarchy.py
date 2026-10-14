@@ -11,9 +11,11 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
 from cadencia.domain.models import HierarchyLevel, Issue
+from cadencia.i18n.message import Msg
 
 NO_EPIC_KEY = "__sem_epico__"
-NO_EPIC_LABEL = "Sem épico"
+#: The synthetic "no epic" node's label; rendered by the view that shows it.
+NO_EPIC_LABEL = Msg("board.tree.no_epic")
 
 
 @dataclass(frozen=True)
@@ -46,13 +48,10 @@ class Progress:
         return self.estimated / self.total if self.total else None
 
     @property
-    def coverage_warning(self) -> str | None:
+    def coverage_warning(self) -> Msg | None:
         if self.unestimated == 0 or self.total == 0:
             return None
-        return (
-            f"{self.unestimated} de {self.total} itens sem estimativa: "
-            "o progresso por estimativa considera só os estimados."
-        )
+        return Msg("board.progress.coverage", unestimated=self.unestimated, total=self.total)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -67,7 +66,8 @@ class Progress:
             "count_ratio": self.count_ratio,
             "estimate_ratio": self.estimate_ratio,
             "coverage": self.coverage,
-            "coverage_warning": self.coverage_warning,
+            # A `$msg` record: the view that embeds this renders it (``localize``).
+            "coverage_warning": warning.to_json() if (warning := self.coverage_warning) else None,
         }
 
 
@@ -97,7 +97,7 @@ def progress_of(items: Iterable[Issue], is_done: Callable[[Issue], bool] | None 
 @dataclass
 class TreeNode:
     key: str
-    label: str
+    label: str | Msg  # an issue's summary, or a message for a synthetic node
     issue: Issue | None
     children: list[TreeNode] = field(default_factory=list)
     progress: Progress | None = None
@@ -146,7 +146,7 @@ def build_tree(issues: Sequence[Issue], is_done: Callable[[Issue], bool] | None 
             _finish(
                 TreeNode(
                     key=parent_key,
-                    label=f"{parent_key} (fora do escopo coletado)",
+                    label=Msg("board.tree.out_of_scope", key=parent_key),
                     issue=None,
                     children=kids,
                     missing=True,

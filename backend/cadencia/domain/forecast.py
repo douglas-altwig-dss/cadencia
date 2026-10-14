@@ -21,6 +21,7 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from cadencia.domain.history import IssueHistory
+from cadencia.i18n.message import Msg
 
 RUNS = 2000
 #: Business days of history the sample is drawn from: about three months of work.
@@ -47,7 +48,7 @@ class Forecast:
     horizon_days: int | None
     probability: float | None
     low_confidence: bool
-    reason: str | None = None
+    reason: Msg | None = None  # why there is no answer; rendered by the view
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -63,7 +64,7 @@ class Forecast:
             "horizon_days": self.horizon_days,
             "probability": self.probability,
             "low_confidence": self.low_confidence,
-            "reason": self.reason,
+            "reason": self.reason.to_json() if self.reason else None,
         }
 
 
@@ -139,7 +140,7 @@ def monte_carlo(
     active_days = sum(1 for s in samples if s)
     low = active_days < LOW_CONFIDENCE_DAYS
 
-    def empty(reason: str | None, probability: float | None) -> Forecast:
+    def empty(reason: Msg | None, probability: float | None) -> Forecast:
         return Forecast(
             remaining,
             len(samples),
@@ -172,7 +173,7 @@ def monte_carlo(
             low,
         )
     if not samples or delivered == 0:
-        return empty("Nenhum item concluído no período de amostra: não há ritmo para projetar.", None)
+        return empty(Msg("board.forecast.no_pace"), None)
 
     rng = random.Random(_seed(samples, remaining, horizon_days))
     needed: list[int] = []
@@ -195,7 +196,7 @@ def monte_carlo(
         return days, calendar[days - 1] if days >= 1 else start
 
     (d50, t50), (d85, t85), (d95, t95) = at(p50), at(p85), at(p95)
-    reason = None if d95 is not None else f"Parte das simulações passa de {MAX_DAYS} dias úteis."
+    reason = None if d95 is not None else Msg("board.forecast.beyond", days=MAX_DAYS)
     return Forecast(
         remaining,
         len(samples),

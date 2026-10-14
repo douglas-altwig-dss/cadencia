@@ -11,6 +11,7 @@ from cadencia.domain.calendar import business_days, sprint_timeline
 from cadencia.domain.forecast import daily_throughput, monte_carlo
 from cadencia.domain.models import HierarchyLevel, Sprint
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg, localize, tr
 
 
 def _sample(data: BoardData, now: datetime) -> list[int]:
@@ -43,14 +44,14 @@ def sprint_forecast(data: BoardData, sprint: Sprint, now: datetime) -> dict[str,
         "sprint": {"id": sprint.id, "name": sprint.name, "state": sprint.state},
         "end": timeline.end.isoformat() if timeline.end else None,
         "closed": sprint.state == "closed",
-        "forecast": result.as_dict(),
+        "forecast": localize(result.as_dict()),
         "remaining_keys": sorted(h.issue.key for h in remaining),
     }
 
 
 def epic_forecast(data: BoardData, epic_key: str, now: datetime) -> dict[str, Any]:
     if epic_key not in data.issues:
-        raise NotFound(epic_key, f"O épico {epic_key} não está neste board.")
+        raise NotFound(epic_key, Msg("board.not_found.epic", key=epic_key))
     keys, frontier = {epic_key}, [epic_key]
     while frontier:
         parent = frontier.pop()
@@ -69,14 +70,11 @@ def epic_forecast(data: BoardData, epic_key: str, now: datetime) -> dict[str, An
     return {
         "scope": "epic",
         "epic": {"key": epic_key, "summary": data.issues[epic_key].summary},
-        "forecast": result.as_dict(),
+        "forecast": localize(result.as_dict()),
         "remaining_keys": sorted(h.issue.key for h in remaining),
         # The epic competes with everything else on the board for the same people, so its forecast
         # at the board's full pace is optimistic by construction; say so rather than let it pass.
-        "caveat": (
-            "Usa o ritmo do board inteiro; se o épico divide o time com outras frentes, "
-            "o prazo real tende a ser maior."
-        ),
+        "caveat": tr("board.forecast.epic_caveat"),
     }
 
 
@@ -89,7 +87,7 @@ def board_forecast(data: BoardData, now: datetime) -> dict[str, Any]:
     result = monte_carlo(_sample(data, now), len(remaining), start, holidays=data.profile.holidays)
     return {
         "scope": "board",
-        "forecast": result.as_dict(),
+        "forecast": localize(result.as_dict()),
         "remaining_keys": sorted(h.issue.key for h in remaining),
     }
 

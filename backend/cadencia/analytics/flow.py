@@ -29,12 +29,7 @@ from cadencia.domain.metrics import (
     wip_average,
 )
 from cadencia.domain.models import BoardProfile, HierarchyLevel
-
-PRINCIPLE = (
-    "Métrica individual sem contexto de complexidade e de trabalho não planejado mede a sorte da "
-    "pessoa, não o trabalho dela. Por isso mostramos percentis com amostra, destacamos o não "
-    "planejado e comparamos com a mediana dos boards — nunca uma lista ordenada de pessoas."
-)
+from cadencia.i18n import tr
 
 CommittedLookup = Callable[[int], Collection[str] | None]
 
@@ -141,7 +136,7 @@ def flow_view(
         people.append(
             {
                 "account_id": account_id,
-                "name": items[0].assignee_name or "Sem responsável",
+                "name": items[0].assignee_name or tr("board.no_owner"),
                 "completed": len(items),
                 "cycle_time": distribution(i.cycle_days for i in items).as_dict(),
                 "lead_time": distribution(i.lead_days for i in items).as_dict(),
@@ -161,7 +156,7 @@ def flow_view(
         "sprints": sprints,
         "people": people,
         "items": [metrics_dict(m, d.board.name) for d, m in pairs],
-        "note": PRINCIPLE,
+        "note": tr("board.flow.principle"),  # beside every per-person number
     }
 
 
@@ -171,7 +166,8 @@ def _owner_id(history: IssueHistory, at: datetime) -> str | None:
 
 
 def cfd_view(data: BoardData, start: datetime, end: datetime) -> dict[str, Any]:
-    return cumulative_flow(data.work_items(), data.profile, start, end)
+    fallback = [tr("board.cfd.todo"), tr("board.cfd.doing"), tr("board.cfd.done")]
+    return cumulative_flow(data.work_items(), data.profile, start, end, fallback_columns=fallback)
 
 
 def scatter_view(
@@ -315,5 +311,5 @@ def person_view(
         "composition": {"work_mix": summary.work_mix, "unplanned_items": unplanned},
         "trend": trend,
         "risks": risks,
-        "note": PRINCIPLE,
+        "note": tr("board.flow.principle"),  # beside every per-person number
     }

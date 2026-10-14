@@ -66,7 +66,7 @@ def test_affinity_tiers_then_capacity_then_id():
 def test_items_without_capacity_are_reported():
     plan = allocate([AllocationItem("BIG", "a", 100, "Story")], PEOPLE)
     assert plan.assignments[0].account_id is None
-    assert any("sem capacidade" in w for w in plan.warnings)
+    assert any("sem capacidade" in str(w) for w in plan.warnings)
 
 
 def test_plan_comparison_adherence_and_load_states():

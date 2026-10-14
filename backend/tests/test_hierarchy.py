@@ -19,7 +19,7 @@ def test_epic_progress_by_count_and_estimate_with_coverage_warning():
     assert progress.estimate_total == 27 and progress.estimate_done == 8
     assert round(progress.estimate_ratio, 3) == round(8 / 27, 3)
     assert progress.coverage == 0.7
-    assert "3 de 10" in progress.coverage_warning
+    assert "3 de 10" in str(progress.coverage_warning)
 
 
 def test_unestimated_items_are_never_counted_as_zero():
@@ -39,8 +39,8 @@ def test_tree_groups_orphans_and_missing_parents_explicitly():
     nodes = build_tree(items)
     keys = [n.key for n in nodes]
     assert keys == ["E-1", "E-9", NO_EPIC_KEY]
-    assert nodes[1].missing and "fora do escopo" in nodes[1].label
-    assert nodes[2].label == "Sem épico" and [c.key for c in nodes[2].children] == ["S-2"]
+    assert nodes[1].missing and "fora do escopo" in str(nodes[1].label)
+    assert str(nodes[2].label) == "Sem épico" and [c.key for c in nodes[2].children] == ["S-2"]
     story = find_node(nodes, "S-1")
     assert [c.key for c in story.children] == ["T-1"]
     assert nodes[0].estimate_rollup == 3

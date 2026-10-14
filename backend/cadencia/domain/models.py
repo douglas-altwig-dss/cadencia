@@ -11,6 +11,7 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cadencia.errors import Invalid
+from cadencia.i18n.message import Msg
 
 
 class StatusCategory(StrEnum):
@@ -243,46 +244,46 @@ class BoardProfile:
         is always accepted, because it means "back to the default".
         """
         problems = [
-            f"{key}: {problem}"
+            Msg("profile.problem", key=key, problem=problem)
             for key, value in changes.items()
             if value is not None and (problem := cls._problem(key, value))
         ]
         if problems:
-            raise Invalid("; ".join(problems))
+            raise Invalid(Msg("profile.invalid", problems=problems))
 
     @classmethod
-    def _problem(cls, key: str, value: Any) -> str | None:
+    def _problem(cls, key: str, value: Any) -> Msg | None:
         if key in cls.LIMITS:
             integer, lowest, highest = cls.LIMITS[key]
             is_number = isinstance(value, int | float) and not isinstance(value, bool)
             if not is_number or not math.isfinite(value) or (integer and value != int(value)):
-                return "precisa ser um número inteiro" if integer else "precisa ser um número"
-            return None if lowest <= value <= highest else f"precisa estar entre {lowest} e {highest}"
+                return Msg("profile.integer") if integer else Msg("profile.number")
+            return None if lowest <= value <= highest else Msg("profile.between", low=lowest, high=highest)
         if key == "timezone":
             try:
                 ZoneInfo(str(value))
             except (ZoneInfoNotFoundError, ValueError):
-                return f"fuso horário desconhecido: {value!r}"
+                return Msg("profile.timezone", value=repr(value))
             return None
         if key in cls._NAME_LISTS:
             ok = isinstance(value, list | tuple) and all(isinstance(v, str) for v in value)
-            return None if ok else "precisa ser uma lista de textos"
+            return None if ok else Msg("profile.names")
         if key == "holidays":
             if not isinstance(value, list | tuple):
-                return "precisa ser uma lista de datas AAAA-MM-DD"
+                return Msg("profile.dates")
             for day in value:
                 if isinstance(day, date):
                     continue
                 try:
                     date.fromisoformat(str(day))
                 except ValueError:
-                    return f"data inválida: {day!r} (use AAAA-MM-DD)"
+                    return Msg("profile.date", value=repr(day))
             return None
         if key == "affinity":
             ok = isinstance(value, Mapping) and all(
                 isinstance(v, list | tuple) and all(isinstance(x, str) for x in v) for v in value.values()
             )
-            return None if ok else "precisa mapear cada pessoa a uma lista de textos"
+            return None if ok else Msg("profile.affinity")
         return None
 
     # ---- workflow helpers

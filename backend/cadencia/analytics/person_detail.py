@@ -21,6 +21,7 @@ from cadencia.domain.commitment import commitment_report
 from cadencia.domain.history import IssueHistory
 from cadencia.domain.models import HierarchyLevel, Person
 from cadencia.domain.risk import Situation
+from cadencia.i18n import render
 
 RECENT_DAYS = 14
 TIMELINE_WEEKS = 8
@@ -86,7 +87,7 @@ def _items(data: BoardData, account_id: str, now: datetime, base_url: str | None
             brief["blocked_days"] = blocked_days(history, profile, now) if blocked else None
             brief["block_reason"] = next(
                 (
-                    e.message
+                    render(e.msg)
                     for e in (assessment.evidence if assessment else ())
                     if e.situation is Situation.BLOCKED
                 ),

@@ -19,6 +19,7 @@ from cadencia.api.deps import (
 )
 from cadencia.domain.models import BoardProfile
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg
 from cadencia.store import repo
 
 router = APIRouter(tags=["pessoas"])
@@ -60,7 +61,7 @@ def detail(
     mine = next((p for p in overview_items if p["account_id"] == account_id), None)
     name = names.get(account_id) or (mine["name"] if mine else None)
     if name is None:
-        raise NotFound(account_id, "Pessoa não encontrada.")
+        raise NotFound(account_id, Msg("board.not_found.person"))
     return {
         "generated_at": now.isoformat(),
         **person_detail(
@@ -93,7 +94,7 @@ def _availability(session: SessionDep, settings: SettingsDep, account_id: str) -
 @router.get("/people/{account_id}/availability")
 def get_availability(account_id: str, session: SessionDep, settings: SettingsDep) -> JSONDict:
     if account_id not in repo.people_names(session):
-        raise NotFound(account_id, "Pessoa não encontrada.")
+        raise NotFound(account_id, Msg("board.not_found.person"))
     return _availability(session, settings, account_id)
 
 
@@ -108,7 +109,7 @@ def put_availability(
     account_id: str, body: AvailabilityBody, session: SessionDep, settings: SettingsDep
 ) -> JSONDict:
     if account_id not in repo.people_names(session):
-        raise NotFound(account_id, "Pessoa não encontrada.")
+        raise NotFound(account_id, Msg("board.not_found.person"))
     repo.save_availability(
         session, account_id, hours_per_day=body.hours_per_day, allocation_pct=body.allocation
     )

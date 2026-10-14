@@ -27,6 +27,7 @@ from cadencia.api.deps import (
     selected_or,
     sprint_or_404,
 )
+from cadencia.i18n import tr
 from cadencia.store import repo
 
 router = APIRouter(tags=["exportação"])
@@ -131,7 +132,11 @@ def export(
 ) -> Response:
     if dataset not in DATASETS:
         raise HTTPException(
-            404, detail={"cause": "conjunto desconhecido", "message": f"Use um de: {', '.join(DATASETS)}"}
+            404,
+            detail={
+                "cause": tr("board.export.unknown"),
+                "message": tr("board.export.use_one_of", datasets=", ".join(DATASETS)),
+            },
         )
     until = parse_instant(end, now)
     since = parse_instant(start, until - timedelta(weeks=12))
@@ -142,7 +147,7 @@ def export(
         )["rows"]
     elif dataset in {"risks", "commitment", "tree"}:
         if sprint_id is None and dataset != "risks":
-            raise HTTPException(400, detail={"cause": "sprint_id obrigatório"})
+            raise HTTPException(400, detail={"cause": tr("board.export.sprint_required")})
         if sprint_id is not None:
             sprint = sprint_or_404(session, sprint_id)
             data = board_data(session, settings, sprint.board_id)
@@ -162,7 +167,7 @@ def export(
         else:
             ids = csv_ints(board_id)
             if not ids:
-                raise HTTPException(400, detail={"cause": "informe sprint_id ou board_id"})
+                raise HTTPException(400, detail={"cause": tr("board.export.sprint_or_board")})
             data = board_data(session, settings, ids[0])
             rows = _risk_rows(
                 sprint_views.risk_list(data, now, person=person, type_name=type, base_url=base_url(settings))
@@ -180,7 +185,7 @@ def export(
     else:
         ids = csv_ints(board_id)
         if not ids:
-            raise HTTPException(400, detail={"cause": "board_id obrigatório"})
+            raise HTTPException(400, detail={"cause": tr("board.export.board_required")})
         data = board_data(session, settings, ids[0])
         if dataset == "aging":
             rows = flow.aging_view(data, now)["items"]

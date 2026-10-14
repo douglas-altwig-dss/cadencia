@@ -27,6 +27,7 @@ from cadencia.api.deps import (
     sprint_or_404,
 )
 from cadencia.domain.calendar import sprint_timeline
+from cadencia.i18n import render, tr
 from cadencia.store import repo
 from cadencia.store import schema as s
 
@@ -52,7 +53,7 @@ def board_sprints(board_id: int, session: SessionDep, settings: SettingsDep, now
             {
                 **sprint_dict(sprint),
                 "windows": [window_dict(w) for w in timeline.windows],
-                "warnings": list(timeline.warnings),
+                "warnings": [render(w) for w in timeline.warnings],
                 "current": current is not None and sprint.id == current.id,
             }
         )
@@ -254,7 +255,7 @@ def people(session: SessionDep, scope: str = "selected") -> JSONDict:
         space = spaces.get(key or "")
         groups.append(
             {
-                "space": {"key": key, "name": space.label if space else "Sem espaço"},
+                "space": {"key": key, "name": space.label if space else tr("board.no_space")},
                 "people": [{"account_id": p.account_id, "name": p.display_name} for p in members],
             }
         )

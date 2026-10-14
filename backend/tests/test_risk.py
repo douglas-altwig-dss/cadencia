@@ -41,7 +41,7 @@ def test_item_without_transition_between_checkpoints_is_stagnant():
     assert result.situation is Situation.STAGNANT
     assert result.stalled_checkpoints == 1
     evidence = result.evidence[0]
-    assert evidence.message == "parado há 10 dias em Em andamento"
+    assert str(evidence.msg) == "parado há 10 dias em Em andamento"
     assert evidence.last_transition_author == "Ana"
     assert evidence.last_transition_to == "Em andamento"
 
@@ -55,14 +55,14 @@ def test_reassignment_without_status_change_keeps_item_stagnant_with_evidence():
     )
     result = assess(h, ctx())
     assert result.situation is Situation.STAGNANT
-    assert any("responsável mudou de Ana para Bruno" in d for d in result.evidence[0].details)
+    assert any("responsável mudou de Ana para Bruno" in str(d) for d in result.evidence[0].details)
 
 
 def test_counts_how_many_checkpoints_the_item_stayed_still():
     h = history(issue("A-3", status=REVIEW), move("A-3", "2026-08-26T12:00", DOING, REVIEW))
     result = assess(h, ctx())
     assert result.stalled_checkpoints == 2
-    assert "(2 checkpoints sem transição)" in result.evidence[0].message
+    assert "(2 checkpoints sem transição)" in str(result.evidence[0].msg)
 
 
 def test_moving_after_the_previous_checkpoint_is_not_stagnation():
@@ -87,7 +87,7 @@ def test_overdue_uses_board_local_date():
     h = history(issue("C-1", due=date(2026, 9, 8)))
     result = assess(h, ctx())
     assert result.situation is Situation.OVERDUE
-    assert result.evidence[0].message == "data limite 08/09 vencida há 3 dias"
+    assert str(result.evidence[0].msg) == "data limite 08/09 vencida há 3 dias"
 
 
 def test_carried_over_is_most_severe_and_keeps_all_evidence():

@@ -24,6 +24,7 @@ from cadencia.api.deps import (
     sprint_or_404,
 )
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg
 from cadencia.store import repo
 from cadencia.store import schema as s
 
@@ -143,4 +144,4 @@ def update_view(view_id: int, body: ViewBody, session: SessionDep) -> JSONDict:
 @router.delete("/views/{view_id}", status_code=204)
 def delete_view(view_id: int, session: SessionDep) -> None:
     if not repo.delete_view(session, view_id):
-        raise NotFound(view_id, f"A visão {view_id} não existe.")
+        raise NotFound(view_id, Msg("board.not_found.view", view_id=view_id))

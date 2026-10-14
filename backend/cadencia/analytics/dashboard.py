@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from cadencia.analytics.data import BoardData, load_board
-from cadencia.analytics.serialize import iso, sprint_dict, window_dict
+from cadencia.analytics.serialize import iso, progress_dict, sprint_dict, window_dict
 from cadencia.analytics.sprint import risk_counts
 from cadencia.domain.calendar import calendar_windows, sprint_timeline
 from cadencia.domain.commitment import commitment_report
@@ -19,6 +19,7 @@ from cadencia.domain.compare import compare_window
 from cadencia.domain.hierarchy import progress_of
 from cadencia.domain.metrics import throughput
 from cadencia.domain.models import HierarchyLevel
+from cadencia.i18n import render, stored_text, tr
 from cadencia.store import repo
 
 log = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def dashboard_row(
         }
         row["risk_counts"] = risk_counts(data.assess(data.open_items(now), now).values())
         if data.board.type == "scrum":
-            row["warnings"].append("Nenhuma sprint ativa ou encerrada encontrada para este board.")
+            row["warnings"].append(tr("board.dashboard.no_sprint"))
         return row
 
     reference = data.reference_for(sprint, now)
@@ -69,9 +70,9 @@ def dashboard_row(
     current = [h for h in scope if h.in_sprint_at(sprint.id, reference)]
     work = [h for h in current if h.issue.hierarchy_level == HierarchyLevel.STANDARD]
     row["sprint"] = sprint_dict(sprint)
-    row["progress"] = progress_of(
-        [h.issue for h in work], is_done=lambda i: data.histories[i.key].is_done_at(reference)
-    ).as_dict()
+    row["progress"] = progress_dict(
+        progress_of([h.issue for h in work], is_done=lambda i: data.histories[i.key].is_done_at(reference))
+    )
     row["risk_counts"] = risk_counts(
         data.assess([h for h in current if h.issue.hierarchy_level < HierarchyLevel.EPIC], reference).values()
     )
@@ -103,7 +104,7 @@ def dashboard_row(
                 "open": item.state == "active",
             }
         )
-    row["warnings"] += list(timeline.warnings)
+    row["warnings"] += [render(w) for w in timeline.warnings]
     return row
 
 
@@ -130,10 +131,12 @@ def dashboard(
                         "space_key": board_row.space_key,
                         "space_name": board_row.space_name,
                     },
-                    "error": {"cause": "falha ao calcular os indicadores", "message": str(exc)},
+                    "error": {"cause": tr("board.dashboard.failed"), "message": str(exc)},
                     "freshness": {
                         "last_success_at": board_row.last_success_at,
-                        "last_error": board_row.last_error,
+                        "last_error": stored_text(
+                            (board_row.last_error_i18n or {}).get("message"), board_row.last_error
+                        ),
                     },
                 }
             )

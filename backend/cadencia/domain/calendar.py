@@ -14,6 +14,7 @@ from itertools import pairwise
 from zoneinfo import ZoneInfo
 
 from cadencia.domain.models import BoardProfile, Sprint
+from cadencia.i18n.message import Msg
 
 WORKDAY_START = time(9)
 WORKDAY_END = time(18)
@@ -47,7 +48,7 @@ class SprintTimeline:
     end: datetime | None
     windows: tuple[Window, ...]
     assumed_end: bool
-    warnings: tuple[str, ...]
+    warnings: tuple[Msg, ...]  # rendered by the view that shows them
 
     def window_at(self, at: datetime) -> Window | None:
         for window in self.windows:
@@ -154,7 +155,7 @@ def build_windows(start: datetime, end: datetime, profile: BoardProfile) -> tupl
 
 
 def sprint_timeline(sprint: Sprint, profile: BoardProfile) -> SprintTimeline:
-    warnings: list[str] = []
+    warnings: list[Msg] = []
     if sprint.start is None:
         return SprintTimeline(
             sprint_id=sprint.id,
@@ -162,7 +163,7 @@ def sprint_timeline(sprint: Sprint, profile: BoardProfile) -> SprintTimeline:
             end=sprint.end,
             windows=(),
             assumed_end=False,
-            warnings=("Sprint sem data de início no Jira: janelas indisponíveis até ela começar.",),
+            warnings=(Msg("board.timeline.no_start"),),
         )
     start = sprint.start
     end = sprint.end
@@ -171,15 +172,15 @@ def sprint_timeline(sprint: Sprint, profile: BoardProfile) -> SprintTimeline:
         weeks = min(max(profile.default_sprint_weeks, MIN_SPRINT_WEEKS), MAX_SPRINT_WEEKS)
         end = start + timedelta(weeks=weeks)
         assumed = True
-        reason = "sem data de fim" if sprint.end is None else "com data de fim anterior ao início"
-        warnings.append(f"Sprint {reason} no Jira: assumida a duração configurada de {weeks} semanas.")
+        reason = "board.timeline.no_end" if sprint.end is None else "board.timeline.end_before_start"
+        warnings.append(Msg(reason, weeks=weeks))
     elif end - start > timedelta(weeks=MAX_SPRINT_WEEKS, days=1):
-        warnings.append("Sprint com mais de três semanas: confira as datas no Jira.")
+        warnings.append(Msg("board.timeline.too_long"))
     windows = build_windows(start, end, profile)
     if windows and windows[-1].partial:
         last = windows[-1]
         warnings.append(
-            f"Janela {last.index} é parcial: {last.business_days} dias úteis ({last.days} dias corridos)."
+            Msg("board.timeline.partial", index=last.index, business_days=last.business_days, days=last.days)
         )
     return SprintTimeline(
         sprint_id=sprint.id,

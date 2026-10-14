@@ -3,7 +3,9 @@
 Six situations ordered by severity. Every rule is deterministic, configurable through the board
 profile, and evaluated in the same order everywhere. An item gets the most severe situation that
 fired; *all* fired rules are kept as evidence, because a classification must never be a black box.
-Messages describe facts ("parado há 9 dias em Code Review"), never judge people.
+Messages describe facts ("stalled for 9 days in Code Review"), never judge people. They are built
+as ``Msg`` values and rendered at the boundary in the reader's language (the catalogue is the
+``risk`` namespace); this module never renders text.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 from cadencia.domain.history import IssueHistory
 from cadencia.domain.models import BoardProfile, ChangeField, Sprint, StatusCategory
+from cadencia.i18n.message import Msg
 
 
 class Situation(StrEnum):
@@ -32,8 +35,9 @@ class Situation(StrEnum):
         return SEVERITY.index(self)
 
     @property
-    def label(self) -> str:
-        return LABELS[self]
+    def label(self) -> Msg:
+        """The situation's name, as a message (``risk.situation.<value>``)."""
+        return Msg(f"risk.situation.{self.value}")
 
 
 SEVERITY = [
@@ -44,38 +48,26 @@ SEVERITY = [
     Situation.OVERDUE,
     Situation.CARRIED_OVER,
 ]
-LABELS = {
-    Situation.ON_TRACK: "Em dia",
-    Situation.AGING: "Envelhecendo",
-    Situation.STAGNANT: "Estagnado",
-    Situation.BLOCKED: "Bloqueado",
-    Situation.OVERDUE: "Atrasado",
-    Situation.CARRIED_OVER: "Arrastado",
-}
-RULES = {
-    "arrasto": "Participou de sprints encerradas sem ser concluído.",
-    "prazo": "Data limite (duedate) anterior à data de referência e item não concluído.",
-    "bloqueio": "Sinalizado como impedimento, em status de bloqueio ou com bloqueador aberto.",
-    "estagnacao": "Em coluna de andamento sem nenhuma transição de status entre checkpoints consecutivos.",
-    "envelhecimento": "Tempo em andamento acima do percentil histórico do mesmo tipo e board.",
-}
+#: The rules, in the order they are evaluated; each has ``risk.rule.<id>`` as its description.
+RULES = ("arrasto", "prazo", "bloqueio", "estagnacao", "envelhecimento")
 
 
 @dataclass(frozen=True)
 class Evidence:
     rule: str
     situation: Situation
-    message: str
+    msg: Msg
     last_transition_at: datetime | None = None
     last_transition_author: str | None = None
     last_transition_from: str | None = None
     last_transition_to: str | None = None
     days: float | None = None
-    details: tuple[str, ...] = ()
+    details: tuple[Msg, ...] = ()
 
     @property
-    def description(self) -> str:
-        return RULES[self.rule]
+    def description(self) -> Msg:
+        """What the rule means, as a message (``risk.rule.<rule>``)."""
+        return Msg(f"risk.rule.{self.rule}")
 
 
 @dataclass(frozen=True)
@@ -107,8 +99,9 @@ def _days(delta: timedelta) -> float:
     return round(delta.total_seconds() / 86400, 1)
 
 
-def _fmt(at: datetime, tz: str) -> str:
-    return at.astimezone(ZoneInfo(tz)).strftime("%d/%m")
+def _local_date(at: datetime, tz: str) -> str:
+    """The instant's local date as ISO, for a message to format in the reader's convention."""
+    return at.astimezone(ZoneInfo(tz)).date().isoformat()
 
 
 def carried_sprints(history: IssueHistory, sprints: Mapping[int, Sprint], at: datetime) -> list[Sprint]:
@@ -155,13 +148,11 @@ def assess(history: IssueHistory, ctx: RiskContext) -> RiskAssessment:
     }
 
     if carried:
-        names = ", ".join(s.name for s in carried)
-        plural = "sprint encerrada" if len(carried) == 1 else "sprints encerradas"
         evidence.append(
             Evidence(
                 "arrasto",
                 Situation.CARRIED_OVER,
-                f"passou por {len(carried)} {plural} sem conclusão ({names})",
+                Msg("risk.evidence.carried", count=len(carried), sprints=[s.name for s in carried]),
                 **last_fields,
             )
         )
@@ -173,49 +164,47 @@ def assess(history: IssueHistory, ctx: RiskContext) -> RiskAssessment:
             Evidence(
                 "prazo",
                 Situation.OVERDUE,
-                f"data limite {issue.due_date:%d/%m} vencida há {late} dia{'s' if late != 1 else ''}",
+                Msg("risk.evidence.overdue", due=issue.due_date.isoformat(), late=late),
                 days=float(late),
                 **last_fields,
             )
         )
 
-    reasons = []
+    reasons: list[Msg] = []
     if history.flagged_at(at):
-        reasons.append("sinalizado como impedimento no Jira")
+        reasons.append(Msg("risk.reason.flagged"))
     if profile.is_blocked_status(status):
-        reasons.append(f"no status {status.name}")
+        reasons.append(Msg("risk.reason.status", status=status.name))
     open_blockers = [k for k in issue.blocked_by if ctx.blocker_done(k) is False]
     if open_blockers:
-        reasons.append("aguardando " + ", ".join(open_blockers))
+        reasons.append(Msg("risk.reason.waiting", keys=open_blockers))
     if reasons:
-        evidence.append(Evidence("bloqueio", Situation.BLOCKED, "; ".join(reasons), **last_fields))
+        evidence.append(
+            Evidence(
+                "bloqueio", Situation.BLOCKED, Msg("risk.evidence.blocked", reasons=reasons), **last_fields
+            )
+        )
 
     wip = profile.is_wip(status)
     stalled = stalled_checkpoints(last_change, ctx.checkpoints, at) if wip else 0
     if wip and stalled >= max(1, profile.stagnation_checkpoints):
         idle = at - last_change
-        details = []
+        details: list[Msg] = []
         for t in history.transitions_between(last_change, at):
             if t.field is ChangeField.STATUS:
                 continue
-            when = _fmt(t.at, profile.timezone)
+            when = _local_date(t.at, profile.timezone)
             if t.field is ChangeField.ASSIGNEE:
-                details.append(
-                    f"responsável mudou de {t.from_value or 'ninguém'} para "
-                    f"{t.to_value or 'ninguém'} em {when}, sem mudança de status"
-                )
+                details.append(Msg("risk.detail.assignee", before=t.from_value, after=t.to_value, when=when))
             elif t.field is ChangeField.ESTIMATE:
-                details.append(
-                    f"estimativa mudou de {t.from_value or '—'} para {t.to_value or '—'} em {when}"
-                )
+                details.append(Msg("risk.detail.estimate", before=t.from_value, after=t.to_value, when=when))
             elif t.field is ChangeField.SPRINT:
-                details.append(f"sprint mudou para {t.to_value or '—'} em {when}")
-        suffix = f" ({stalled} checkpoints sem transição)" if stalled > 1 else ""
+                details.append(Msg("risk.detail.sprint", after=t.to_value, when=when))
         evidence.append(
             Evidence(
                 "estagnacao",
                 Situation.STAGNANT,
-                f"parado há {int(_days(idle))} dias em {column}{suffix}",
+                Msg("risk.evidence.stalled", days=int(_days(idle)), column=column, checkpoints=stalled),
                 days=_days(idle),
                 details=tuple(details),
                 **last_fields,
@@ -233,8 +222,13 @@ def assess(history: IssueHistory, ctx: RiskContext) -> RiskAssessment:
                     Evidence(
                         "envelhecimento",
                         Situation.AGING,
-                        f"em andamento há {wip_age:g} dias; P{profile.aging_percentile:g} "
-                        f"histórico de {issue.type_name}: {threshold:g} dias",
+                        Msg(
+                            "risk.evidence.aging",
+                            age=wip_age,
+                            percentile=profile.aging_percentile,
+                            type_name=issue.type_name,
+                            threshold=threshold,
+                        ),
                         days=wip_age,
                         **last_fields,
                     )

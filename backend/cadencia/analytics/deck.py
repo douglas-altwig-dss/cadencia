@@ -20,6 +20,7 @@ from cadencia.domain.history import IssueHistory
 from cadencia.domain.metrics import distribution, item_metrics
 from cadencia.domain.models import HierarchyLevel, Issue, Sprint
 from cadencia.domain.risk import SEVERITY, RiskAssessment, Situation
+from cadencia.i18n import DECK_LOCALE, render
 from cadencia.report.core.context import (
     FIXED_PREFIX,
     BoardDeck,
@@ -31,8 +32,8 @@ from cadencia.report.core.context import (
     VariableSpec,
 )
 
-NO_EPIC = "Sem épico:"
-NO_OWNER = "Sem responsável"
+NO_EPIC = "Sem épico:"  # deck text: pt-BR by design
+NO_OWNER = "Sem responsável"  # deck text: pt-BR by design
 SPRINT_STATES = {"active": "Ativa", "closed": "Encerrada", "future": "Futura"}
 HIGHLIGHTS = 5
 MAX_DATE = date.max
@@ -218,7 +219,7 @@ def board_deck(
     if window is not None:
         deck.numbers["janela.indice"] = float(window.index)
         deck.numbers["janela.total"] = float(len(windows))
-        deck.texts["janela.numero"] = f"{window.index} de {len(windows)}"
+        deck.texts["janela.numero"] = f"{window.index} de {len(windows)}"  # deck text: pt-BR by design
         deck.texts["janela.periodo"] = (
             f"{_local(window.start, tz, '%d/%m')} – {_local(min(window.end, at), tz, '%d/%m')}"
         )
@@ -237,14 +238,14 @@ def board_deck(
 
     def message(history: IssueHistory) -> str:
         evidence = assessments[history.issue.key].evidence
-        return evidence[0].message if evidence else ""
+        return render(evidence[0].msg, DECK_LOCALE) if evidence else ""
 
     def owner_name(history: IssueHistory) -> str:
         person = history.assignee_at(at)
         return alias(person.account_id, person.display_name) if person else NO_OWNER
 
     def situation_name(history: IssueHistory) -> str:
-        return assessments[history.issue.key].situation.label
+        return render(assessments[history.issue.key].situation.label, DECK_LOCALE)
 
     blocked = [h for h in members if any(e.rule == "bloqueio" for e in assessments[h.issue.key].evidence)]
 
@@ -260,7 +261,14 @@ def board_deck(
     # Highlights: the biggest deliveries of the window, largest estimate first, then by key.
     highlights = sorted(completed_work, key=lambda h: (-(h.issue.estimate or 0), h.issue.key))[:HIGHLIGHTS]
     deck.groups["conquistas.destaques"] = (
-        [Group("Destaques da semana:", [h.issue.summary for h in highlights])] if highlights else []
+        [
+            Group(
+                "Destaques da semana:",  # deck text: pt-BR by design
+                [h.issue.summary for h in highlights],
+            )
+        ]
+        if highlights
+        else []
     )
 
     deadlines = []
@@ -274,7 +282,7 @@ def board_deck(
         still_open = sum(1 for h in children if not h.is_done_at(at))
         items = [f"Data limite {epic.due_date:%d/%m/%y}"]
         if still_open:
-            items.append(f"{still_open} item(ns) em aberto nesta sprint")
+            items.append(f"{still_open} item(ns) em aberto nesta sprint")  # deck text: pt-BR by design
         deadlines.append(Group(f"{epic.summary}:", items))
     deck.groups["prazos.por_epico"] = deadlines
 
@@ -454,7 +462,7 @@ def board_deck(
         )
     tally = Counter(assessments[h.issue.key].situation for h in members if not h.is_done_at(at))
     deck.series["grafico.riscos"] = Series(
-        categories=[s.label for s in SEVERITY],
+        categories=[render(s.label, DECK_LOCALE) for s in SEVERITY],
         series={"Itens": [float(tally.get(s, 0)) for s in SEVERITY]},
     )
     # Burndown from the same windows as the throughput chart, so the two line up week by week.
@@ -462,7 +470,7 @@ def board_deck(
     deck.series["grafico.burndown"] = Series(
         categories=[f"Semana {w.index}" for w in closed_windows],
         series={
-            "Em aberto": [
+            "Em aberto": [  # deck text: pt-BR by design
                 float(sum(1 for h in scope if not h.is_done_at(min(w.end, at)))) for w in closed_windows
             ]
         },
@@ -481,7 +489,7 @@ def board_deck(
         1 for h in work if data.profile.is_wip(h.status_at(at) or h.issue.status) and not h.is_done_at(at)
     )
     deck.series["grafico.progresso"] = Series(
-        categories=["Concluído", "Em andamento", "A fazer"],
+        categories=["Concluído", "Em andamento", "A fazer"],  # deck text: pt-BR by design
         series={
             "Itens": [
                 float(progress.done),
@@ -565,9 +573,9 @@ def _forecast_fields(
     days = [result.p50_days, result.p85_days, result.p95_days]
     if all(d is not None for d in days):
         deck.series["grafico.previsao"] = Series(
-            categories=["50% de chance", "85% de chance", "95% de chance"],
-            series={"Dias úteis": [float(d) for d in days if d is not None]},
-            y_label="dias úteis",
+            categories=["50% de chance", "85% de chance", "95% de chance"],  # deck text: pt-BR by design
+            series={"Dias úteis": [float(d) for d in days if d is not None]},  # deck text: pt-BR by design
+            y_label="dias úteis",  # deck text: pt-BR by design
         )
 
 
@@ -630,10 +638,14 @@ def _flow_fields(
             marks.append({"x": position[index], "y": round(age, 1), "label": history.issue.key})
         deck.series["grafico.aging"] = Series(
             categories=[columns[i].name for i in used],
-            series={"P85 histórico de cycle time": [float(cycle_p85)]} if cycle_p85 else {},
+            series={
+                "P85 histórico de cycle time": [float(cycle_p85)]  # deck text: pt-BR by design
+            }
+            if cycle_p85
+            else {},
             style="scatter",
             marks=marks,
-            y_label="dias em andamento",
+            y_label="dias em andamento",  # deck text: pt-BR by design
         )
 
 
@@ -647,7 +659,7 @@ def _change_fields(
     tz = data.profile.timezone
     if inputs.changes_since is not None:
         deck.texts["mudancas.periodo"] = f"desde {_local(inputs.changes_since, tz, '%d/%m %H:%M')}"
-    labels = {s.value: s.label for s in SEVERITY}
+    labels = {s.value: render(s.label, DECK_LOCALE) for s in SEVERITY}
 
     def rows(entries: Sequence[Mapping[str, Any]], before: str, after: str) -> list[Row]:
         out = []
@@ -674,7 +686,7 @@ def _change_fields(
     deck.rows["mudancas.entraram"] = rows(changes.get("entered", []), "", "status")
     summary = []
     for title, key in (
-        ("Ficaram em risco", "mudancas.novos_riscos"),
+        ("Ficaram em risco", "mudancas.novos_riscos"),  # deck text: pt-BR by design
         ("Riscos resolvidos", "mudancas.resolvidos"),
         ("Concluídos", "mudancas.concluidos"),
         ("Entraram no escopo", "mudancas.entraram"),

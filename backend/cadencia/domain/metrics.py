@@ -213,15 +213,23 @@ def aging_thresholds(
 
 
 def cumulative_flow(
-    histories: Iterable[IssueHistory], profile: BoardProfile, start: datetime, end: datetime
+    histories: Iterable[IssueHistory],
+    profile: BoardProfile,
+    start: datetime,
+    end: datetime,
+    *,
+    fallback_columns: Sequence[str],
 ) -> dict[str, object]:
-    """Daily count of items per board column (RF-33, diagrama de fluxo cumulativo)."""
+    """Daily count of items per board column (RF-33, cumulative flow diagram).
+
+    A board without columns is drawn with ``fallback_columns`` (to do, in progress, done): names
+    the caller gives already in the reader's language, since this module renders no text."""
     items = list(histories)
     instants = sample_instants(start, end)
     if profile.columns:
         names = [c.name for c in profile.columns]
     else:
-        names = ["A fazer", "Em andamento", "Concluído"]
+        names = list(fallback_columns)
     fallback = {
         StatusCategory.TODO: names[0],
         StatusCategory.IN_PROGRESS: names[len(names) // 2] if len(names) > 2 else names[-1],
