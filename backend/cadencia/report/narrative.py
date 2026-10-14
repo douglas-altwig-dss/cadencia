@@ -42,7 +42,8 @@ FACTS: tuple[tuple[str, str], ...] = (
     ("riscos_resolvidos", "num.mudancas_resolvidos"),
 )
 
-SYSTEM = (  # deck text: pt-BR by design (docs/i18n.md) — the draft becomes the deck variable
+SYSTEM = (
+    # deck text: pt-BR by design (docs/i18n.md) — the draft becomes the deck variable
     "Você escreve o parágrafo de abertura do slide de um time numa reunião semanal de "
     "acompanhamento de entregas. Escreva em português do Brasil, em 2 a 4 frases, tom factual e "
     "direto, sem markdown, sem listas e sem saudação. Use apenas os números fornecidos; quando um "

@@ -3,7 +3,7 @@ import { IconEye, IconTrash } from '@tabler/icons-react';
 
 import type { Binding, CatalogField, SlideMapping } from '../../api/types';
 import { bindingKey } from '../../api/types';
-import { KIND_LABEL } from '../../pages/FieldCatalog';
+import { kindLabel } from '../../pages/FieldCatalog';
 import { useT } from '../../i18n';
 
 /**
@@ -64,7 +64,7 @@ export function BindingsPanel({
                   </Badge>
                   {spec && (
                     <Badge size="xs" variant="outline" color="gray">
-                      {KIND_LABEL[spec.kind]}
+                      {kindLabel(spec.kind)}
                     </Badge>
                   )}
                 </Group>

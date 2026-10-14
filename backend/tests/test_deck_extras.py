@@ -8,8 +8,8 @@ import asyncio
 import pytest
 from pptx import Presentation
 
-from cadencia.demo import PEOPLE, DemoJira
-from cadencia.demo_seed import DEMO_TEAM
+from cadencia.demo import DemoJira
+from cadencia.demo_seed import save_demo_team
 from cadencia.report.adapters.jira_source import JiraSource
 from cadencia.report.core.charts import render_chart_png
 from cadencia.report.core.context import FIELD_INDEX, Series
@@ -17,7 +17,6 @@ from cadencia.report.core.generate import generate_deck
 from cadencia.report.core.manifest import extract_manifest
 from cadencia.report.core.mapping import DeckMapping
 from cadencia.report.core.sample_template import build_sample_template
-from cadencia.store import repo
 from cadencia.store.db import session_scope
 from tests.support import NOW, collect_demo
 
@@ -26,11 +25,7 @@ from tests.support import NOW, collect_demo
 def deck(sessions, settings):
     asyncio.run(collect_demo(DemoJira(NOW, epic_plan=True), sessions, settings, select=(1, 2, 3, 4)))
     with session_scope(sessions) as session:
-        roles = {r.name: r.id for r in repo.list_roles(session)}
-        for handle, entries in DEMO_TEAM.items():
-            repo.save_member(
-                session, PEOPLE[handle][0], active=True, roles=[(roles[n], s) for n, s in entries]
-            )
+        save_demo_team(session)
     with session_scope(sessions) as session:
         return JiraSource(session, settings).deck_data([1, 4], reference=NOW, now=NOW, registry={})
 

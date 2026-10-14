@@ -38,8 +38,8 @@ DEFAULT_PALETTE = {
 }
 DEFAULT_STATUS_LABELS = {
     "concluido": "Concluído",
-    "em_dia": "Em dia",
-    "risco": "Em risco",
+    "em_dia": "Em dia",  # deck text: pt-BR by design (docs/i18n.md)
+    "risco": "Em risco",  # deck text: pt-BR by design (docs/i18n.md)
     "atrasado": "Atrasado",
 }
 
@@ -258,7 +258,7 @@ class Schedule(BaseModel):
     @classmethod
     def _weekdays(cls, value: list[int]) -> list[int]:
         if not value or any(d < 0 or d > 6 for d in value):
-            raise ValueError("dias da semana vão de 0 (segunda) a 6 (domingo)")
+            raise ValueError("dias da semana vão de 0 (segunda) a 6 (domingo)")  # i18n: out of scope
         return sorted(set(value))
 
     @field_validator("timezone")
@@ -269,7 +269,7 @@ class Schedule(BaseModel):
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError):
-            raise ValueError(f"fuso horário desconhecido: {value!r}") from None
+            raise ValueError(f"fuso horário desconhecido: {value!r}") from None  # i18n: out of scope
         return value
 
 

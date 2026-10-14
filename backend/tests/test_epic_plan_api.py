@@ -12,8 +12,8 @@ from sqlalchemy import inspect, text
 from cadencia.analytics.epic_plan import deck_summary, plan_view
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
-from cadencia.demo import PEOPLE, DemoJira
-from cadencia.demo_seed import DEMO_TEAM
+from cadencia.demo import DemoJira
+from cadencia.demo_seed import save_demo_team
 from cadencia.domain.epic_plan.schedule import Allocation, Schedule
 from cadencia.i18n import DECK_LOCALE, Msg, using_locale
 from cadencia.planner import strategies
@@ -28,11 +28,7 @@ def client(sessions, settings):
     demo = DemoJira(NOW, epic_plan=True)
     asyncio.run(collect_demo(demo, sessions, settings, select=(4,)))
     with session_scope(sessions) as session:
-        roles = {r.name: r.id for r in repo.list_roles(session)}
-        for handle, entries in DEMO_TEAM.items():
-            repo.save_member(
-                session, PEOPLE[handle][0], active=True, roles=[(roles[n], s) for n, s in entries]
-            )
+        save_demo_team(session)
     app = create_app(settings, sessions)
     app.dependency_overrides[clock] = lambda: NOW
     with TestClient(app, headers=PT_BR) as test_client:

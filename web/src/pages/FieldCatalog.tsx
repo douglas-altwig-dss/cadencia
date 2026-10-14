@@ -19,15 +19,6 @@ function useFavoriteFields() {
 /** What each kind can actually do, in the words the field picker used to carry. Read at use time. */
 export const kindLabel = (kind: FieldKind): string => messages().deck.fieldCatalog.kinds[kind];
 
-const KINDS: FieldKind[] = ['text', 'number', 'groups', 'rows', 'row_groups', 'status', 'series'];
-
-/**
- * The same labels as a lookup table, kept for the callers that index it (`KIND_LABEL[kind]`). Each
- * entry is a getter, so it follows the current language instead of the one at module load.
- */
-export const KIND_LABEL = {} as Readonly<Record<FieldKind, string>>;
-for (const kind of KINDS) Object.defineProperty(KIND_LABEL, kind, { get: () => kindLabel(kind), enumerable: true });
-
 /** Binding modes a field of each kind can fill — the rule the old picker applied by filtering. */
 export const MODE_KINDS: Record<string, FieldKind[]> = {
   text: ['text', 'status', 'number'],
@@ -88,13 +79,17 @@ export function FieldCatalog({
   }, [fields, mode, query]);
 
   const groups = useMemo(() => {
-    const byGroup = new Map<string, CatalogField[]>();
+    // Grouped by the stable `group_id` (the words in `group` are translated); shown by name.
+    const byGroup = new Map<string, { name: string; items: CatalogField[] }>();
     for (const field of usable) {
-      const group = field.group ?? (field.scope === 'deck' ? f.fromReport : f.fromBoard);
-      byGroup.set(group, [...(byGroup.get(group) ?? []), field]);
+      const name = field.group ?? (field.scope === 'deck' ? f.fromReport : f.fromBoard);
+      const id = field.group_id ?? name;
+      const entry = byGroup.get(id) ?? { name, items: [] };
+      entry.items.push(field);
+      byGroup.set(id, entry);
     }
     const compare = collator().compare;
-    return [...byGroup].sort((a, b) => compare(a[0], b[0]));
+    return [...byGroup.values()].map(({ name, items }) => [name, items] as const).sort((a, b) => compare(a[0], b[0]));
   }, [usable, f]);
 
   const favoriteFields = useMemo(() => usable.filter((field) => favorites.includes(field.key)), [usable, favorites]);

@@ -13,7 +13,9 @@ Portuguese function word. It is a heuristic: read what it lists.
 Not reported: the files in the allowlist below (demo data, the sample template, migrations, the
 pt-BR catalogue), the Jira-name matchers used to *read* Jira, and any literal on a line marked
 ``# deck text: pt-BR by design`` (deck content, which stays pt-BR) or ``# i18n: out of scope``
-(operator-only text such as boot errors). Exit status 1 when anything is reported.
+(operator-only text such as boot errors). A marker covers the lines of the literal it sits on (or
+a comment line directly above it), never the rest of the statement. Exit status 1 when anything is
+reported.
 """
 
 from __future__ import annotations
@@ -40,20 +42,24 @@ ALLOWED_FILES = (
 ALLOWED_NAMES = {
     "jira/fields.py": {"STORY_POINT_NAMES", "FLAGGED_NAMES"},
     "jira/mapping.py": {"_BLOCKED_BY"},
+    "domain/epic_plan/from_jira.py": {"_SECTIONS"},  # description headings as teams write them
+    # Deck text: the labels are the charts' alt text in the .pptx (docs/i18n-backend.md 1.7); the
+    # field picker shows ``fields.label.<key>`` in the reader's language instead.
+    "report/core/context.py": {"FIELDS"},
 }
 MARKERS = ("# deck text: pt-BR by design", "# i18n: out of scope")
 
 DIACRITICS = frozenset("áàâãéêíóôõúçÁÀÂÃÉÊÍÓÔÕÚÇ")
 WORDS = re.compile(
     # Words English does not share ("no", "do", "item", "configure" would flag English text).
-    r"\b(?:não|sem|para|com|de|da|dos|em|na|que|há|já|nada|ainda|uma|pelo|pela|está|"
+    # A word right after "." "@" "/" or a letter is part of a domain, address or path ("x.com").
+    r"(?<![\w.@/])(?:não|sem|para|com|de|da|dos|em|na|que|há|já|nada|ainda|uma|pelo|pela|está|"
     r"coleta|itens|dias|dia|nenhum|nenhuma|confira|informe|escolha|recarregue|verifique|"
-    r"tente|selecione|aguarde|abra|veja)\b",
+    r"tente|selecione|aguarde|abra|veja)\b(?![.@/]\w)",
     re.IGNORECASE,
 )
 LOG_RECEIVERS = frozenset({"log", "logger", "logging", "_log", "LOG"})
 SKIP_CALLS = frozenset({"log_event", "FastAPI", "APIRouter"})
-SIMPLE_STATEMENTS = (ast.Assign, ast.AnnAssign, ast.AugAssign, ast.Expr, ast.Return, ast.Raise)
 
 
 @dataclass(frozen=True)
@@ -112,15 +118,11 @@ def _docstrings(tree: ast.AST) -> set[int]:
     return found
 
 
-def _strings(tree: ast.AST, allowed_names: set[str]) -> Iterator[tuple[ast.expr, str, ast.stmt | None]]:
-    """Every literal and f-string template outside the skipped places, with its simple statement."""
+def _strings(tree: ast.AST, allowed_names: set[str]) -> Iterator[tuple[ast.expr, str]]:
+    """Every literal and f-string template outside the skipped places."""
     docstrings = _docstrings(tree)
 
-    def walk(node: ast.AST, statement: ast.stmt | None) -> Iterator[tuple[ast.expr, str, ast.stmt | None]]:
-        if isinstance(node, SIMPLE_STATEMENTS):
-            statement = node
-        elif isinstance(node, ast.stmt):
-            statement = None
+    def walk(node: ast.AST) -> Iterator[tuple[ast.expr, str]]:
         if isinstance(node, ast.Call) and _skipped_call(node):
             return
         if isinstance(node, ast.keyword) and node.arg == "tags":
@@ -130,15 +132,15 @@ def _strings(tree: ast.AST, allowed_names: set[str]) -> Iterator[tuple[ast.expr,
             if any(isinstance(t, ast.Name) and t.id in allowed_names for t in targets):
                 return
         if isinstance(node, ast.JoinedStr):
-            yield node, _template(node), statement
+            yield node, _template(node)
             return
         if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in docstrings:
-            yield node, node.value, statement
+            yield node, node.value
             return
         for child in ast.iter_child_nodes(node):
-            yield from walk(child, statement)
+            yield from walk(child)
 
-    yield from walk(tree, None)
+    yield from walk(tree)
 
 
 def scan_file(path: Path) -> list[Finding]:
@@ -150,15 +152,20 @@ def scan_file(path: Path) -> list[Finding]:
     tree = ast.parse(source, filename=str(path))
 
     def marked(first: int, last: int) -> bool:
-        return any(marker in line for line in lines[first - 1 : last] for marker in MARKERS)
+        """A marker on one of the literal's own lines, or alone on the comment line right above it.
+
+        Never the whole statement: one marker in a dict of messages must not hide every entry."""
+        own = lines[first - 1 : last]
+        above = lines[first - 2].strip() if first >= 2 else ""
+        if above.startswith("#"):
+            own = [*own, above]
+        return any(marker in line for line in own for marker in MARKERS)
 
     findings = []
-    for node, text, statement in _strings(tree, ALLOWED_NAMES.get(relative, set())):
+    for node, text in _strings(tree, ALLOWED_NAMES.get(relative, set())):
         if not looks_portuguese(text):
             continue
         if marked(node.lineno, node.end_lineno or node.lineno):
-            continue
-        if statement is not None and marked(statement.lineno, statement.end_lineno or statement.lineno):
             continue
         findings.append(Finding(relative, node.lineno, text))
     return findings

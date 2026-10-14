@@ -17,7 +17,7 @@ import { useState } from 'react';
 
 import type { Binding, CatalogField, DeckMapping, SceneShape } from '../../api/types';
 import { bindingKey } from '../../api/types';
-import { FieldPicker, KIND_LABEL } from '../../pages/FieldCatalog';
+import { FieldPicker, kindLabel } from '../../pages/FieldCatalog';
 import { useT } from '../../i18n';
 
 export type ContentOrigin = 'estatico' | 'dados' | 'fixo';
@@ -177,7 +177,7 @@ export function ContentSection({
                     </Text>
                     {boundSpec && (
                       <Badge size="xs" variant="outline">
-                        {KIND_LABEL[boundSpec.kind]}
+                        {kindLabel(boundSpec.kind)}
                       </Badge>
                     )}
                     {legacyField && (

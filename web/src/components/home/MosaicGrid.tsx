@@ -106,7 +106,7 @@ export function MosaicGrid({ tiles, editing, onChange }: { tiles: TileState[]; e
                     data={SIZES.map((s) => ({ value: s.value, label: s.label }))}
                     onChange={(value) => {
                       onChange(resizeTile(tiles, tile.id, value as TileSize));
-                      announce(m.resized(label(tile), SIZES.find((s) => s.value === value)?.hint.split(':')[0] ?? String(value)));
+                      announce(m.resized(label(tile), value as TileSize));
                     }}
                   />
                   <Tooltip label={m.moveBefore}>

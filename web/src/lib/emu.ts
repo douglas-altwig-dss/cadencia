@@ -6,6 +6,8 @@
  * round: a shape is *at* 1143000 EMU and merely *drawn* at 213.4 px. Rounding therefore happens
  * once, on the way to the screen, and never accumulates into the file.
  */
+import { fmtNum } from './format';
+
 export const EMU_PER_INCH = 914400;
 export const EMU_PER_PT = 12700;
 export const PT_PER_INCH = 72;
@@ -23,4 +25,4 @@ export const cmToEmu = (cm: number) => Math.round((cm / 2.54) * EMU_PER_INCH);
 /** A point size drawn on a stage: points are EMU too, so the same scale applies. */
 export const fontPx = (sizePt: number, scale: number) => sizePt * EMU_PER_PT * scale;
 
-export const fmtCm = (emu: number) => `${emuToCm(emu).toFixed(2)} cm`;
+export const fmtCm = (emu: number) => `${fmtNum(emuToCm(emu), 2)} cm`;

@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from cadencia.collector.service import Collector
 from cadencia.config import Settings
 from cadencia.demo import BASE_URL, PEOPLE, DemoJira
+from cadencia.domain.epic_plan.seed import ROLE_SEED
+from cadencia.i18n import SUPPORTED, render
 from cadencia.jira.client import JiraClient
 from cadencia.report.core.mapping import DeckMapping
 from cadencia.report.core.sample_template import build_sample_template
@@ -19,18 +21,45 @@ from cadencia.report.service import store_template
 from cadencia.store import repo
 from cadencia.store.db import session_scope
 
-# The epic plan's team: who covers which role. Four people cover two roles (floating capacity).
+# The epic plan's team: who covers which role, by the stable `key` of each `ROLE_SEED` entry (the
+# seeded names are rendered in CADENCIA_LOCALE, so they differ per install). Four people cover two
+# roles (floating capacity).
 DEMO_TEAM: dict[str, list[tuple[str, str]]] = {
-    "ana": [("PM/PO", "senior")],
-    "bruno": [("Backend", "pleno")],
-    "carla": [("Tech Leader", "senior"), ("Infraestrutura", "junior")],
-    "diego": [("Cientista de Dados / Engenheiro de Dados", "junior"), ("Backend", "junior")],
-    "elisa": [("Infraestrutura", "pleno")],
-    "fabio": [("Arquiteto de Software", "senior"), ("Infraestrutura", "pleno")],
-    "gabriela": [("Backend", "pleno"), ("Cientista de Dados / Engenheiro de Dados", "pleno")],
-    "heitor": [("Cientista de Dados / Engenheiro de Dados", "senior")],
-    "iris": [("Frontend", "pleno")],
+    "ana": [("pm_po", "senior")],
+    "bruno": [("backend", "pleno")],
+    "carla": [("tech_lead", "senior"), ("infrastructure", "junior")],
+    "diego": [("data", "junior"), ("backend", "junior")],
+    "elisa": [("infrastructure", "pleno")],
+    "fabio": [("architect", "senior"), ("infrastructure", "pleno")],
+    "gabriela": [("backend", "pleno"), ("data", "pleno")],
+    "heitor": [("data", "senior")],
+    "iris": [("frontend", "pleno")],
 }
+
+
+def seeded_role_ids(session: Session) -> dict[str, int]:
+    """Seed key → role id for the seeded roles still present, whatever locale named them."""
+    by_name = {r.name: r.id for r in repo.list_roles(session)}
+    found: dict[str, int] = {}
+    for seed in ROLE_SEED:
+        for locale in SUPPORTED:
+            role_id = by_name.get(render(seed["name"], locale))  # type: ignore[arg-type]
+            if role_id is not None:
+                found[str(seed["key"])] = role_id
+                break
+    return found
+
+
+def save_demo_team(session: Session) -> None:
+    """Give the demo people their roles (`DEMO_TEAM`)."""
+    roles = seeded_role_ids(session)
+    for handle, entries in DEMO_TEAM.items():
+        repo.save_member(
+            session,
+            PEOPLE[handle][0],
+            active=True,
+            roles=[(roles[key], seniority) for key, seniority in entries if key in roles],
+        )
 
 
 def demo_mapping(manifest: dict[str, Any], boards: list[dict[str, Any]]) -> DeckMapping:
@@ -97,14 +126,7 @@ async def seed_demo(settings: Settings, sessions: sessionmaker[Session]) -> dict
         )
 
     with session_scope(sessions) as session:
-        roles = {r.name: r.id for r in repo.list_roles(session)}
-        for handle, entries in DEMO_TEAM.items():
-            repo.save_member(
-                session,
-                PEOPLE[handle][0],
-                active=True,
-                roles=[(roles[name], seniority) for name, seniority in entries if name in roles],
-            )
+        save_demo_team(session)
 
     path = build_sample_template(settings.data_dir / "modelo-exemplo.pptx")
     with session_scope(sessions) as session:

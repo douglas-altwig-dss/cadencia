@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { api, qs } from './client';
+import { api, qs, withLang } from './client';
 import type {
   A11yReport,
   DeckBlock,
@@ -24,7 +24,7 @@ import type {
 
 /** #8, RF-70: where a deck is taken away from, as .pptx or .pdf; `force` for a refused/unapproved one. */
 export const runFileUrl = (run: Pick<ReportRun, 'id'>, format: 'pptx' | 'pdf', force = false) =>
-  `/api/reports/runs/${run.id}/file${qs({ format, force: force || undefined })}`;
+  `/api/reports/runs/${run.id}/file${qs(withLang({ format, force: force || undefined }))}`;
 
 export const usePreviewRuns = (templateId?: number) =>
   useQuery({

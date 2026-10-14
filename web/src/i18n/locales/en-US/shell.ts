@@ -15,7 +15,7 @@ const HOURS =
 const CAPACITY =
   'Remaining capacity is: working days from today to the end of the sprint (or of the week, when there is no active sprint or it is past its end date) × hours per day × focus factor × allocation, minus absences. Each person’s hours per day and allocation are set on the Capacity tab.';
 
-const LOAD_STATES = 'Over 110% is “over capacity”; under 80%, “has slack” (the board’s limits; these are the defaults).';
+const LOAD_STATES = 'Over 110% is “over capacity”; under 80%, “with slack” (the board’s limits; these are the defaults).';
 
 const BLOCK =
   'A block is an open item — subtasks included — flagged as an impediment in Jira, in a blocking status, or waiting on another open item through an “is blocked by” link.\n\nSeverity comes from how long it has been stuck: under 2 days is low, up to 5 is medium, more than that is high. An item that is both blocked and overdue counts here even if another rule shows it as overdue.';

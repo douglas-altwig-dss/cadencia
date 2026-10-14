@@ -153,6 +153,13 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* A value with words ("14 working days", "14 Arbeitstage") wraps between them rather than running
+   out of a narrow card; a bare number still has no space to break at. */
+.kpi-value.num {
+  white-space: normal;
+  text-wrap: balance;
+}
+
 /* Explanatory notes: a quiet aside, not a coloured slab competing with the data. */
 .note {
   background: var(--surface-sunken);

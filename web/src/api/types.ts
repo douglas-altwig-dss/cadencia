@@ -34,6 +34,8 @@ export interface Evidence {
   situation: Situation;
   label: string;
   message: string;
+  /** The message's key: tells the messages apart without reading their (translated) text. */
+  code?: string;
   days: number | null;
   last_transition: { at: string | null; author: string | null; from: string | null; to: string | null } | null;
   details: string[];
@@ -792,8 +794,10 @@ export interface CatalogField {
   scope: 'deck' | 'board';
   label: string;
   columns: string[];
-  /** How the field picker groups this entry. */
+  /** How the field picker groups this entry, as words in the request's language. */
   group?: string;
+  /** The group's stable id (`report`, `sprint`…), to group and sort by; null for a group the server does not know. */
+  group_id?: string | null;
   hint?: string;
   /** RF-56: `jira` for a catalogue field, `variavel` for a registered variable. */
   origin?: 'jira' | 'variavel';

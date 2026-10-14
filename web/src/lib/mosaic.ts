@@ -37,7 +37,7 @@ export interface SizeOption {
   value: TileSize;
   /** One letter, in the current language. */
   readonly label: string;
-  /** "Small: a quarter of the width": the word before the colon names the size on its own. */
+  /** "Small: a quarter of the width", the tooltip of the size control. */
   readonly hint: string;
 }
 

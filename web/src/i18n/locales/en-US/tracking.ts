@@ -577,7 +577,8 @@ export const tracking = {
     gridLabel: 'Home indicators',
     moved: (label: string, position: number) => `${label} moved to position ${position}.`,
     sizeOf: (label: string) => `Size of ${label}`,
-    resized: (label: string, size: string) => `${label} is now ${size.toLowerCase()}.`,
+    /** `size` is the tile size code (`P`, `M`, `G`): each language words the whole sentence. */
+    resized: (label: string, size: 'P' | 'M' | 'G') => `${label} is now ${{ P: 'small', M: 'medium', G: 'large' }[size]}.`,
     moveBefore: 'Move earlier',
     moveBeforeAria: (label: string) => `Move ${label} earlier`,
     moveAfter: 'Move later',
@@ -631,7 +632,7 @@ export const tracking = {
       elapsed: 'Sprint in progress',
       kanban: 'Kanban boards',
       load: 'Team load',
-      overloaded: 'People above capacity',
+      overloaded: 'People over capacity',
       blocks: 'Active blocks',
       delivered: 'Deliveries in the sprint',
       recent: 'Deliveries in the last 7 days',

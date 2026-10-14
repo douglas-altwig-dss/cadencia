@@ -83,5 +83,11 @@ export const api = {
   upload: <T>(path: string, form: FormData) => request<T>('POST', path, form, true),
 };
 
+/**
+ * A link the browser opens itself (a download, an export) goes without the app's `Accept-Language`,
+ * so it names the language in `?lang=` instead (docs/i18n-backend.md, section 3).
+ */
+export const withLang = (params: Params = {}): Params => ({ ...params, lang: currentLocale() });
+
 export const exportUrl = (dataset: string, params: Params & { format?: 'csv' | 'json' }) =>
-  `/api/export/${dataset}${qs(params)}`;
+  `/api/export/${dataset}${qs(withLang(params))}`;

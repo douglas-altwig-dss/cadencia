@@ -172,7 +172,7 @@ export const editor: Messages['editor'] = {
       estimativa: 'Schätzung',
       status: 'Status im Board',
       dias_parado: 'Tage im Stillstand',
-      cycle_time: 'Durchlaufzeit',
+      cycle_time: 'Zykluszeit',
     },
     sorts: {
       modelo: 'Reihenfolge des Boards',

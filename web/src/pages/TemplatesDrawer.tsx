@@ -22,10 +22,10 @@ import type { TemplateSummary } from '../api/types';
 import { ErrorState, Loading, Note } from '../components/common';
 import { TemplateDiagnosticsPanel } from '../components/deck/TemplatePanels';
 import { useT } from '../i18n';
-import { fmtDateTime } from '../lib/format';
+import { fmtDateTime, fmtNum } from '../lib/format';
 
 const size = (bytes: number | null) =>
-  bytes == null ? '—' : bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} kB`;
+  bytes == null ? '—' : bytes > 1024 * 1024 ? `${fmtNum(bytes / 1024 / 1024)} MB` : `${Math.round(bytes / 1024)} kB`;
 
 function Upload({ onUploaded }: { onUploaded: (id: number) => void }) {
   const t = useT();

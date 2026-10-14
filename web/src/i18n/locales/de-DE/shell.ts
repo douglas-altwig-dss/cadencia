@@ -63,7 +63,7 @@ export const shell: Messages['shell'] = {
     collecting: 'Rufe ab…',
     collected: (when: string) => `Abgerufen ${when}`,
     neverCollected: 'Nie abgerufen',
-    openStatus: (label: string) => `${label}. Status des Datenabrufs ansehen`,
+    openStatus: (label: string) => `${label}. Abrufstatus ansehen`,
     tipCollecting: 'Ein Datenabruf läuft.',
     tipOldest: (when: string) => `Ältester Datenabruf aller Boards: ${when}`,
     tipOldestFailed: (when: string) => `Ältester Datenabruf aller Boards: ${when}. Bei einem Board ist der letzte Datenabruf fehlgeschlagen.`,
@@ -79,7 +79,7 @@ export const shell: Messages['shell'] = {
     people: 'Personen',
     focusTimeline: 'Fokus-Zeitleiste',
     presentation: 'Präsentation',
-    collectionStatus: 'Status des Datenabrufs',
+    collectionStatus: 'Abrufstatus',
     settings: 'Einstellungen',
     myWeek: 'Meine Woche',
     dataHygiene: 'Datenpflege',
@@ -101,7 +101,7 @@ export const shell: Messages['shell'] = {
     freshness: 'Aktualität der Daten',
     lastFailedTitle: 'Der letzte Datenabruf dieses Boards ist fehlgeschlagen',
     lastFailedBody: (error: string) => `${error} — die Zahlen unten stammen aus dem letzten erfolgreichen Datenabruf.`,
-    openStatus: 'Status des Datenabrufs öffnen',
+    openStatus: 'Abrufstatus öffnen',
     staleTitle: 'Daten möglicherweise veraltet',
     staleBody: (when: string) => `Der letzte erfolgreiche Datenabruf war ${when}.`,
     loadFailed: 'Konnte nicht geladen werden',
@@ -250,7 +250,7 @@ export const shell: Messages['shell'] = {
     collectNow: 'Jetzt abrufen',
     collectNowDetail: 'inkrementeller Datenabruf aller Boards',
     collectionStarted: 'Datenabruf gestartet',
-    collectionStartedMessage: 'Verfolgen Sie ihn unter Status des Datenabrufs.',
+    collectionStartedMessage: 'Verfolgen Sie ihn unter Abrufstatus.',
     collectionNotStarted: 'Datenabruf nicht gestartet',
     showShortcuts: 'Tastenkürzel anzeigen',
     placeholder: 'Board, Sprint, Vorgang (CAD-14), Person, Vorlage oder Aktion suchen…',
@@ -330,7 +330,7 @@ export const shell: Messages['shell'] = {
     openPoints: 'Offene Punkte',
     nobody: 'niemand',
     noCheckpointTitle: 'Noch kein eingefrorener Checkpoint',
-    seeStatus: 'Status des Datenabrufs ansehen',
+    seeStatus: 'Abrufstatus ansehen',
     noCheckpointBody:
       'Der erste Checkpoint wird zur wöchentlichen Zeit des Boards nach einem Datenabruf gespeichert. Ab dann vergleicht dieser Tab die Woche.',
     since: 'Seit Checkpoint',
@@ -371,13 +371,13 @@ export const shell: Messages['shell'] = {
 
   flowCharts: {
     noData: 'Keine Daten im Zeitraum',
-    seeStatus: 'Status des Datenabrufs ansehen',
+    seeStatus: 'Abrufstatus ansehen',
     noDataBody: 'Erweitern Sie den Zeitraum in den Filtern oder prüfen Sie, ob der letzte Datenabruf dieses Boards abgeschlossen ist.',
     cfdLabel: (from: string, to: string, columns: string) => `Kumulativer Fluss von ${from} bis ${to} nach Spalte: ${columns}`,
     noneDone: 'Keine erledigten Vorgänge im Zeitraum',
-    noneDoneBody: 'Erweitern Sie den Zeitraum in den Filtern: Das Diagramm braucht abgeschlossene Vorgänge, um die Durchlaufzeit zu zeigen.',
+    noneDoneBody: 'Erweitern Sie den Zeitraum in den Filtern: Das Diagramm braucht abgeschlossene Vorgänge, um die Zykluszeit zu zeigen.',
     scatterLabel: (n: number, p50: string, p85: string, p95: string) =>
-      `Durchlaufzeit von ${plural(n, 'erledigtem Vorgang', 'erledigten Vorgängen')}; P50 ${p50} Tage, P85 ${p85}, P95 ${p95}`,
+      `Zykluszeit von ${plural(n, 'erledigtem Vorgang', 'erledigten Vorgängen')}; P50 ${p50} Tage, P85 ${p85}, P95 ${p95}`,
     scatterTip: (days: string, date: string) => `${days} Tage · erledigt am ${date}`,
     days: 'Tage',
     noneInProgress: 'Keine Vorgänge in Arbeit',
@@ -395,7 +395,7 @@ export const shell: Messages['shell'] = {
     added: 'Hinzugefügter Umfang',
     cfdTitle: 'Kumulativer Fluss',
     cfdCaption: 'Vorgänge pro Spalte, Tag für Tag: Bänder, die breiter werden, zeigen einen Stau.',
-    cycleTitle: 'Durchlaufzeit',
+    cycleTitle: 'Zykluszeit',
     cycleCaption: 'Jeder Punkt ist ein erledigter Vorgang; gestrichelte Linien sind die Perzentile 50, 85 und 95.',
     agingTitle: 'Alterung der laufenden Arbeit',
     agingCaption: 'Alter jedes offenen Vorgangs nach Spalte; Rauten liegen über dem historischen P85 des Typs.',
@@ -565,7 +565,7 @@ export const shell: Messages['shell'] = {
       'kpi:adherence': { label: 'Zusagetreue', description: 'Wie viel vom Zugesagten geliefert wurde, Sprint für Sprint.' },
       'sprint:scope': { label: 'Hinzugefügter Umfang', description: 'Vorgänge, die nach dem Start in die Sprints kamen.' },
       'team:load': { label: 'Auslastung des Teams', description: 'Offene Stunden gegenüber der im Sprint verbleibenden Kapazität.' },
-      'team:overloaded': { label: 'Personen über Kapazität', description: 'Wer mehr offene Stunden als Kapazität hat, um früh zu sprechen.' },
+      'team:overloaded': { label: 'Personen über der Kapazität', description: 'Wer mehr offene Stunden als Kapazität hat, um früh zu sprechen.' },
       'team:blocks': { label: 'Aktive Blockaden', description: 'Wie viele Blockaden es gibt, wie schwer und seit wann.' },
       'team:delivered': { label: 'Lieferungen im Sprint', description: 'Was das Team bisher geliefert hat, gegenüber der Zusage.' },
       'pulse:recent': { label: 'Letzte Lieferungen', description: 'Lieferungen pro Tag in den letzten 7 Tagen, gegenüber den 7 davor.' },
@@ -610,7 +610,7 @@ export const shell: Messages['shell'] = {
       'Offene Vorgänge (Storys, Aufgaben und Bugs) mit Fälligkeitsdatum in den nächsten 7 Tagen. Die kleinere Zahl sind die offenen Vorgänge, deren Fälligkeitsdatum schon vorbei ist.',
     'tile:boards': 'Eine Zeile pro verfolgtem Board. Zeigen Sie auf die Spaltenköpfe oder fokussieren Sie sie, um zu sehen, wie jede berechnet wird.',
     'tile:saude:pontos':
-      'Hinweise zur Datenpflege in den verfolgten Boards — Vorgänge ohne Schätzung, wenig erledigte Historie und Ähnliches. Keiner verhindert den Datenabruf, aber jeder macht einen Indikator weniger verlässlich. Die Details pro Board stehen unter Status des Datenabrufs → Datenpflege.',
+      'Hinweise zur Datenpflege in den verfolgten Boards — Vorgänge ohne Schätzung, wenig erledigte Historie und Ähnliches. Keiner verhindert den Datenabruf, aber jeder macht einen Indikator weniger verlässlich. Die Details pro Board stehen unter Abrufstatus → Datenpflege.',
 
     'col:space': 'Der Jira-Bereich, zu dem das Board gehört: das Team.',
     'col:sprint': 'Der aktive (oder letzte) Sprint und das Wochenfenster, in dem er sich befindet, unter den Fenstern des Sprints.',
@@ -660,7 +660,7 @@ export const shell: Messages['shell'] = {
     'flow:wip':
       'Mittelwert, Tag für Tag im Zeitraum, wie viele Vorgänge (Storys, Aufgaben und Bugs) in einem In-Arbeit-Status waren, über die Boards summiert.',
     'flow:efficiency':
-      'Aktive Zeit ÷ Lead Time, über die erledigten Vorgänge summiert: wie viel der Gesamtzeit der Vorgang in aktiven Spalten verbrachte, ohne Warteschlange oder Blockade. Niedrige Effizienz bedeutet viel Wartezeit.',
+      'Aktive Zeit ÷ Durchlaufzeit, über die erledigten Vorgänge summiert: wie viel der Gesamtzeit der Vorgang in aktiven Spalten verbrachte, ohne Warteschlange oder Blockade. Niedrige Effizienz bedeutet viel Wartezeit.',
     'flow:adherence': 'Median der Zusagetreue (geliefert ÷ zugesagt) der im Zeitraum abgeschlossenen Sprints.',
     'flow:carryover': 'Median der Übertragungsquote (übrig gebliebene zugesagte ÷ zugesagte) der im Zeitraum abgeschlossenen Sprints.',
     'flow:reopen':
@@ -671,7 +671,7 @@ export const shell: Messages['shell'] = {
     'issue:queue': 'Von der Erstellung bis zum Start des Vorgangs (oder bis heute, wenn er noch nicht begonnen hat).',
     'issue:blocked': 'In Jira als Hindernis markierte Zeit plus Zeit in einem blockierenden Status, seit der Erstellung.',
     'issue:active': 'Zeit in aktiven Spalten (den In-Arbeit-Spalten des Boards oder den in den Einstellungen gewählten), abzüglich der als Hindernis markierten Zeit.',
-    'issue:efficiency': 'Aktive Zeit ÷ Lead Time, höchstens 100%. Gibt es nur für erledigte Vorgänge.',
+    'issue:efficiency': 'Aktive Zeit ÷ Durchlaufzeit, höchstens 100%. Gibt es nur für erledigte Vorgänge.',
     'issue:backward': 'Wie oft der Vorgang in eine Spalte vor der aktuellen gewechselt ist, nach der Reihenfolge der Board-Spalten. Ein Zeichen für Nacharbeit.',
     'issue:reopened': 'Ja, wenn der Vorgang schon einmal in einer Erledigt-Kategorie war und in eine andere zurückgekehrt ist.',
 

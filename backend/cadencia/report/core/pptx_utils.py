@@ -458,7 +458,7 @@ def slide_index(prs: Any, slide: Any) -> int:
     for index, sld_id in enumerate(prs.slides._sldIdLst):
         if int(sld_id.get("id")) == slide.slide_id:
             return index
-    raise ValueError(f"slide {slide.slide_id} não está na apresentação")
+    raise ValueError(f"slide {slide.slide_id} não está na apresentação")  # i18n: out of scope
 
 
 def move_slide(prs: Any, slide: Any, new_index: int) -> None:

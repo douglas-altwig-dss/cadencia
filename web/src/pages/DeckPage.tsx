@@ -103,7 +103,7 @@ import { VariablesDrawer } from './VariablesDrawer';
 import { useCommands, useRegisterCommands } from '../lib/commands';
 import { useFilters } from '../lib/filters';
 import { collator, t as messages, useT } from '../i18n';
-import { fmtDate, fmtDateTime } from '../lib/format';
+import { fmtDate, fmtDateTime, fmtNum } from '../lib/format';
 import { openShortcuts, typing } from '../lib/shortcuts';
 
 type Drawer = 'gerar' | 'textos' | 'regras' | 'modelo' | 'versoes' | 'diagnostico' | 'acessibilidade' | 'uso' | 'narrativa';
@@ -195,7 +195,7 @@ function RunResult({
         <Text size="sm">
           {r.runSummary(v.slides, fmtDate(run.reference_at, true))}
           {run.audience ? ` · ${r.audienceOf(run.audience)}` : ''}
-          {run.seconds != null ? ` · ${run.seconds.toFixed(1)} s` : ''}
+          {run.seconds != null ? ` · ${fmtNum(run.seconds)} s` : ''}
         </Text>
       </Group>
       {scene.data?.template_deleted && (

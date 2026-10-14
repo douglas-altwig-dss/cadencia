@@ -556,7 +556,7 @@ export const tracking: Messages['tracking'] = {
     gridLabel: 'Indicadores do painel',
     moved: (label, position) => `${label} movido para a posição ${position}.`,
     sizeOf: (label) => `Tamanho de ${label}`,
-    resized: (label, size) => `${label} agora é ${size.toLowerCase()}.`,
+    resized: (label, size) => `${label} agora tem tamanho ${{ P: 'pequeno', M: 'médio', G: 'grande' }[size]}.`,
     moveBefore: 'Mover para antes',
     moveBeforeAria: (label) => `Mover ${label} para antes`,
     moveAfter: 'Mover para depois',

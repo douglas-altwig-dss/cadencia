@@ -6,6 +6,7 @@ import { Layer, Line, Rect, Stage, Transformer } from 'react-konva';
 import type { DeckScene } from '../../api/types';
 import type { EffectiveShape } from '../../lib/deckEdits';
 import { EMU_PER_INCH, emuToCm, emuToPx, pxToEmu } from '../../lib/emu';
+import { fmtNum } from '../../lib/format';
 import type { DisplayShape } from '../../lib/variableDisplay';
 import { ShapeNode, hex } from './ShapeNode';
 import { useT } from '../../i18n';
@@ -462,8 +463,8 @@ export function SlideStage({
         <MText className="sr-only">
           {t.editor.stage.summary(
             shapes.length,
-            emuToCm(scene.slide_width).toFixed(1),
-            emuToCm(scene.slide_height).toFixed(1),
+            fmtNum(emuToCm(scene.slide_width)),
+            fmtNum(emuToCm(scene.slide_height)),
           )}
         </MText>
       )}

@@ -45,7 +45,7 @@ class Target:
 def parse_target(target: str) -> Target:
     match = _TARGET.match(target.strip())
     if not match:
-        raise ValueError(f"identificador de área inválido: {target!r}")
+        raise ValueError(f"identificador de área inválido: {target!r}")  # i18n: out of scope
     slide, shape, para, row, col, cell_para = match.groups()
     paragraph = para if para is not None else cell_para
     return Target(
@@ -220,6 +220,7 @@ def _area(slide: Any, shape: Any, parent_id: int | None) -> dict[str, Any]:
         area["targets"] += [
             {
                 "id": area_id(sid, shape.shape_id, f"p{p['index']}"),
+                # i18n: out of scope (stored in the manifest, never shown by the web app)
                 "label": f"parágrafo {p['index'] + 1}: {p['text'][:40]}",
                 "accepts": ["text", "number", "status_text", "inline_list"],
             }
@@ -250,6 +251,7 @@ def _area(slide: Any, shape: Any, parent_id: int | None) -> dict[str, Any]:
                 area["targets"].append(
                     {
                         "id": area_id(sid, shape.shape_id, f"r{r}c{c}"),
+                        # i18n: out of scope (stored in the manifest, never shown)
                         "label": f"célula {r + 1},{c + 1}: {cell.text[:40]}",
                         "accepts": [
                             "text",
@@ -270,9 +272,11 @@ def _area(slide: Any, shape: Any, parent_id: int | None) -> dict[str, Any]:
             "series": [s.name for p in plots for s in p.series],
             "categories": [str(c) for c in plots[0].categories] if plots else [],
         }
-        area["targets"] = [{"id": base, "label": "gráfico nativo", "accepts": ["chart"]}]
+        label = "gráfico nativo"  # i18n: out of scope (stored in the manifest, never shown)
+        area["targets"] = [{"id": base, "label": label, "accepts": ["chart"]}]
     elif kind == "picture":
-        area["targets"] = [{"id": base, "label": "área da imagem", "accepts": ["chart"]}]
+        label = "área da imagem"  # i18n: out of scope (stored in the manifest, never shown)
+        area["targets"] = [{"id": base, "label": label, "accepts": ["chart"]}]
     return area
 
 

@@ -3,7 +3,7 @@ import { IconAlertTriangle, IconArrowDownRight, IconArrowUpRight, IconMinus, Ico
 
 import type { DashboardRow, TrendPoint } from '../../api/types';
 import { useT } from '../../i18n';
-import { fmtDateTime, fromNow } from '../../lib/format';
+import { fmtDateTime, fmtNum, fromNow } from '../../lib/format';
 import { InfoTip } from '../common';
 
 // The small drawings the Home tiles share: bars of a trend, a sparkline, a direction, a freshness.
@@ -119,7 +119,7 @@ export function Delta({ value, better, unit = '' }: { value: number | null; bett
     <Group gap={2}>
       <Icon size={12} aria-hidden />
       <Text size="xs" c={good ? 'teal.8' : 'red.8'}>
-        {m.delta(`${value > 0 ? '+' : ''}${Number.isInteger(value) ? value : value.toFixed(1)}${unit}`, good)}
+        {m.delta(`${value > 0 ? '+' : ''}${fmtNum(value)}${unit}`, good)}
       </Text>
     </Group>
   );

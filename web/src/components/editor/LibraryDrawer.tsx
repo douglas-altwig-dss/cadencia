@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { useAssetLibrary, useBlocks, useDeleteBlock, useSaveBlock, useUpdateAsset } from '../../api/deckHooks';
 import type { DeckBlock, LibraryAsset, ShapeEdit } from '../../api/types';
 import { emuToCm } from '../../lib/emu';
+import { fmtNum } from '../../lib/format';
 import { ErrorState } from '../common';
 import { useT } from '../../i18n';
 
@@ -196,7 +197,7 @@ function Blocks({ selection, onInsert }: { selection: Record<string, ShapeEdit>;
                 {block.name}
               </Text>
               <Text size="xs" c="dimmed">
-                {t.editor.library.elements(Object.keys(block.shapes).length)} · {emuToCm(block.width).toFixed(1)} × {emuToCm(block.height).toFixed(1)} cm
+                {t.editor.library.elements(Object.keys(block.shapes).length)} · {fmtNum(emuToCm(block.width))} × {fmtNum(emuToCm(block.height))} cm
                 {block.author ? ` · ${block.author}` : ''}
                 {block.usage_count > 0 ? ` · ${t.editor.library.uses(block.usage_count)}` : ''}
               </Text>

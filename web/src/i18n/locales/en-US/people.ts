@@ -305,8 +305,8 @@ export const people = {
   indicators: {
     state: {
       ok: 'within capacity',
-      acima: 'above capacity',
-      folga: 'with room to spare',
+      acima: 'over capacity',
+      folga: 'with slack',
       sem_estimativa: 'no estimate',
       sem_capacidade: 'no capacity in the period',
     },
