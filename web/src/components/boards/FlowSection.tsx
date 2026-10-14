@@ -1,48 +1,69 @@
-import { Anchor, Group, MultiSelect, Paper, Select, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
+import { Group, MultiSelect, Paper, Select, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { Link } from 'react-router';
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router';
 
-import { useBoards, useBoardSprints, useFlow } from '../api/hooks';
-import { Empty, ErrorState, ExportMenu, Freshness, KpiCard, Loading, Note, PageHeader, Percentiles, Stat } from '../components/common';
-import { axisStyle, EChart } from '../components/EChart';
-import { FlowCharts } from '../components/FlowCharts';
-import { useT } from '../i18n';
-import { useFilters } from '../lib/filters';
-import { HELP } from '../lib/indicatorHelp';
-import { fmtDate, fmtNum, fmtPct } from '../lib/format';
+import { useBoards, useBoardSprints, useFlow } from '../../api/hooks';
+import { useT } from '../../i18n';
+import { useFilters } from '../../lib/filters';
+import { fmtDate, fmtNum, fmtPct } from '../../lib/format';
+import { HELP } from '../../lib/indicatorHelp';
+import { Empty, ErrorState, Freshness, KpiCard, Loading, Note, Percentiles, Stat } from '../common';
+import { axisStyle, EChart } from '../EChart';
+import { FlowCharts } from '../FlowCharts';
 
-/** RF-20 … RF-22: flow metrics per board, people alphabetical against the boards' median. */
-export function FlowPage() {
-  const { get, set, carry } = useFilters();
+export const FLOW_ANCHOR = 'flow';
+
+/** Smooth unless the person asked for less motion, here or in the system. */
+function scrollBehavior(): ScrollBehavior {
+  const reduced = document.documentElement.dataset.motion === 'reduzido' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  return reduced ? 'auto' : 'smooth';
+}
+
+/**
+ * RF-20 … RF-22: flow metrics for the boards in the filter (every tracked one when none is chosen),
+ * the second half of the Boards page. Arriving with `#flow` — the old Flow page's redirect, or a
+ * card's "Flow metrics" — scrolls here once the page above has rendered, so it lands where it stays.
+ */
+export function FlowSection({ ready }: { ready: boolean }) {
+  const { get, set } = useFilters();
   const m = useT().tracking.flow;
+  const location = useLocation();
+  const section = useRef<HTMLDivElement>(null);
+  const scrolledFor = useRef<string | null>(null);
   const filters = { board: get('board'), type: get('type'), start: get('start'), end: get('end') };
   const boards = useBoards('', 1, 200, true);
   const flow = useFlow(filters);
   const data = flow.data;
-  // This page has no freshness of its own — it can span every board. When exactly one is chosen,
-  // though, its own staleness (and a failed-collection alert) is worth the same one call the board
-  // page already makes for it, instead of leaving the header pill as the only signal.
+  // The section can span every board. When exactly one is chosen, its own staleness (and a
+  // failed-collection alert) is worth the same one call the board page already makes for it.
   const soleBoardId = filters.board && !filters.board.includes(',') ? Number(filters.board) : undefined;
   const soleBoard = useBoardSprints(soleBoardId);
 
+  const settled = ready && !flow.isLoading;
+  useEffect(() => {
+    if (location.hash !== `#${FLOW_ANCHOR}` || !settled || scrolledFor.current === location.key) return;
+    scrolledFor.current = location.key;
+    // After the frame that laid the data out, so the target does not move under the scroll.
+    const frame = requestAnimationFrame(() => section.current?.scrollIntoView({ behavior: scrollBehavior(), block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [location.hash, location.key, settled]);
+
   const range: [string | null, string | null] = [filters.start ?? null, filters.end ?? null];
   const types = data ? Object.keys(data.summary.work_mix) : [];
-  const overallP50 = data?.summary.cycle_time.p50 ?? null;
 
   return (
-    <>
-      <PageHeader
-        title={m.title}
-        subtitle={m.subtitle}
-        actions={
-          <>
-            <ExportMenu label={m.exportItems} dataset="flow" params={{ board_id: filters.board, type: filters.type, start: filters.start, end: filters.end }} />
-            <ExportMenu label={m.exportPeople} dataset="flow_people" params={{ board_id: filters.board, start: filters.start, end: filters.end }} />
-          </>
-        }
-      />
+    <Stack component="section" id={FLOW_ANCHOR} ref={section} className="boards-flow" gap="md" aria-labelledby="flow-title">
+      <Stack gap={4}>
+        <Title order={3} id="flow-title">
+          {m.title}
+        </Title>
+        <Text size="sm" c="dimmed" maw={820}>
+          {m.subtitle}
+        </Text>
+      </Stack>
       {soleBoard.data && <Freshness freshness={soleBoard.data.freshness} />}
-      <Group align="flex-end" mb="md" wrap="wrap">
+      <Group align="flex-end" wrap="wrap">
         <MultiSelect
           label={m.boards}
           placeholder={m.allTracked}
@@ -88,9 +109,7 @@ export function FlowPage() {
           {data.summary.completed === 0 ? (
             <Empty
               title={m.emptyTitle}
-              action={
-                filters.start || filters.end ? { label: m.widenPeriod, onClick: () => set({ start: undefined, end: undefined }) } : undefined
-              }
+              action={filters.start || filters.end ? { label: m.widenPeriod, onClick: () => set({ start: undefined, end: undefined }) } : undefined}
             >
               {m.emptyBody}
             </Empty>
@@ -129,53 +148,9 @@ export function FlowPage() {
               </Paper>
             </SimpleGrid>
           )}
-          {soleBoardId ? (
-            <FlowCharts boardId={soleBoardId} start={filters.start} end={filters.end} />
-          ) : (
-            <Note>{m.chooseBoard}</Note>
-          )}
-          <Stack gap="xs">
-            <Title order={4}>{m.byPerson}</Title>
-            <Note title={m.whyNoRanking}>{data.note}</Note>
-            <Table.ScrollContainer minWidth={760}>
-              <Table>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>{m.colPerson}</Table.Th>
-                    <Table.Th className="num">{m.colCompleted}</Table.Th>
-                    <Table.Th>{m.colCycle}</Table.Th>
-                    <Table.Th>{m.colVsMedian}</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {data.people.map((p) => (
-                    <Table.Tr key={p.account_id ?? 'none'}>
-                      <Table.Td>
-                        {p.account_id ? (
-                          <Anchor component={Link} to={carry(`/people/${encodeURIComponent(p.account_id)}`)}>
-                            {p.name}
-                          </Anchor>
-                        ) : (
-                          p.name
-                        )}
-                      </Table.Td>
-                      <Table.Td className="num">{p.completed}</Table.Td>
-                      <Table.Td>
-                        <Percentiles dist={p.cycle_time} />
-                      </Table.Td>
-                      <Table.Td>
-                        {p.cycle_time.p50 != null && overallP50 != null
-                          ? m.vsMedian(fmtNum(p.cycle_time.p50), fmtNum(overallP50))
-                          : '—'}
-                      </Table.Td>
-                    </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
-            </Table.ScrollContainer>
-          </Stack>
+          {soleBoardId ? <FlowCharts boardId={soleBoardId} start={filters.start} end={filters.end} /> : <Note>{m.chooseBoard}</Note>}
         </Stack>
       )}
-    </>
+    </Stack>
   );
 }

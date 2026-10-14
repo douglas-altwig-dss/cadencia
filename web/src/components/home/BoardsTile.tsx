@@ -11,7 +11,7 @@ import { fmtDate } from '../../lib/format';
 import { HELP } from '../../lib/indicatorHelp';
 import { InfoTip, ProgressBars, Tipped } from '../common';
 import { RiskCountsInline } from '../risk';
-import { FreshnessCell, MiniBars, Throughput } from './parts';
+import { elapsedOf, FreshnessCell, MiniBars, Throughput } from './parts';
 
 type ColumnId = 'space' | 'sprint' | 'progress' | 'risk' | 'throughput' | 'trend' | 'data';
 
@@ -32,15 +32,6 @@ function ordered(config: BoardsConfig): ColumnId[] {
   const known = COLUMN_IDS;
   const kept = (config.order ?? []).filter((id) => known.includes(id));
   return [...kept, ...known.filter((id) => !kept.includes(id))];
-}
-
-/** How far through a running sprint the board is, 0 to 1 (M25: the mark on the progress bar). */
-function elapsedOf(row: DashboardRow): number | null {
-  if (row.sprint?.state !== 'active' || !row.sprint.start || !row.sprint.end) return null;
-  const start = Date.parse(row.sprint.start);
-  const end = Date.parse(row.sprint.end);
-  if (!(end > start)) return null;
-  return Math.min(Math.max((Date.now() - start) / (end - start), 0), 1);
 }
 
 /** ``compact`` is the desktop table's short risk names; a card on a phone has the room for the full ones. */

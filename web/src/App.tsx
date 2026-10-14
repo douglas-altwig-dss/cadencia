@@ -39,11 +39,11 @@ import { useScrollHints } from './lib/scrollHints';
 import { AudienceView } from './pages/AudienceView';
 import { fmtDateTime, fromNow, setDisplayTimeZone } from './lib/format';
 import { BoardPage } from './pages/BoardPage';
+import { BoardsPage } from './pages/BoardsPage';
 import { ConfigWizardPage } from './pages/ConfigWizardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DeckPage } from './pages/DeckPage';
 import { EpicPage } from './pages/EpicPage';
-import { FlowPage } from './pages/FlowPage';
 import { IssuePage } from './pages/IssuePage';
 import { PeoplePage, PersonPage } from './pages/PeoplePages';
 import { SettingsPage } from './pages/SettingsPage';
@@ -136,7 +136,8 @@ export function App() {
   // Old Portuguese URLs (bookmarks, saved views, e-mails, share links) land on the English ones,
   // before any branch is chosen so the public and audience windows are covered too.
   const legacy = normalizeLegacyUrl(location.pathname, location.search);
-  if (legacy) return <Navigate to={legacy + location.hash} replace />;
+  // A page that became a section brings its own anchor; otherwise the URL's hash travels.
+  if (legacy) return <Navigate to={legacy.includes('#') ? legacy : legacy + location.hash} replace />;
   // RF-100: the projector window is the slide and nothing else — no menu, no header.
   if (location.pathname.startsWith('/present/audience')) return <AudienceView />;
   // #14: a read-only share link — no shell, no sign-in, one deck.
@@ -163,7 +164,7 @@ function PinnedViews({ rail }: { rail: boolean }) {
       {pinned.map((view) => {
         // A view saved before the English URLs is compared as the URL it now redirects to.
         const [viewPath, viewQuery = ''] = view.url.split('?');
-        const target = normalizeLegacyUrl(viewPath, viewQuery ? `?${viewQuery}` : '') ?? view.url;
+        const target = (normalizeLegacyUrl(viewPath, viewQuery ? `?${viewQuery}` : '') ?? view.url).split('#')[0];
         const active = location.pathname + location.search === target;
         const link = (
           <NavLink
@@ -309,11 +310,11 @@ function Shell() {
               <Route path="/getting-started" element={<WizardPage />} />
               {/* Now a tab of People — kept as a redirect so an old bookmark or link still lands. */}
               <Route path="/my-week" element={<Navigate to="/people?tab=my-week" replace />} />
+              <Route path="/boards" element={<BoardsPage />} />
               <Route path="/boards/:boardId" element={<BoardPage />} />
               <Route path="/boards/:boardId/sprints/:sprintId" element={<SprintPage />} />
               <Route path="/boards/:boardId/epics/:epicKey" element={<EpicPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
-              <Route path="/flow" element={<FlowPage />} />
               <Route path="/people" element={<PeoplePage />} />
               <Route path="/people/:accountId" element={<PersonPage />} />
               <Route path="/presentation" element={<DeckPage />} />

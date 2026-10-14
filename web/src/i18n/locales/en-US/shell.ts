@@ -88,7 +88,7 @@ export const shell = {
     deliver: 'Deliver',
     system: 'System',
     home: 'Home',
-    flow: 'Flow',
+    boards: 'Boards',
     people: 'People',
     focusTimeline: 'Focus timeline',
     presentation: 'Presentation',
@@ -714,6 +714,14 @@ export const shell = {
     'flow:carryover': 'Median carry-over rate (committed left over ÷ committed) of the sprints closed in the period.',
     'flow:reopen':
       'Done items that were ever reopened ÷ done items. Below, how many moves back to an earlier column there were in total.',
+
+    // ---- a board's card on the Boards page
+    'boards:progress':
+      'Done ÷ items in the running sprint (stories, tasks and bugs; subtasks and epics are left out), by count. The vertical mark is how much of the sprint’s time has passed, to read the bar against.',
+    'boards:delivered':
+      'Stories, tasks and bugs done in the current weekly window — the calendar week on a board with no sprint running — and, beside it, how many in the window before.',
+    'boards:trend':
+      'Items delivered in each of the last periods, oldest on the left: per sprint (the last four closed and the running one) when a sprint is running, otherwise per weekly window (the last four).',
 
     // ---- an issue
     'issue:lead': 'From creation until done. Exists only once the item is done.',

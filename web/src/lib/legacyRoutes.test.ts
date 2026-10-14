@@ -10,7 +10,8 @@ const go = (url: string) => {
 describe('normalizeLegacyUrl: paths', () => {
   it.each([
     ['/inicio', '/getting-started'],
-    ['/fluxo', '/flow'],
+    ['/fluxo', '/boards#flow'],
+    ['/flow', '/boards#flow'],
     ['/pessoas', '/people'],
     ['/pessoas/abc-123', '/people/abc-123'],
     ['/apresentacao', '/presentation'],
@@ -36,6 +37,16 @@ describe('normalizeLegacyUrl: paths', () => {
     expect(go('/pessoasx')).toBeNull();
     expect(go('/fluxograma')).toBeNull();
     expect(go('/boards/1/fluxo')).toBeNull();
+    expect(go('/boards/1/flow')).toBeNull();
+    expect(go('/flowx')).toBeNull();
+  });
+
+  it('sends the old flow page to its section of Boards, filters kept', () => {
+    expect(go('/flow?board=4')).toBe('/boards?board=4#flow');
+    expect(go('/fluxo?board=4&type=Bug')).toBe('/boards?board=4&type=Bug#flow');
+    // Only the page itself became a section: a sub-path was never a page.
+    expect(go('/flow/x')).toBeNull();
+    expect(go('/fluxo/x')).toBeNull();
   });
 
   it('leaves /apresentar without the audience segment alone', () => {
@@ -122,7 +133,7 @@ describe('normalizeLegacyUrl: query keys', () => {
 describe('normalizeLegacyUrl: what it keeps', () => {
   it('keeps the shared filters', () => {
     expect(go('/fluxo?board=1,2&type=Story&start=2026-09-01&end=2026-09-30')).toBe(
-      '/flow?board=1,2&type=Story&start=2026-09-01&end=2026-09-30',
+      '/boards?board=1,2&type=Story&start=2026-09-01&end=2026-09-30#flow',
     );
     expect(go('/boards/1/sprints/9?tab=riscos&situation=bloqueado&person=abc')).toBe(
       '/boards/1/sprints/9?tab=risks&situation=bloqueado&person=abc',
@@ -132,7 +143,8 @@ describe('normalizeLegacyUrl: what it keeps', () => {
   it('answers null for URLs that are already English', () => {
     for (const url of [
       '/',
-      '/flow?board=1',
+      '/boards?board=1',
+      '/boards?kind=kanban',
       '/people',
       '/people/abc?tab=week',
       '/people?tab=my-week&absences=1',
@@ -153,6 +165,6 @@ describe('normalizeLegacyUrl: what it keeps', () => {
   });
 
   it('does not re-encode a query it did not touch', () => {
-    expect(go('/fluxo?type=User%20Story')).toBe('/flow?type=User%20Story');
+    expect(go('/fluxo?type=User%20Story')).toBe('/boards?type=User%20Story#flow');
   });
 });

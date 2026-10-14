@@ -1,7 +1,7 @@
 import {
   IconActivity,
-  IconChartDots,
   IconLayoutDashboard,
+  IconLayoutKanban,
   IconPresentation,
   IconSettings,
   IconTimeline,
@@ -26,8 +26,8 @@ export function nav(): { section: string; items: NavItem[] }[] {
     {
       section: w.follow,
       items: [
-        { to: '/', label: w.home, icon: IconLayoutDashboard, match: (p) => p === '/' || p.startsWith('/boards') || p.startsWith('/issues') },
-        { to: '/flow', label: w.flow, icon: IconChartDots, match: (p) => p.startsWith('/flow') },
+        { to: '/', label: w.home, icon: IconLayoutDashboard, match: (p) => p === '/' || p.startsWith('/issues') },
+        { to: '/boards', label: w.boards, icon: IconLayoutKanban, match: (p) => p.startsWith('/boards') },
         { to: '/people', label: w.people, icon: IconUsers, match: (p) => p.startsWith('/people') },
         { to: '/focus-timeline', label: w.focusTimeline, icon: IconTimeline, match: (p) => p.startsWith('/focus-timeline') },
       ],

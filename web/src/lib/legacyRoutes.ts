@@ -10,12 +10,20 @@ const PATHS: readonly (readonly [readonly string[], readonly string[]])[] = [
   [['configuracao', 'assistente'], ['settings', 'wizard']],
   [['apresentar', 'plateia'], ['present', 'audience']],
   [['inicio'], ['getting-started']],
-  [['fluxo'], ['flow']],
   [['pessoas'], ['people']],
   [['apresentacao'], ['presentation']],
   [['timeline-foco'], ['focus-timeline']],
   [['configuracao'], ['settings']],
   [['compartilhado'], ['shared']],
+];
+
+/**
+ * Whole pages that became a section of another one: the exact path (no sub-path) → the page and the
+ * section's anchor. The flow metrics are the second half of the Boards page.
+ */
+const SECTIONS: readonly (readonly [string, string, string])[] = [
+  ['fluxo', 'boards', 'flow'],
+  ['flow', 'boards', 'flow'],
 ];
 
 /** Old query keys → new ones, on any screen. */
@@ -75,14 +83,22 @@ function tabsFor(segments: readonly string[]): Readonly<Record<string, string>> 
 /**
  * The English URL (path plus `?search`) an old one stands for, or `null` when nothing in it is old —
  * so an English URL never redirects, and an unknown value is left for the page to handle as it
- * always has.
+ * always has. It carries a `#hash` only when the old page became a section of a new one; otherwise
+ * the caller keeps the URL's own hash.
  */
 export function normalizeLegacyUrl(pathname: string, search: string): string | null {
   let pathChanged = false;
   let queryChanged = false;
+  let hash = '';
   let segments = segmentsOf(pathname);
   const trailing = pathname.length > 1 && pathname.endsWith('/');
-  for (const [from, to] of PATHS) {
+  const section = segments.length === 1 ? SECTIONS.find(([from]) => from === segments[0]) : undefined;
+  if (section) {
+    segments = [section[1]];
+    hash = `#${section[2]}`;
+    pathChanged = true;
+  }
+  for (const [from, to] of section ? [] : PATHS) {
     if (from.every((part, i) => segments[i] === part)) {
       segments = [...to, ...segments.slice(from.length)];
       pathChanged = true;
@@ -129,5 +145,5 @@ export function normalizeLegacyUrl(pathname: string, search: string): string | n
   const path = pathChanged ? `/${segments.join('/')}${trailing && segments.length ? '/' : ''}` : pathname;
   // Untouched, the query is kept byte for byte rather than re-encoded.
   const query = queryChanged ? params.toString() : search.replace(/^\?/, '');
-  return `${path}${query ? `?${query}` : ''}`;
+  return `${path}${query ? `?${query}` : ''}${hash}`;
 }

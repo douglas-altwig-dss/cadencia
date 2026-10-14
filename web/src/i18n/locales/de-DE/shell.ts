@@ -75,7 +75,7 @@ export const shell: Messages['shell'] = {
     deliver: 'Liefern',
     system: 'System',
     home: 'Start',
-    flow: 'Fluss',
+    boards: 'Boards',
     people: 'Personen',
     focusTimeline: 'Fokus-Zeitleiste',
     presentation: 'Präsentation',
@@ -665,6 +665,13 @@ export const shell: Messages['shell'] = {
     'flow:carryover': 'Median der Übertragungsquote (übrig gebliebene zugesagte ÷ zugesagte) der im Zeitraum abgeschlossenen Sprints.',
     'flow:reopen':
       'Erledigte Vorgänge, die jemals wieder geöffnet wurden ÷ erledigte Vorgänge. Darunter, wie viele Wechsel in eine frühere Spalte es insgesamt gab.',
+
+    'boards:progress':
+      'Erledigt ÷ Vorgänge des laufenden Sprints (Storys, Aufgaben und Bugs; Unteraufgaben und Epics zählen nicht), nach Anzahl. Die senkrechte Marke zeigt, wie viel von der Sprintzeit vergangen ist, um den Balken daran zu messen.',
+    'boards:delivered':
+      'Storys, Aufgaben und Bugs, die im aktuellen Wochenfenster erledigt wurden — die Kalenderwoche auf einem Board ohne laufenden Sprint — und daneben, wie viele im Fenster davor.',
+    'boards:trend':
+      'Gelieferte Vorgänge in jedem der letzten Zeiträume, der älteste links: pro Sprint (die letzten vier abgeschlossenen und der laufende), wenn ein Sprint läuft, sonst pro Wochenfenster (die letzten vier).',
 
     'issue:lead': 'Von der Erstellung bis zur Erledigung. Gibt es erst, wenn der Vorgang erledigt ist.',
     'issue:cycle': 'Vom ersten Moment in einem In-Arbeit-Status bis zur Erledigung. Gibt es nur, wenn der Vorgang begonnen wurde.',

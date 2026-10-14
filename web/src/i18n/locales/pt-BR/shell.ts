@@ -75,7 +75,7 @@ export const shell: Messages['shell'] = {
     deliver: 'Entregar',
     system: 'Sistema',
     home: 'Painel',
-    flow: 'Fluxo',
+    boards: 'Boards',
     people: 'Pessoas',
     focusTimeline: 'Timeline de foco',
     presentation: 'Apresentação',
@@ -665,6 +665,13 @@ export const shell: Messages['shell'] = {
     'flow:carryover': 'Mediana da taxa de arrasto (comprometidos que sobraram ÷ comprometidos) das sprints encerradas no período.',
     'flow:reopen':
       'Itens concluídos que já foram reabertos alguma vez ÷ itens concluídos. Abaixo, quantas mudanças para uma coluna anterior houve no total.',
+
+    'boards:progress':
+      'Concluídos ÷ itens da sprint em andamento (histórias, tarefas e bugs; subtarefas e épicos ficam de fora), pela contagem. A marca vertical é quanto do tempo da sprint já passou, para ler a barra contra ela.',
+    'boards:delivered':
+      'Histórias, tarefas e bugs concluídos na janela semanal atual — a semana do calendário num board sem sprint em andamento — e, ao lado, quantos na janela anterior.',
+    'boards:trend':
+      'Itens entregues em cada um dos últimos períodos, do mais antigo à esquerda: por sprint (as quatro últimas encerradas e a em andamento) quando há sprint em andamento; senão, por janela semanal (as quatro últimas).',
 
     'issue:lead': 'Da criação até a conclusão. Só existe depois de o item concluir.',
     'issue:cycle': 'Do primeiro momento em status de andamento até a conclusão. Só existe se o item chegou a começar.',

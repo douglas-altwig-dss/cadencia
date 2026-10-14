@@ -11,7 +11,7 @@ e-mails and shared deck links already carry them. JSON keys are **not** routes a
 |---|---|
 | `/inicio` | `/getting-started` |
 | `/minha-semana` | `/my-week` (→ `/people?tab=my-week`) |
-| `/fluxo` | `/flow` |
+| `/fluxo`, `/flow` | `/boards#flow` (the flow metrics became the second half of the Boards page; the query is kept) |
 | `/pessoas`, `/pessoas/:accountId` | `/people`, `/people/:accountId` |
 | `/apresentacao` | `/presentation` |
 | `/apresentar/plateia` | `/present/audience` |
@@ -20,7 +20,7 @@ e-mails and shared deck links already carry them. JSON keys are **not** routes a
 | `/configuracao/assistente` | `/settings/wizard` |
 | `/compartilhado/:token` | `/shared/:token` (public, outside the shell) |
 
-`/`, `/status`, `/boards/...`, `/issues/:key` are already English.
+`/`, `/status`, `/boards` (`?kind=scrum|kanban`), `/boards/...`, `/issues/:key` are already English.
 
 ## Query keys
 
@@ -68,7 +68,9 @@ roles catalogue `funcoes/equipe → roles/team`. They need no redirect.
 - **Web app:** one pure function, `normalizeLegacyUrl(pathname, search)` in
   `web/src/lib/legacyRoutes.ts`, maps an old path, query keys and tab values to the new URL; the
   router redirects (`replace`) when it returns something different. Tab values are normalised there
-  too, so any stored URL with an old tab still lands.
+  too, so any stored URL with an old tab still lands. A page that became a *section* of another
+  (`/flow`, `/fluxo`) is mapped only as an exact path and carries its anchor (`#flow`); every other
+  redirect keeps the URL's own hash.
 - **Stored URLs:** migration `0023` rewrites `saved_view` paths and query keys (paths and keys only;
   old tab values are normalised by the web app at runtime).
 - **nginx:** `/shared/` and the old `/compartilhado/` both bypass basic auth.

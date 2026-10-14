@@ -101,7 +101,7 @@ export function BoardPage() {
             <Text size="sm" c="dimmed">
               {m.flowHint}
             </Text>
-            <Button component={Link} to={`/flow?board=${boardId}`} variant="light">
+            <Button component={Link} to={`/boards?board=${boardId}#flow`} variant="light">
               {m.openInFlow}
             </Button>
           </Stack>
