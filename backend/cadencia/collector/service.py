@@ -26,8 +26,9 @@ from cadencia.analytics.data import invalidate, load_board
 from cadencia.collector.snapshots import record_checkpoints, record_commitments
 from cadencia.config import Settings
 from cadencia.domain.models import Issue, Sprint
+from cadencia.i18n import Msg, localize
 from cadencia.jira.client import JiraClient
-from cadencia.jira.errors import JiraError
+from cadencia.jira.errors import JiraError, error_record
 from cadencia.jira.fields import FieldMap, discover_fields
 from cadencia.jira.mapping import (
     board_from,
@@ -213,7 +214,11 @@ class Collector:
             if not tasks:
                 with session_scope(self.sessions) as session:
                     repo.finish_run(
-                        session, run_id, "empty", self.client.counters.as_dict(), "nenhum board selecionado"
+                        session,
+                        run_id,
+                        "empty",
+                        self.client.counters.as_dict(),
+                        Msg("collect.no_board_selected"),
                     )
                 return {
                     "run_id": run_id,
@@ -361,9 +366,11 @@ class Collector:
                     task,
                     started,
                     counters,
-                    "Coleta cancelada a pedido.",
-                    "cancelada",
-                    "Rode de novo quando quiser; nada foi gravado pela metade.",
+                    error_record(
+                        Msg("collect.cancelled.cause"),
+                        Msg("collect.cancelled.action"),
+                        Msg("collect.cancelled.message"),
+                    ),
                     full,
                     status="cancelled",
                 )
@@ -371,7 +378,7 @@ class Collector:
                 log_event(
                     log, "falha na coleta do board", level=logging.ERROR, cause=exc.cause, error=exc.message
                 )
-                return self._fail(run_id, task, started, counters, exc.message, exc.cause, exc.action, full)
+                return self._fail(run_id, task, started, counters, exc.record(), full)
             except Exception as exc:
                 log.exception("erro inesperado na coleta do board")
                 return self._fail(
@@ -379,9 +386,8 @@ class Collector:
                     task,
                     started,
                     counters,
-                    str(exc),
-                    "erro inesperado",
-                    "Veja o log estruturado desta execução.",
+                    # The exception's own words stay as they are: nobody wrote a key for them.
+                    error_record(Msg("collect.unexpected.cause"), Msg("collect.unexpected.action"), str(exc)),
                     full,
                 )
 
@@ -438,13 +444,13 @@ class Collector:
         task: BoardTask,
         started: datetime,
         counters: dict[str, Any],
-        message: str,
-        cause: str,
-        action: str,
+        error: dict[str, Any],
         full: bool,
         *,
         status: str = "failed",
     ) -> dict[str, Any]:
+        """Record a board that did not finish. ``error`` is the ``{"cause", "action", "message"}``
+        record (``error_record``): stored as messages, answered here in the ambient language."""
         with session_scope(self.sessions) as session:
             repo.finish_board_run(
                 session,
@@ -454,15 +460,13 @@ class Collector:
                 counters=counters,
                 started_at=started,
                 full=full,
-                error=message,
-                cause=cause,
-                action=action,
+                error=error,
             )
         return {
             "board_id": task.id,
             "name": task.name,
             "status": status,
-            "error": {"cause": cause, "action": action, "message": message},
+            "error": localize(error),
             "counters": counters,
         }
 

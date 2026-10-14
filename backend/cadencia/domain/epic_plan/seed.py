@@ -1,54 +1,62 @@
 """Roles a fresh install starts with. Seeded once; after that the CRUD owns them (deleting all of
-them does not bring them back)."""
+them does not bring them back).
+
+Names and descriptions are messages (``seed.role.<key>.name`` / ``.description``): the store renders
+them once, in ``CADENCIA_LOCALE``, when it seeds an empty table. From then on they are the team's
+own data and are never translated again (docs/i18n-backend.md, decision 4).
+"""
 
 from __future__ import annotations
 
+from cadencia.i18n.message import Msg
+
 ROLE_SEED: tuple[dict[str, object], ...] = (
     {
-        "name": "Arquiteto de Software",
-        "description": "Desenha a solução técnica antes do desenvolvimento e define os contratos entre "
-        "backend, frontend e dados.",
+        "key": "architect",
+        "name": Msg("seed.role.architect.name"),
+        "description": Msg("seed.role.architect.description"),
         "color": "#4dabf7",
         "labels": ["arquitetura", "arquiteto"],
     },
     {
-        "name": "Backend",
-        "description": "Constrói e mantém as APIs, a lógica de negócio e as integrações com bancos de "
-        "dados e serviços externos.",
+        "key": "backend",
+        "name": Msg("seed.role.backend.name"),
+        "description": Msg("seed.role.backend.description"),
         "color": "#20c997",
         "labels": ["backend"],
     },
     {
-        "name": "Cientista de Dados / Engenheiro de Dados",
-        "description": "Modela, treina e avalia os agentes de IA e constrói os pipelines de dados que "
-        "os sustentam.",
+        "key": "data",
+        "name": Msg("seed.role.data.name"),
+        "description": Msg("seed.role.data.description"),
         "color": "#f783ac",
         "labels": ["dados", "ciencia-de-dados", "engenharia-de-dados"],
     },
     {
-        "name": "Frontend",
-        "description": "Constrói a interface que o usuário final utiliza, consumindo as APIs entregues "
-        "pelo backend.",
+        "key": "frontend",
+        "name": Msg("seed.role.frontend.name"),
+        "description": Msg("seed.role.frontend.description"),
         "color": "#b197fc",
         "labels": ["frontend"],
     },
     {
-        "name": "Infraestrutura",
-        "description": "Provisiona e mantém filas, observabilidade e ambientes.",
+        "key": "infrastructure",
+        "name": Msg("seed.role.infrastructure.name"),
+        "description": Msg("seed.role.infrastructure.description"),
         "color": "#8ca0b3",
         "labels": ["infra", "infraestrutura"],
     },
     {
-        "name": "PM/PO",
-        "description": "Gerencia prazo, escopo e comunicação com o cliente; prioriza o backlog e traduz "
-        "necessidades em requisitos.",
+        "key": "pm_po",
+        "name": Msg("seed.role.pm_po.name"),
+        "description": Msg("seed.role.pm_po.description"),
         "color": "#fcc419",
         "labels": ["pm", "po", "pm-po"],
     },
     {
-        "name": "Tech Leader",
-        "description": "Guia as decisões técnicas do time, garante a qualidade do código e destrava "
-        "impedimentos técnicos.",
+        "key": "tech_lead",
+        "name": Msg("seed.role.tech_lead.name"),
+        "description": Msg("seed.role.tech_lead.description"),
         "color": "#69db7c",
         "labels": ["tech-lead", "tech-leader"],
     },

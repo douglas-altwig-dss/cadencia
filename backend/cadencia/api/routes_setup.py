@@ -20,6 +20,7 @@ from cadencia.collector.service import (
     run_discovery,
 )
 from cadencia.errors import NotFound
+from cadencia.i18n import stored_text, tr
 from cadencia.jira.errors import JiraError
 from cadencia.logging import new_run_id
 from cadencia.store import repo
@@ -34,9 +35,8 @@ def _require_jira(settings: Any) -> None:
         raise HTTPException(
             400,
             detail={
-                "cause": "Jira não configurado",
-                "action": "Defina CADENCIA_JIRA_BASE_URL, CADENCIA_JIRA_EMAIL e CADENCIA_JIRA_API_TOKEN "
-                "(variável de ambiente ou arquivo em /run/secrets).",
+                "cause": tr("collect.jira_not_configured.cause"),
+                "action": tr("collect.jira_not_configured.action"),
             },
         )
 
@@ -71,7 +71,15 @@ async def discovery(settings: SettingsDep, sessions: SessionsDep) -> JSONDict:
     return await run_discovery(settings, sessions)
 
 
-NO_SPACE = {"key": None, "name": "Sem espaço"}
+def _no_space() -> JSONDict:
+    return {"key": None, "name": tr("collect.no_space")}
+
+
+def _error_text(record: dict[str, Any] | None, part: str, legacy: str | None) -> str | None:
+    """One part of a stored failure, in the reader's language; rows from before the records
+    existed (and a message that was never a key, such as an exception's own words) show the
+    stored text."""
+    return stored_text((record or {}).get(part), legacy)
 
 
 def _board_dict(row: s.BoardRow) -> JSONDict:
@@ -83,7 +91,7 @@ def _board_dict(row: s.BoardRow) -> JSONDict:
         "space_name": row.space_name,
         "selected": row.selected,
         "last_success_at": iso(row.last_success_at),
-        "last_error": row.last_error,
+        "last_error": _error_text(row.last_error_i18n, "message", row.last_error),
     }
 
 
@@ -98,7 +106,7 @@ def _group_by_space(session: Session, rows: list[s.BoardRow]) -> list[JSONDict]:
         space = spaces.get(key or "")
         out.append(
             {
-                "space": {"key": key, "name": space.label} if space else dict(NO_SPACE),
+                "space": {"key": key, "name": space.label} if space else _no_space(),
                 "boards": [_board_dict(b) for b in sorted(boards, key=lambda b: b.name.casefold())],
             }
         )
@@ -156,7 +164,7 @@ def select_boards(body: Selection, session: SessionDep) -> JSONDict:
 def board_detail(board_id: int, session: SessionDep, settings: SettingsDep) -> JSONDict:
     row = session.get(s.BoardRow, board_id)
     if row is None:
-        raise not_found("board não encontrado", f"Board {board_id}.")
+        raise not_found(tr("collect.board_not_found"), tr("collect.board_detail", board=board_id))
     profile = repo.board_profile(session, board_id, repo.profile_defaults(settings))
     return {
         **_board_dict(row),
@@ -173,7 +181,7 @@ def board_settings(
     try:
         profile = repo.update_board_settings(session, board_id, body, repo.profile_defaults(settings))
     except NotFound:
-        raise not_found("board não encontrado", f"Board {board_id}.") from None
+        raise not_found(tr("collect.board_not_found"), tr("collect.board_detail", board=board_id)) from None
     return {"settings": profile.settings_dict()}
 
 
@@ -213,9 +221,9 @@ def _run_dict(last: s.BoardRunRow | None) -> JSONDict | None:
         "started_at": iso(last.started_at),
         "finished_at": iso(last.finished_at),
         "counters": last.counters,
-        "error": last.error,
-        "cause": last.cause,
-        "action": last.action,
+        "error": _error_text(last.error_i18n, "message", last.error),
+        "cause": _error_text(last.error_i18n, "cause", last.cause),
+        "action": _error_text(last.error_i18n, "action", last.action),
     }
 
 
@@ -288,7 +296,7 @@ def status(session: SessionDep, settings: SettingsDep) -> JSONDict:
                 "started_at": iso(r.started_at),
                 "finished_at": iso(r.finished_at),
                 "counters": r.counters,
-                "error": r.error,
+                "error": stored_text(r.error_i18n, r.error),
             }
             for r in runs
         ],
@@ -339,7 +347,7 @@ def cancel_collection(session: SessionDep) -> JSONDict:
     """Stop the running collection at its next step; what was already written stays consistent."""
     holder = repo.lease_holder(session, COLLECT_LEASE)
     if holder is None:
-        raise HTTPException(409, detail={"cause": "nenhuma coleta em andamento"})
+        raise HTTPException(409, detail={"cause": tr("collect.nothing_running")})
     repo.request_cancel(session, holder)
     return {"cancelling": holder}
 
@@ -361,7 +369,11 @@ async def collect(
         taken = repo.acquire_lease(session, COLLECT_LEASE, run_id, LEASE_TTL)
     if not taken:
         raise HTTPException(
-            409, detail={"cause": "coleta em andamento", "action": "Aguarde a coleta atual terminar."}
+            409,
+            detail={
+                "cause": tr("collect.already_running.cause"),
+                "action": tr("collect.already_running.action"),
+            },
         )
 
     async def job() -> None:

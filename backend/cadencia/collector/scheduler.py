@@ -19,6 +19,7 @@ from cadencia import notify
 from cadencia.collector.service import run_collection
 from cadencia.config import Settings
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, using_locale
 from cadencia.logging import log_event
 from cadencia.report.core.mapping import DeckMapping
 from cadencia.report.service import generate_report, run_boards, run_pdf
@@ -41,7 +42,12 @@ def _collect(
     wait: timedelta | None = None,
 ) -> None:
     try:
-        result = asyncio.run(run_collection(settings, sessions, mode=mode, board_ids=board_ids, wait=wait))
+        # The result's failure texts feed the notification, which speaks CADENCIA_LOCALE; asyncio.run
+        # copies this context into the collection's task.
+        with using_locale(settings.locale):
+            result = asyncio.run(
+                run_collection(settings, sessions, mode=mode, board_ids=board_ids, wait=wait)
+            )
     except Exception as exc:
         log.exception("coleta agendada falhou")
         result = {"status": "failed", "boards": [], "error": str(exc)}
@@ -55,8 +61,8 @@ def _notify_failure(settings: Settings, sessions: sessionmaker[Session], result:
     lines = [f"{b['name']}: {b['error']['cause']} — {b['error']['message']}" for b in failed]
     message = notify.Message(
         event="collection_failed",
-        title="Coleta com falha" if result["status"] == "failed" else "Coleta parcial",
-        text="\n".join(lines) or str(result.get("error") or "A coleta agendada falhou."),
+        title=Msg("notify.collection." + ("failed" if result["status"] == "failed" else "partial")),
+        text="\n".join(lines) or str(result.get("error") or "") or Msg("notify.collection.failed_text"),
         link=notify.app_link(settings, "/status"),
     )
     try:

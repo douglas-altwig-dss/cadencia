@@ -6,6 +6,7 @@ checkpoint instant…), so an interrupted collection is repaired by simply runni
 
 from __future__ import annotations
 
+import contextvars
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
@@ -29,6 +30,7 @@ from cadencia.domain.models import (
     Transition,
 )
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import STORAGE_LOCALE, Msg, current_locale, render
 from cadencia.jira.fields import FieldMap
 from cadencia.store import schema as s
 
@@ -48,7 +50,7 @@ def _insert_for(session: Session) -> Any:
     elif dialect == "sqlite":
         from sqlalchemy.dialects.sqlite import insert
     else:  # pragma: no cover - guarded by configuration
-        raise RuntimeError(f"banco não suportado: {dialect}")
+        raise RuntimeError(f"banco não suportado: {dialect}")  # i18n: out of scope
     return insert
 
 
@@ -273,10 +275,10 @@ def update_board_settings(
 ) -> BoardProfile:
     row = session.get(s.BoardRow, board_id)
     if row is None:
-        raise NotFound(board_id, f"Board {board_id}.")
+        raise NotFound(board_id, Msg("store.board.not_found", board=board_id))
     unknown = set(changes) - set(BoardProfile.EDITABLE)
     if unknown:
-        raise Invalid(f"campos desconhecidos: {', '.join(sorted(unknown))}")
+        raise Invalid(Msg("store.board.unknown_settings", fields=", ".join(sorted(unknown))))
     BoardProfile.check(changes)
     merged = {**(row.settings or {}), **changes}
     profile = BoardProfile.from_parts(board_id, row.columns, merged, defaults)
@@ -324,7 +326,7 @@ def create_variable(
     at: datetime | None = None,
 ) -> s.VariableRow:
     if not valid_variable_name(name):
-        raise Invalid(f"nome inválido: {name!r}")
+        raise Invalid(Msg("store.variable.bad_name", name=repr(name)))
     existing = session.scalar(
         select(s.VariableRow).where(
             s.VariableRow.name == name,
@@ -334,7 +336,7 @@ def create_variable(
         )
     )
     if existing is not None:
-        raise Invalid(f"já existe uma variável chamada {name!r} neste escopo")
+        raise Invalid(Msg("store.variable.duplicate", name=repr(name)))
     row = s.VariableRow(
         name=name,
         label=label,
@@ -374,7 +376,7 @@ def update_variable(
         return None
     if name is not None:
         if not valid_variable_name(name):
-            raise Invalid(f"nome inválido: {name!r}")
+            raise Invalid(Msg("store.variable.bad_name", name=repr(name)))
         row.name = name
     if label is not None:
         row.label = label
@@ -426,12 +428,12 @@ def set_variable_value(
     at: datetime | None = None,
 ) -> s.VariableValueRow:
     if scope not in VARIABLE_SCOPES:
-        raise Invalid(f"escopo inválido: {scope!r}")
+        raise Invalid(Msg("store.variable.bad_scope", scope=repr(scope)))
     if session.get(s.VariableRow, variable_id) is None:
-        raise NotFound(variable_id, f"A variável {variable_id} não existe.")
+        raise NotFound(variable_id, Msg("store.variable.not_found", id=variable_id))
     key = "" if scope == "global" else scope_key
     if scope != "global" and not key:
-        raise Invalid(f"o escopo {scope!r} precisa de um alvo")
+        raise Invalid(Msg("store.variable.scope_needs_target", scope=repr(scope)))
     row = session.scalar(
         select(s.VariableValueRow).where(
             s.VariableValueRow.variable_id == variable_id,
@@ -996,15 +998,25 @@ def start_run(session: Session, run_id: str, mode: str) -> None:
     session.add(s.CollectorRunRow(id=run_id, mode=mode, status="running", started_at=utcnow(), counters={}))
 
 
+def _mirror(value: Msg | Mapping[str, Any] | str | None) -> str | None:
+    """The pt-BR text stored beside a message record (R4), for old readers and ad-hoc SQL."""
+    return None if value is None else render(value, STORAGE_LOCALE)  # type: ignore[arg-type]
+
+
 def finish_run(
-    session: Session, run_id: str, status: str, counters: Mapping[str, Any], error: str | None = None
+    session: Session,
+    run_id: str,
+    status: str,
+    counters: Mapping[str, Any],
+    error: Msg | str | None = None,
 ) -> None:
     row = session.get(s.CollectorRunRow, run_id)
     if row is not None:
         row.status = status
         row.finished_at = utcnow()
         row.counters = dict(counters)
-        row.error = error
+        row.error = _mirror(error)
+        row.error_i18n = error.to_json() if isinstance(error, Msg) else None
 
 
 def start_board_run(session: Session, run_id: str, board_id: int) -> None:
@@ -1033,28 +1045,34 @@ def finish_board_run(
     counters: Mapping[str, Any],
     started_at: datetime,
     full: bool = False,
-    error: str | None = None,
-    cause: str | None = None,
-    action: str | None = None,
+    error: Mapping[str, Any] | None = None,
 ) -> None:
+    """``error`` is the failure's ``{"cause", "action", "message"}`` record (``$msg`` JSON, or text
+    for a message nobody wrote a key for): stored as it is, with the pt-BR mirror in the old text
+    columns."""
+    record = dict(error) if error else None
+    texts = {name: _mirror((record or {}).get(name)) for name in ("cause", "action", "message")}
     row = session.get(s.BoardRunRow, (run_id, board_id))
     now = utcnow()
     if row is not None:
         row.status = status
         row.finished_at = now
         row.counters = dict(counters)
-        row.error = error
-        row.cause = cause
-        row.action = action
+        row.error = texts["message"]
+        row.cause = texts["cause"]
+        row.action = texts["action"]
+        row.error_i18n = record
     board = session.get(s.BoardRow, board_id)
     if board is not None:
         if status == "success":
             board.last_success_at = started_at
             board.last_error = None
+            board.last_error_i18n = None
             if full:
                 board.last_full_at = started_at
         elif status == "failed":  # a cancelled run is somebody's decision, not a broken board
-            board.last_error = error
+            board.last_error = texts["message"]
+            board.last_error_i18n = record
             board.last_error_at = now
 
 
@@ -1146,7 +1164,7 @@ def add_absence(
     session: Session, account_id: str, start: date, end: date, note: str | None = None
 ) -> s.AbsenceRow:
     if end < start:
-        raise Invalid("fim da ausência anterior ao início")
+        raise Invalid(Msg("store.absence.end_before_start"))
     row = s.AbsenceRow(account_id=account_id, start_date=start, end_date=end, note=note)
     session.add(row)
     session.flush()
@@ -1169,9 +1187,9 @@ def save_availability(
 ) -> None:
     """Store a person's availability; the defaults (board's hours, 100%) are stored as *no row*."""
     if hours_per_day is not None and not 0.5 <= hours_per_day <= 24:
-        raise Invalid("As horas por dia ficam entre 0,5 e 24.")
+        raise Invalid(Msg("store.availability.hours"))
     if not 0 <= allocation_pct <= 100:
-        raise Invalid("A dedicação fica entre 0% e 100%.")
+        raise Invalid(Msg("store.availability.allocation"))
     if hours_per_day is None and allocation_pct == 100:
         session.execute(
             delete(s.PersonAvailabilityRow).where(s.PersonAvailabilityRow.account_id == account_id)
@@ -1334,12 +1352,12 @@ def save_view(
 ) -> s.SavedViewRow:
     name, path = name.strip(), path.strip()
     if not name:
-        raise Invalid("dê um nome à visão")
+        raise Invalid(Msg("store.view.name_missing"))
     if not path.startswith("/") or path.startswith("//"):
-        raise Invalid("a visão precisa apontar para uma tela da Cadência (um caminho que começa com /)")
+        raise Invalid(Msg("store.view.bad_path"))
     row = session.get(s.SavedViewRow, view_id) if view_id is not None else None
     if view_id is not None and row is None:
-        raise NotFound(view_id, f"A visão {view_id} não existe.")
+        raise NotFound(view_id, Msg("store.view.not_found", id=view_id))
     if row is None:
         row = s.SavedViewRow(created_at=utcnow())
         session.add(row)
@@ -1450,11 +1468,11 @@ def add_comment(
 ) -> s.DeckCommentRow:
     body = body.strip()
     if not body:
-        raise Invalid("o comentário está vazio")
+        raise Invalid(Msg("store.comment.empty"))
     if parent_id is not None:
         parent = session.get(s.DeckCommentRow, parent_id)
         if parent is None or parent.template_id != template_id:
-            raise NotFound(parent_id, f"O comentário {parent_id} não existe neste modelo.")
+            raise NotFound(parent_id, Msg("store.comment.not_in_template", id=parent_id))
         origin_slide_id, shape_key = parent.origin_slide_id, parent.shape_key
     row = s.DeckCommentRow(
         template_id=template_id,
@@ -1473,7 +1491,7 @@ def add_comment(
 def resolve_comment(session: Session, comment_id: int, resolved: bool) -> s.DeckCommentRow:
     row = session.get(s.DeckCommentRow, comment_id)
     if row is None:
-        raise NotFound(comment_id, f"O comentário {comment_id} não existe.")
+        raise NotFound(comment_id, Msg("store.comment.not_found", id=comment_id))
     row.resolved_at = utcnow() if resolved else None
     return row
 
@@ -1496,11 +1514,15 @@ def ensure_role_seed(session: Session) -> None:
     if get_setting(session, ROLE_SEEDED_KEY):
         return
     if session.scalar(select(func.count()).select_from(s.RoleRow)) == 0:
+        # CADENCIA_LOCALE, never the request's: the first person to open the roles screen should not
+        # decide the language the whole team's roles are named in. A fresh, empty context reads the
+        # process default (set from the settings by create_app and the CLI), past any request's.
+        locale = contextvars.Context().run(current_locale)
         for position, seed in enumerate(ROLE_SEED):
             session.add(
                 s.RoleRow(
-                    name=str(seed["name"]),
-                    description=str(seed["description"]),
+                    name=render(seed["name"], locale),  # type: ignore[arg-type]
+                    description=render(seed["description"], locale),  # type: ignore[arg-type]
                     color=str(seed["color"]),
                     position=position,
                     labels=list(seed["labels"]),  # type: ignore[call-overload]
@@ -1521,9 +1543,9 @@ def _role_values(
 ) -> dict[str, Any]:
     name = name.strip()
     if not name:
-        raise Invalid("O papel precisa de um nome.")
+        raise Invalid(Msg("store.role.name_missing"))
     if not _COLOR.match(color):
-        raise Invalid("A cor do papel deve estar no formato #rrggbb.")
+        raise Invalid(Msg("store.role.bad_color"))
     clean = list(dict.fromkeys(label.strip() for label in labels if label.strip()))
     return {
         "name": name,
@@ -1539,7 +1561,7 @@ def _check_role_name(session: Session, name: str, exclude: int | None = None) ->
     if exclude is not None:
         stmt = stmt.where(s.RoleRow.id != exclude)
     if session.scalar(stmt) is not None:
-        raise Invalid(f"Já existe um papel chamado {name.strip()}.")
+        raise Invalid(Msg("store.role.duplicate", name=name.strip()))
 
 
 def create_role(
@@ -1566,7 +1588,7 @@ def update_role(
 ) -> s.RoleRow:
     row = session.get(s.RoleRow, role_id)
     if row is None:
-        raise NotFound(f"Papel {role_id}", "Papel não encontrado.")
+        raise NotFound(role_id, Msg("store.role.not_found"))
     values = _role_values(name, description, color, position, labels)
     _check_role_name(session, values["name"], exclude=role_id)
     for key, value in values.items():
@@ -1585,12 +1607,10 @@ def delete_role(session: Session, role_id: int) -> None:
     """Callers check subtask usage first (it needs the Jira data); members are checked here."""
     row = session.get(s.RoleRow, role_id)
     if row is None:
-        raise NotFound(f"Papel {role_id}", "Papel não encontrado.")
+        raise NotFound(role_id, Msg("store.role.not_found"))
     members = role_member_names(session, role_id)
     if members:
-        raise Invalid(
-            f"O papel {row.name} está atribuído a: {', '.join(members)}. Remova-o dessas pessoas antes."
-        )
+        raise Invalid(Msg("store.role.in_use", role=row.name, people=", ".join(members)))
     session.delete(row)
     session.flush()
 
@@ -1642,16 +1662,18 @@ def list_members(session: Session) -> list[MemberRecord]:
 
 def save_member(session: Session, account_id: str, *, active: bool, roles: Sequence[tuple[int, str]]) -> None:
     if session.get(s.PersonRow, account_id) is None:
-        raise NotFound(account_id, "Pessoa não encontrada entre as pessoas coletadas do Jira.")
+        raise NotFound(account_id, Msg("store.person.not_found"))
     known = set(session.scalars(select(s.RoleRow.id)))
     seen: set[int] = set()
     for role_id, seniority in roles:
         if role_id not in known:
-            raise Invalid(f"Papel {role_id} não existe.")
+            raise Invalid(Msg("store.role.missing", id=role_id))
         if seniority not in SENIORITY_KEYS:
-            raise Invalid(f"Senioridade inválida: {seniority}. Use {', '.join(SENIORITY_KEYS)}.")
+            raise Invalid(
+                Msg("store.member.bad_seniority", seniority=seniority, allowed=", ".join(SENIORITY_KEYS))
+            )
         if role_id in seen:
-            raise Invalid("Um papel aparece duas vezes para a mesma pessoa.")
+            raise Invalid(Msg("store.member.role_twice"))
         seen.add(role_id)
     upsert(session, s.TeamMemberRow, [{"account_id": account_id, "active": active}], ["account_id"])
     session.execute(delete(s.MemberRoleRow).where(s.MemberRoleRow.account_id == account_id))
@@ -1712,14 +1734,14 @@ def set_subtask_roles(session: Session, issue_key: str, role_ids: Sequence[int])
     """Choose the role(s) of a subtask by hand; an empty list goes back to the automatic answer."""
     row = session.get(s.IssueRow, issue_key)
     if row is None or row.hierarchy_level >= 0:
-        raise NotFound(issue_key, f"{issue_key} não é uma subtarefa coletada.")
+        raise NotFound(issue_key, Msg("store.subtask.not_found", key=issue_key))
     ids = list(dict.fromkeys(int(r) for r in role_ids))
     if len(ids) > 2:
-        raise Invalid("Uma subtarefa tem um ou dois papéis.")
+        raise Invalid(Msg("store.subtask.role_count"))
     known = set(session.scalars(select(s.RoleRow.id)))
     unknown = [r for r in ids if r not in known]
     if unknown:
-        raise Invalid(f"Papel inexistente: {', '.join(map(str, unknown))}.")
+        raise Invalid(Msg("store.subtask.unknown_roles", ids=", ".join(map(str, unknown))))
     if not ids:
         session.execute(delete(s.SubtaskRoleRow).where(s.SubtaskRoleRow.issue_key == issue_key))
     else:

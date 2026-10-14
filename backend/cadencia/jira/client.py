@@ -21,6 +21,7 @@ from typing import Any
 import httpx
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception_type, stop_after_attempt
 
+from cadencia.i18n import Msg
 from cadencia.jira.errors import (
     JiraAuthError,
     JiraError,
@@ -65,7 +66,7 @@ class _Retry(Exception):
     """Internal signal: the wrapped error may succeed on a later attempt."""
 
     def __init__(self, error: JiraError, retry_after: float | None = None) -> None:
-        super().__init__(error.message)
+        super().__init__(str(error))
         self.error = error
         self.retry_after = retry_after
 
@@ -115,9 +116,9 @@ class JiraClient:
         max_backoff: float = 60.0,
     ) -> None:
         if not base_url:
-            raise JiraHostError("URL da instância do Jira não configurada")
+            raise JiraHostError(Msg("jira.message.no_base_url"))
         if not email or not api_token:
-            raise JiraAuthError("E-mail ou token de API ausente")
+            raise JiraAuthError(Msg("jira.message.no_credentials"))
         credential = base64.b64encode(f"{email}:{api_token}".encode()).decode()
         register_secret(api_token)
         register_secret(credential)
@@ -166,7 +167,7 @@ class JiraClient:
     def _check_read_only(method: str, path: str) -> None:
         if method == "GET" or (method == "POST" and path in _READ_ONLY_POSTS):
             return
-        raise JiraWriteForbidden(f"{method} {path} bloqueado: a Cadência é somente leitura")
+        raise JiraWriteForbidden(Msg("jira.message.write_blocked", method=method, path=path))
 
     def _wait_seconds(self, state: RetryCallState) -> float:
         exc = state.outcome.exception() if state.outcome else None
@@ -228,10 +229,10 @@ class JiraClient:
             try:
                 response = await self._http.request(method, path, params=params, json=json)
             except httpx.TimeoutException as exc:
-                raise _Retry(JiraHostError(f"Tempo esgotado ao chamar {path}")) from exc
+                raise _Retry(JiraHostError(Msg("jira.message.timeout", path=path))) from exc
             except httpx.TransportError as exc:
                 raise _Retry(
-                    JiraHostError(f"Não foi possível conectar a {self.base_url} ({type(exc).__name__})")
+                    JiraHostError(Msg("jira.message.connect", url=self.base_url, error=type(exc).__name__))
                 ) from exc
 
         status = response.status_code
@@ -241,19 +242,21 @@ class JiraClient:
             try:
                 return response.json()
             except ValueError as exc:
-                raise JiraHostError(
-                    f"Resposta não-JSON em {path}: o endereço não parece ser um Jira",
-                    status=status,
-                ) from exc
+                raise JiraHostError(Msg("jira.message.not_json", path=path), status=status) from exc
         if status < 400:
             location = response.headers.get("Location", "?")
-            raise JiraHostError(f"{path} redirecionou para {location}", status=status)
+            raise JiraHostError(Msg("jira.message.redirect", path=path, location=location), status=status)
         if status in _RETRYABLE:
             if status == 429:
                 self.counters.rate_limit_waits += 1
-                error: JiraError = JiraRateLimitError(f"HTTP 429 em {path}", status=status)
+                error: JiraError = JiraRateLimitError(
+                    Msg("jira.message.rate_limited", path=path), status=status
+                )
             else:
-                error = JiraServerError(f"HTTP {status} em {path}: {_error_detail(response)}", status=status)
+                detail = _error_detail(response)
+                error = JiraServerError(
+                    Msg("jira.message.http", status=status, path=path, detail=detail), status=status
+                )
             raise _Retry(error, _retry_after_seconds(response))
         raise self._error_for(response, path)
 
@@ -262,14 +265,16 @@ class JiraClient:
         status = response.status_code
         detail = _error_detail(response)
         if status == 401:
-            return JiraAuthError(f"O Jira recusou a credencial (HTTP 401): {detail}", status=status)
+            return JiraAuthError(Msg("jira.message.auth", detail=detail), status=status)
         if status == 403:
-            return JiraPermissionError(f"Sem permissão para {path} (HTTP 403): {detail}", status=status)
+            return JiraPermissionError(
+                Msg("jira.message.permission", path=path, detail=detail), status=status
+            )
         if status == 404:
-            return JiraNotFoundError(f"{path} não encontrado (HTTP 404): {detail}", status=status)
+            return JiraNotFoundError(Msg("jira.message.not_found", path=path, detail=detail), status=status)
         if status == 400 and path in _READ_ONLY_POSTS:
-            return JiraQueryError(f"JQL rejeitado: {detail}", status=status)
-        return JiraError(f"HTTP {status} em {path}: {detail}", status=status)
+            return JiraQueryError(Msg("jira.message.query", detail=detail), status=status)
+        return JiraError(Msg("jira.message.http", status=status, path=path, detail=detail), status=status)
 
     # ------------------------------------------------------------------ pagination
 

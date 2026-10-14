@@ -15,7 +15,7 @@ import logging
 import smtplib
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from typing import Any, Literal
@@ -25,6 +25,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from cadencia.config import Settings
+from cadencia.i18n import STORAGE_LOCALE, Msg, localize, render, stored_text, tr, using_locale
+from cadencia.i18n.fmt import day_month
 from cadencia.logging import log_event, register_secret
 from cadencia.store import repo
 
@@ -35,11 +37,11 @@ LAST_KEY = "notify.last"
 DIGEST_KEY = "notify.digest"
 Event = Literal["deck", "digest", "collection_failed"]
 EVENTS: tuple[str, ...] = ("deck", "digest", "collection_failed")
-EVENT_LABELS = {
-    "deck": "apresentação gerada",
-    "digest": "resumo de riscos",
-    "collection_failed": "coleta com falha",
-}
+
+
+def event_label(event: str) -> str:
+    """The event's name for the settings screen, in the ambient language (``notify.event.<id>``)."""
+    return tr(f"notify.event.{event}")
 
 
 class Channel(BaseModel):
@@ -56,7 +58,7 @@ class Channel(BaseModel):
     def _target(cls, value: str) -> str:
         value = value.strip()
         if not value:
-            raise ValueError("o destino não pode ficar vazio")
+            raise ValueError("o destino não pode ficar vazio")  # i18n: out of scope
         return value
 
     def check(self) -> None:
@@ -66,9 +68,9 @@ class Channel(BaseModel):
         if self.kind == "email":
             bad = [a for a in _addresses(self.target) if "@" not in a]
             if bad or not _addresses(self.target):
-                raise Invalid(f"endereço de e-mail inválido: {', '.join(bad) or self.target}")
+                raise Invalid(Msg("notify.channel.bad_email", addresses=", ".join(bad) or self.target))
         elif not self.target.startswith(("https://", "http://")):
-            raise Invalid("o destino de um webhook precisa ser uma URL http(s)")
+            raise Invalid(Msg("notify.channel.bad_url"))
 
     def masked(self) -> dict[str, Any]:
         data = self.model_dump()
@@ -86,7 +88,7 @@ class DigestSchedule(BaseModel):
     @classmethod
     def _weekdays(cls, value: list[int]) -> list[int]:
         if not value or any(d < 0 or d > 6 for d in value):
-            raise ValueError("dias da semana vão de 0 (segunda) a 6 (domingo)")
+            raise ValueError("dias da semana vão de 0 (segunda) a 6 (domingo)")  # i18n: out of scope
         return sorted(set(value))
 
 
@@ -142,31 +144,57 @@ def last_results(session: Session) -> dict[str, Any]:
     return dict(repo.get_setting(session, LAST_KEY, {}) or {})
 
 
+def outcome_view(outcome: Mapping[str, Any] | None, locale: str | None = None) -> dict[str, Any] | None:
+    """A delivery outcome for the screen: ``error`` in the reader's language (``locale``, default
+    the ambient one) and the stored record left out. Outcomes saved before the record existed keep
+    their stored text."""
+    if outcome is None:
+        return None
+    view = {k: v for k, v in outcome.items() if k != "error_msg"}
+    if "error" in outcome:
+        view["error"] = stored_text(outcome.get("error_msg"), outcome.get("error"), locale)
+    return view
+
+
 # ---------------------------------------------------------------- messages
+
+#: A message's text is a ``Msg`` (rendered in ``CADENCIA_LOCALE`` when it is sent) or plain text.
+type Text = str | Msg
 
 
 @dataclass
 class Message:
     event: str
-    title: str
-    text: str
+    title: Text
+    text: Text
     link: str | None = None
-    fields: dict[str, str] = field(default_factory=dict)
+    fields: dict[Text, Text] = field(default_factory=dict)
     #: #13: files an e-mail carries (name, bytes, MIME type). A webhook cannot carry a file, so
     #: Slack and Teams get the link instead — which is why the link is always set too.
     attachments: list[tuple[str, bytes, str]] = field(default_factory=list)
 
+    def rendered(self) -> Message:
+        """A copy whose texts are strings in the ambient language."""
+        return replace(
+            self,
+            title=render(self.title),
+            text=render(self.text),
+            fields={render(k): render(v) for k, v in self.fields.items()},
+        )
+
     def plain(self) -> str:
-        parts = [self.text]
-        parts += [f"{k}: {v}" for k, v in self.fields.items()]
+        parts = [render(self.text)]
+        parts += [f"{render(k)}: {render(v)}" for k, v in self.fields.items()]
         if self.link:
             parts.append(self.link)
         return "\n".join(p for p in parts if p)
 
 
 def payload(kind: str, message: Message) -> dict[str, Any]:
+    """The body posted to a webhook, in the ambient language (``deliver`` pins ``CADENCIA_LOCALE``)."""
+    message = message.rendered()
     if kind == "slack":
-        link = f"\n<{message.link}|Abrir na Cadência>" if message.link else ""
+        link = f"\n<{message.link}|{tr('notify.open_in_app')}>" if message.link else ""
         facts = "".join(f"\n*{k}:* {v}" for k, v in message.fields.items())
         return {"text": f"*{message.title}*\n{message.text}{facts}{link}"}
     if kind == "teams":
@@ -175,14 +203,14 @@ def payload(kind: str, message: Message) -> dict[str, Any]:
             "@context": "https://schema.org/extensions",
             "summary": message.title,
             "title": message.title,
-            "text": message.text.replace("\n", "<br>"),
+            "text": str(message.text).replace("\n", "<br>"),
             "sections": [{"facts": [{"name": k, "value": v} for k, v in message.fields.items()]}],
         }
         if message.link:
             card["potentialAction"] = [
                 {
                     "@type": "OpenUri",
-                    "name": "Abrir na Cadência",
+                    "name": tr("notify.open_in_app"),
                     "targets": [{"os": "default", "uri": message.link}],
                 }
             ]
@@ -196,11 +224,24 @@ def payload(kind: str, message: Message) -> dict[str, Any]:
     }
 
 
+class DeliveryError(Exception):
+    """A channel refused or could not be reached; ``msg`` is stored so the screen can say why in
+    whoever's language reads it."""
+
+    def __init__(self, message: Msg) -> None:
+        super().__init__(message)
+        self.msg = message
+
+    def __str__(self) -> str:
+        return render(self.msg)
+
+
 def _send_email(settings: Settings, to: list[str], message: Message) -> None:
     if not settings.smtp_host:
-        raise RuntimeError("SMTP não configurado (CADENCIA_SMTP_HOST)")
+        raise DeliveryError(Msg("notify.error.smtp_missing"))
+    message = message.rendered()
     email = EmailMessage()
-    email["Subject"] = message.title
+    email["Subject"] = str(message.title)
     email["From"] = settings.smtp_from or settings.smtp_user or "cadencia@localhost"
     email["To"] = ", ".join(to)
     email.set_content(message.plain())
@@ -229,6 +270,10 @@ def deliver(
     A failing channel never stops the others and never raises: delivery is a side effect of work
     that already succeeded, so it reports rather than undoes. The outcome of each channel is kept
     for the settings screen.
+
+    The message goes out in ``CADENCIA_LOCALE`` even when a request sent it: it lands in a team
+    channel, not in front of the person who clicked (docs/i18n-backend.md, decision 1). The outcomes
+    returned are for that person, so their ``error`` is in the caller's language.
     """
     wanted = set(only) if only is not None else None
     targets = [
@@ -238,29 +283,42 @@ def deliver(
     ]
     results: list[dict[str, Any]] = []
     last = last_results(session)
-    with httpx.Client(timeout=15, transport=transport) as client:
-        for channel in targets:
-            outcome: dict[str, Any] = {"channel": channel.id, "name": channel.name, "kind": channel.kind}
-            try:
-                if channel.kind == "email":
-                    _send_email(settings, _addresses(channel.target), message)
-                else:
-                    response = client.post(channel.target, json=payload(channel.kind, message))
-                    if response.status_code >= 300:
-                        raise RuntimeError(f"HTTP {response.status_code}: {response.text[:120]}")
-                outcome["ok"] = True
-            except Exception as exc:  # a channel down is a warning, not a failed generation
-                outcome.update(ok=False, error=str(exc))
-                log_event(
-                    log, "falha ao notificar", level=logging.WARNING, channel=channel.id, error=str(exc)
-                )
-            outcome["at"] = datetime.now(UTC).isoformat()
-            outcome["event"] = message.event
-            last[channel.id] = outcome
-            results.append(outcome)
+    with using_locale(settings.locale):
+        outgoing = message.rendered()
+        with httpx.Client(timeout=15, transport=transport) as client:
+            for channel in targets:
+                outcome: dict[str, Any] = {"channel": channel.id, "name": channel.name, "kind": channel.kind}
+                try:
+                    if channel.kind == "email":
+                        _send_email(settings, _addresses(channel.target), outgoing)
+                    else:
+                        response = client.post(channel.target, json=payload(channel.kind, outgoing))
+                        if response.status_code >= 300:
+                            raise DeliveryError(
+                                Msg(
+                                    "notify.error.http",
+                                    status=response.status_code,
+                                    body=response.text[:120],
+                                )
+                            )
+                    outcome["ok"] = True
+                except Exception as exc:  # a channel down is a warning, not a failed generation
+                    if isinstance(exc, DeliveryError):
+                        outcome.update(
+                            ok=False, error=render(exc.msg, STORAGE_LOCALE), error_msg=exc.msg.to_json()
+                        )
+                    else:  # the library's own words: kept as they are
+                        outcome.update(ok=False, error=str(exc))
+                    log_event(
+                        log, "falha ao notificar", level=logging.WARNING, channel=channel.id, error=str(exc)
+                    )
+                outcome["at"] = datetime.now(UTC).isoformat()
+                outcome["event"] = message.event
+                last[channel.id] = outcome
+                results.append(outcome)
     if results:
         repo.set_setting(session, LAST_KEY, last)
-    return results
+    return [view for view in (outcome_view(r) for r in results) if view is not None]
 
 
 def app_link(settings: Settings, path: str) -> str | None:
@@ -270,23 +328,22 @@ def app_link(settings: Settings, path: str) -> str | None:
 
 
 def deck_message(settings: Settings, run: Any, template_name: str) -> Message:
+    """Built from keys, so it is rendered in ``CADENCIA_LOCALE`` when it is sent."""
     ok = run.status == "ok"
     validation = run.validation or {}
     errors = len(validation.get("errors") or [])
     warnings = len(validation.get("warnings") or [])
     return Message(
         event="deck",
-        title=f"Apresentação gerada: {template_name}",
-        text=(
-            "Aprovada na validação e pronta para baixar."
-            if ok
-            else f"Reprovada na validação ({errors} erro(s)); abra para ver o que falta."
-        ),
+        title=Msg("notify.deck.title", name=template_name),
+        text=Msg("notify.deck.approved") if ok else Msg("notify.deck.refused", errors=errors),
         link=app_link(settings, f"/apresentacao?modelo={run.template_id}&run={run.id}"),
         fields={
-            "Referência": run.reference_at.astimezone(UTC).strftime("%d/%m/%Y %H:%M UTC"),
-            "Slides": str(validation.get("slides", "—")),
-            "Avisos": str(warnings),
+            Msg("notify.deck.field.reference"): Msg(
+                "notify.deck.reference_at", at=run.reference_at.astimezone(UTC).isoformat()
+            ),
+            Msg("notify.deck.field.slides"): str(validation.get("slides", "—")),
+            Msg("notify.deck.field.warnings"): str(warnings),
         },
     )
 
@@ -297,7 +354,8 @@ def send_digest(
     """One message per space with what became stalled, blocked or overdue (RF-73).
 
     A space with nothing new sends nothing: a digest that says "nada" every morning trains people to
-    stop reading it.
+    stop reading it. The text is written in ``CADENCIA_LOCALE`` whoever asked for it; the summary
+    returned is in the caller's language.
     """
     from zoneinfo import ZoneInfo
 
@@ -308,30 +366,33 @@ def send_digest(
     boards = [
         load_board(session, b.id, defaults, settings.history_days) for b in repo.selected_boards(session)
     ]
-    report = digest(session, boards, now, settings.jira_base_url or None)
     zone = ZoneInfo(settings.timezone)
 
     def since(at: str) -> str:
-        return datetime.fromisoformat(at).astimezone(zone).strftime("%d/%m %H:%M")
+        return day_month(datetime.fromisoformat(at).astimezone(zone), time=True)
 
-    sent: list[dict[str, Any]] = []
-    for space in report["spaces"]:
-        new = sum(len(b["new_risks"]) for b in space["boards"])
-        if not new:
-            continue
-        message = Message(
-            event="digest",
-            title=f"Riscos novos — {space['space']['name']}: {new}",
-            text=digest_text(space, since),
-            link=app_link(settings, "/"),
-        )
-        sent.append(
-            {
-                "space": space["space"],
-                "new_risks": new,
-                "results": deliver(session, settings, message, transport=transport),
-            }
-        )
+    outgoing: list[tuple[dict[str, Any], int, Message]] = []
+    with using_locale(settings.locale):
+        report = digest(session, boards, now, settings.jira_base_url or None)
+        for space in report["spaces"]:
+            new = sum(len(b["new_risks"]) for b in space["boards"])
+            if not new:
+                continue
+            message = Message(
+                event="digest",
+                title=Msg("notify.digest.title", space=render(space["space"]["name"]), count=new),
+                text=digest_text(space, since),
+                link=app_link(settings, "/"),
+            )
+            outgoing.append((space, new, message))
+    sent = [
+        {
+            "space": localize(space["space"]),
+            "new_risks": new,
+            "results": deliver(session, settings, message, transport=transport),
+        }
+        for space, new, message in outgoing
+    ]
     return {
         "generated_at": report["generated_at"],
         "total_new_risks": report["total_new_risks"],

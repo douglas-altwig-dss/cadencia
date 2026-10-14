@@ -1,31 +1,62 @@
-"""Jira errors that carry a human cause and a suggested action (RF-01, RF-35)."""
+"""Jira errors that carry a human cause and a suggested action (RF-01, RF-35).
+
+Each class names a catalogue ``code`` (``jira.auth``…); ``cause`` and ``action`` render
+``<code>.cause`` / ``<code>.action`` in the ambient locale, and ``message`` renders the ``Msg`` the
+raiser built (its parameters carry the path, the status and Jira's own answer, which is never
+translated). ``record()`` is the same three as ``$msg`` JSON, for storing a failure so it can be
+shown later in whoever's language reads it (docs/i18n-backend.md, 2.7).
+"""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
+
+from cadencia.i18n import Msg, render
+
+
+def error_record(cause: Msg, action: Msg, message: Msg | str) -> dict[str, Any]:
+    """``{"cause", "action", "message"}`` ready to store: each a ``$msg`` record, except a
+    ``message`` that is already text (an unexpected exception's own words), kept as it is."""
+    return {
+        "cause": cause.to_json(),
+        "action": action.to_json(),
+        "message": message.to_json() if isinstance(message, Msg) else message,
+    }
+
+
+def record_text(record: Mapping[str, Any], locale: str | None = None) -> dict[str, str]:
+    """A stored record's three texts in ``locale`` (default: the ambient one)."""
+    return {name: render(record.get(name), locale) for name in ("cause", "action", "message")}
 
 
 class JiraError(Exception):
-    cause = "erro inesperado ao falar com o Jira"
-    action = "Tente novamente; se persistir, veja o log da coleta."
+    code = "jira.error"
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        status: int | None = None,
-        cause: str | None = None,
-        action: str | None = None,
-        details: Any = None,
-    ) -> None:
+    def __init__(self, message: str | Msg, *, status: int | None = None, details: Any = None) -> None:
         super().__init__(message)
-        self.message = message
+        self.msg: str | Msg = message
         self.status = status
-        if cause:
-            self.cause = cause
-        if action:
-            self.action = action
         self.details = details
+
+    @property
+    def cause(self) -> str:
+        return render(Msg(f"{self.code}.cause"))
+
+    @property
+    def action(self) -> str:
+        return render(Msg(f"{self.code}.action"))
+
+    @property
+    def message(self) -> str:
+        return render(self.msg)
+
+    def __str__(self) -> str:
+        return self.message
+
+    def record(self) -> dict[str, Any]:
+        """What the collector stores for a failed board: rendered again by every reader."""
+        return error_record(Msg(f"{self.code}.cause"), Msg(f"{self.code}.action"), self.msg)
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -38,40 +69,32 @@ class JiraError(Exception):
 
 
 class JiraAuthError(JiraError):
-    cause = "credencial inválida"
-    action = "Confira o e-mail e gere um novo token de API em id.atlassian.com."
+    code = "jira.auth"
 
 
 class JiraPermissionError(JiraError):
-    cause = "sem permissão"
-    action = "Peça acesso de leitura ao projeto ou board para a conta usada pela Cadência."
+    code = "jira.permission"
 
 
 class JiraNotFoundError(JiraError):
-    cause = "recurso não encontrado"
-    action = "Confira se o board, sprint ou item ainda existe e se a conta tem acesso."
+    code = "jira.not_found"
 
 
 class JiraHostError(JiraError):
-    cause = "host inacessível ou errado"
-    action = "Confira a URL da instância, por exemplo https://empresa.atlassian.net."
+    code = "jira.host"
 
 
 class JiraQueryError(JiraError):
-    cause = "consulta JQL inválida"
-    action = "Revise o JQL; o endpoint /search/jql não valida a consulta por conta própria."
+    code = "jira.query"
 
 
 class JiraRateLimitError(JiraError):
-    cause = "limite de requisições do Jira esgotado"
-    action = "Aguarde alguns minutos ou reduza CADENCIA_JIRA_MAX_CONCURRENCY."
+    code = "jira.rate_limit"
 
 
 class JiraServerError(JiraError):
-    cause = "erro interno do Jira"
-    action = "O Jira respondeu com erro; tente novamente em alguns minutos."
+    code = "jira.server"
 
 
 class JiraWriteForbidden(JiraError):
-    cause = "operação de escrita bloqueada"
-    action = "A Cadência é somente leitura; nenhuma chamada de escrita é permitida."
+    code = "jira.write_forbidden"

@@ -30,7 +30,7 @@ class UTCDateTime(TypeDecorator[datetime]):
         if value is None:
             return None
         if value.tzinfo is None:
-            raise ValueError("datetime sem fuso horário não pode ser gravado")
+            raise ValueError("datetime sem fuso horário não pode ser gravado")  # i18n: out of scope
         value = value.astimezone(UTC)
         return value.replace(tzinfo=None) if dialect.name == "sqlite" else value
 
@@ -132,6 +132,9 @@ class BoardRow(Base):
     last_success_at: Mapped[datetime | None]
     last_full_at: Mapped[datetime | None]
     last_error: Mapped[str | None] = mapped_column(Text)
+    #: The failure as ``{"cause", "action", "message"}`` ``$msg`` records, rendered by each reader in
+    #: its own language; ``last_error`` stays the pt-BR mirror (rows from before 0022 have only it).
+    last_error_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     last_error_at: Mapped[datetime | None]
 
 
@@ -295,6 +298,8 @@ class CollectorRunRow(Base):
     finished_at: Mapped[datetime | None]
     counters: Mapped[dict[str, Any]] = mapped_column(default=dict)
     error: Mapped[str | None] = mapped_column(Text)
+    #: ``error`` as a ``$msg`` record (the pt-BR text stays in ``error``).
+    error_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
 class LeaseRow(Base):
@@ -319,6 +324,8 @@ class BoardRunRow(Base):
     error: Mapped[str | None] = mapped_column(Text)
     cause: Mapped[str | None] = mapped_column(String(255))
     action: Mapped[str | None] = mapped_column(Text)
+    #: ``error``/``cause``/``action`` as ``$msg`` records; those three columns keep the pt-BR mirror.
+    error_i18n: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
 class SettingRow(Base):

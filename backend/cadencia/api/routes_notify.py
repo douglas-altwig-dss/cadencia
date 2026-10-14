@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from cadencia import notify
 from cadencia.api.deps import JSONDict, Now, SessionDep, SettingsDep
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg, localize
 
 router = APIRouter(prefix="/notifications", tags=["notificações"])
 
@@ -17,9 +18,11 @@ router = APIRouter(prefix="/notifications", tags=["notificações"])
 def _view(session: SessionDep, settings: SettingsDep) -> JSONDict:
     last = notify.last_results(session)
     return {
-        "channels": [{**c.masked(), "last": last.get(c.id)} for c in notify.channels(session)],
+        "channels": [
+            {**c.masked(), "last": notify.outcome_view(last.get(c.id))} for c in notify.channels(session)
+        ],
         "digest": notify.digest_schedule(session).model_dump(),
-        "events": [{"id": e, "label": notify.EVENT_LABELS[e]} for e in notify.EVENTS],
+        "events": [{"id": e, "label": notify.event_label(e)} for e in notify.EVENTS],
         "smtp_configured": bool(settings.smtp_host),
         "public_url": settings.public_url or None,
     }
@@ -49,11 +52,12 @@ def write_digest(body: notify.DigestSchedule, session: SessionDep, settings: Set
 @router.post("/channels/{channel_id}/test")
 def test_channel(channel_id: str, session: SessionDep, settings: SettingsDep) -> JSONDict:
     if channel_id not in {c.id for c in notify.channels(session)}:
-        raise NotFound(channel_id, f"O canal {channel_id} não existe.")
+        raise NotFound(channel_id, Msg("notify.channel.not_found", id=channel_id))
+    # Keys, not text: the test goes out in CADENCIA_LOCALE, like every message to a team channel.
     message = notify.Message(
         event="deck",
-        title="Teste da Cadência",
-        text="Se você está lendo isto, o canal está configurado certo.",
+        title=Msg("notify.test.title"),
+        text=Msg("notify.test.text"),
         link=notify.app_link(settings, "/"),
     )
     results = notify.deliver(session, settings, message, only=[channel_id])
@@ -62,4 +66,4 @@ def test_channel(channel_id: str, session: SessionDep, settings: SettingsDep) ->
 
 @router.post("/digest/send")
 def send_digest_now(session: SessionDep, settings: SettingsDep, now: Now) -> JSONDict:
-    return notify.send_digest(session, settings, now)
+    return localize(notify.send_digest(session, settings, now))

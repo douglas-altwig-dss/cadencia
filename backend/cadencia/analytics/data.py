@@ -23,6 +23,7 @@ from cadencia.domain.metrics import ItemMetrics, aging_thresholds, item_metrics
 from cadencia.domain.models import Board, BoardProfile, HierarchyLevel, Issue, Sprint, Status
 from cadencia.domain.risk import RiskAssessment, RiskContext, assess
 from cadencia.errors import NotFound
+from cadencia.i18n import Msg, stored_text
 from cadencia.store import repo
 from cadencia.store import schema as s
 
@@ -43,7 +44,11 @@ class BoardData:
     statuses: dict[str, Status] = field(default_factory=dict)
     last_success_at: datetime | None = None
     last_full_at: datetime | None = None
+    #: The pt-BR text stored for the last failure; ``last_error_record`` is the same failure as
+    #: ``$msg`` records. The cache is shared by requests in every language, so it holds the record and
+    #: ``freshness()`` renders it for whoever asks (R3).
     last_error: str | None = None
+    last_error_record: dict[str, Any] | None = None
     last_error_at: datetime | None = None
     history_days: int = 120
     _memo: OrderedDict[Any, Any] = field(default_factory=OrderedDict, repr=False)
@@ -177,7 +182,7 @@ class BoardData:
         return {
             "last_success_at": self.last_success_at,
             "last_full_at": self.last_full_at,
-            "last_error": self.last_error,
+            "last_error": stored_text((self.last_error_record or {}).get("message"), self.last_error),
             "last_error_at": self.last_error_at,
             "stale": stale,
         }
@@ -213,7 +218,7 @@ def load_board(
 ) -> BoardData:
     row = session.get(s.BoardRow, board_id)
     if row is None:
-        raise NotFound(board_id, f"O board {board_id} não existe ou ainda não foi descoberto.")
+        raise NotFound(board_id, Msg("collect.board_unknown", board=board_id))
     version = _version(session, row, defaults)
     with _lock:
         cached = _cache.get(board_id)
@@ -234,6 +239,7 @@ def load_board(
         last_success_at=row.last_success_at,
         last_full_at=row.last_full_at,
         last_error=row.last_error,
+        last_error_record=row.last_error_i18n,
         last_error_at=row.last_error_at,
         history_days=history_days,
     )
