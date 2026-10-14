@@ -78,7 +78,7 @@ function ConfigWizard({ view }: { view: ConfigView }) {
 
   const leave = async () => {
     if (draft.isDirty && !finished && !(await confirm({ title: m.page.discardTitle, body: w.discardBody, confirmLabel: m.page.discardLabel }))) return;
-    navigate('/configuracao');
+    navigate('/settings');
   };
 
   const skip = (index: number) => {
@@ -382,10 +382,10 @@ function ConfigWizard({ view }: { view: ConfigView }) {
             <Stack gap="md" mt="lg" align="flex-start">
               {header(w.done.title, w.done.body)}
               <Group gap="sm" wrap="wrap">
-                <Button component={Link} to="/inicio">
+                <Button component={Link} to="/getting-started">
                   {w.done.start}
                 </Button>
-                <Button component={Link} to="/configuracao" variant="default">
+                <Button component={Link} to="/settings" variant="default">
                   {w.done.settings}
                 </Button>
               </Group>

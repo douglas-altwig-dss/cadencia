@@ -57,6 +57,8 @@ def client(sessions, settings):
 
 def test_the_database_wins_over_the_environment_which_wins_over_the_default(tmp_path, sessions, monkeypatch):
     monkeypatch.setenv("CADENCIA_HISTORY_DAYS", "200")
+    # The dev container's .env sets this one; the test needs it to fall through to the default.
+    monkeypatch.delenv("CADENCIA_CHECKPOINT_HOUR", raising=False)
     base = make_settings(tmp_path, timezone="Europe/Berlin")
     assert base.history_days == 200  # from the environment
     save(base, sessions, timezone="Asia/Tokyo", history_days=30, history_sprints=4)

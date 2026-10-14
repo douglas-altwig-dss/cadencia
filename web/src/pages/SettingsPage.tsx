@@ -1,7 +1,7 @@
 import { Badge, Box, Button } from '@mantine/core';
 import { IconPlugConnected, IconPlugConnectedX, IconWand } from '@tabler/icons-react';
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link } from 'react-router';
 
 import { useConfig, useHealth } from '../api/hooks';
 import { PageHeader, useConfirm } from '../components/common';
@@ -19,7 +19,7 @@ import { useFilters } from '../lib/filters';
 /**
  * Configuração: the runtime configuration that used to live in `.env` (System), what Cadência reads
  * from Jira (Jira data) and what it delivers (Delivery), one section at a time beside a side index.
- * `?tab=` names the section, with the values the old tab bar used, so older links still land.
+ * `?tab=` names the section; an older Portuguese value is translated by `lib/legacyRoutes` before this renders.
  */
 export function SettingsPage() {
   const { get, set } = useFilters();
@@ -31,15 +31,13 @@ export function SettingsPage() {
   const c = t.config;
   const config = useConfig();
   const health = useHealth();
-  const requested = get('tab') ?? 'conexao';
-  // Absences are the team's, so they live on Pessoas now; an old link lands there.
-  if (requested === 'ausencias') return <Navigate to="/pessoas?ausencias=1" replace />;
-  const tab: SectionId = isSection(requested) ? requested : 'conexao';
+  const requested = get('tab') ?? 'connection';
+  const tab: SectionId = isSection(requested) ? requested : 'connection';
 
   // Leaving a section with unsaved edits asks first.
   const goTo = async (value: SectionId) => {
     if (value === tab) return;
-    const dialog = tab === 'perfil' ? discardDialog(m) : { title: c.page.discardTitle, body: c.page.discardBody, confirmLabel: c.page.discardLabel };
+    const dialog = tab === 'profile' ? discardDialog(m) : { title: c.page.discardTitle, body: c.page.discardBody, confirmLabel: c.page.discardLabel };
     if (dirty && !(await confirm(dialog))) return;
     set({ tab: value });
   };
@@ -57,7 +55,7 @@ export function SettingsPage() {
           {jiraConfigured ? c.page.jiraConnected : c.page.jiraNotConfigured}
         </Badge>
       )}
-      <Button component={Link} to="/configuracao/assistente" variant="default" leftSection={<IconWand size={16} />}>
+      <Button component={Link} to="/settings/wizard" variant="default" leftSection={<IconWand size={16} />}>
         {c.page.wizard}
       </Button>
     </>
@@ -66,9 +64,9 @@ export function SettingsPage() {
   let content;
   if (isSystemSection(tab)) content = <SystemSection key={tab} section={tab} onDirtyChange={setDirty} />;
   else if (tab === 'boards') content = <BoardsTab />;
-  else if (tab === 'campos') content = <FieldsTab />;
-  else if (tab === 'perfil') content = <ProfileTab onDirtyChange={setDirty} />;
-  else if (tab === 'notificacoes') content = <NotificationsSettings />;
+  else if (tab === 'fields') content = <FieldsTab />;
+  else if (tab === 'profile') content = <ProfileTab onDirtyChange={setDirty} />;
+  else if (tab === 'notifications') content = <NotificationsSettings />;
   else content = <PlanParametersSettings />;
 
   return (

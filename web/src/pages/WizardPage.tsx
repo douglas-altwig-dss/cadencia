@@ -60,7 +60,7 @@ export function WizardPage() {
                 <Alert color="yellow" variant="light" title={m.notConfigured}>
                   <Stack gap="sm" align="flex-start">
                     <Text size="sm">{m.notConfiguredBody}</Text>
-                    <Button component={Link} to="/configuracao/assistente" leftSection={<IconSettings size={16} />}>
+                    <Button component={Link} to="/settings/wizard" leftSection={<IconSettings size={16} />}>
                       {m.configure}
                     </Button>
                     <Text size="sm">
@@ -113,7 +113,7 @@ export function WizardPage() {
                     <>
                       {' '}
                       {m.missingFields(discover.data.missing_fields.join(', '))}{' '}
-                      <Anchor component={Link} to="/configuracao?tab=campos">
+                      <Anchor component={Link} to="/settings?tab=fields">
                         {m.fillManually}
                       </Anchor>
                       .
@@ -171,7 +171,7 @@ export function WizardPage() {
               <Title order={5}>{m.deckTitle}</Title>
               <Text size="sm">{m.deckBody}</Text>
               <Group>
-                <Button component={Link} to="/apresentacao" onClick={() => setStep(5)}>
+                <Button component={Link} to="/presentation" onClick={() => setStep(5)}>
                   {m.openDeck}
                 </Button>
                 <Button variant="default" onClick={() => (setStep(5), navigate('/'))}>

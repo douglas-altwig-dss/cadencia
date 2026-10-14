@@ -65,7 +65,7 @@ export function BoardPage() {
   if (!data) return null;
   if (data.current_sprint_id) return <Navigate to={carry(`/boards/${boardId}/sprints/${data.current_sprint_id}`)} replace />;
 
-  const tab = get('tab') ?? 'visao';
+  const tab = get('tab') ?? 'overview';
   return (
     <>
       <PageHeader
@@ -76,32 +76,32 @@ export function BoardPage() {
       <Freshness freshness={data.freshness} />
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
-          <Tabs.Tab value="arvore">{m.tabTree}</Tabs.Tab>
-          <Tabs.Tab value="riscos">{m.tabOpen}</Tabs.Tab>
-          <Tabs.Tab value="fluxo">{m.tabFlow}</Tabs.Tab>
+          <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="work-tree">{m.tabTree}</Tabs.Tab>
+          <Tabs.Tab value="risks">{m.tabOpen}</Tabs.Tab>
+          <Tabs.Tab value="flow">{m.tabFlow}</Tabs.Tab>
           {data.sprints.length > 0 && <Tabs.Tab value="sprints">{m.tabSprints}</Tabs.Tab>}
-          <Tabs.Tab value="mudancas">{m.tabChanges}</Tabs.Tab>
+          <Tabs.Tab value="changes">{m.tabChanges}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="visao">
+        <Tabs.Panel value="overview">
           {overview.isLoading && <Loading rows={6} />}
           {overview.error ? <ErrorState error={overview.error} /> : overview.data ? <BoardOverviewTab boardId={boardId} data={overview.data} /> : null}
         </Tabs.Panel>
-        <Tabs.Panel value="arvore">
+        <Tabs.Panel value="work-tree">
           <BoardTreeTab boardId={boardId} />
         </Tabs.Panel>
-        <Tabs.Panel value="mudancas">
+        <Tabs.Panel value="changes">
           <ChangesPanel boardId={boardId} />
         </Tabs.Panel>
-        <Tabs.Panel value="riscos">
+        <Tabs.Panel value="risks">
           <RiskTable boardId={boardId} />
         </Tabs.Panel>
-        <Tabs.Panel value="fluxo">
+        <Tabs.Panel value="flow">
           <Stack align="flex-start">
             <Text size="sm" c="dimmed">
               {m.flowHint}
             </Text>
-            <Button component={Link} to={`/fluxo?board=${boardId}`} variant="light">
+            <Button component={Link} to={`/flow?board=${boardId}`} variant="light">
               {m.openInFlow}
             </Button>
           </Stack>

@@ -68,7 +68,7 @@ export function FindReplacePanel({
     <Tabs defaultValue="slides" keepMounted={false}>
       <Tabs.List grow>
         <Tabs.Tab value="slides">{t.editor.findReplace.onSlides}</Tabs.Tab>
-        <Tabs.Tab value="variaveis">{t.editor.findReplace.inVariables}</Tabs.Tab>
+        <Tabs.Tab value="variables">{t.editor.findReplace.inVariables}</Tabs.Tab>
       </Tabs.List>
       <Stack gap="xs" p="sm">
         <TextInput size="xs" label={t.editor.findReplace.find} value={query} onChange={(e) => setQuery(e.currentTarget.value)} data-autofocus />
@@ -121,7 +121,7 @@ export function FindReplacePanel({
           </ScrollArea.Autosize>
         </Stack>
       </Tabs.Panel>
-      <Tabs.Panel value="variaveis">
+      <Tabs.Panel value="variables">
         <Stack gap="xs" px="sm" pb="sm">
           <Text size="xs" c="dimmed">
             {t.editor.findReplace.variablesHint}

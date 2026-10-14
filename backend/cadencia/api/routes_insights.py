@@ -28,7 +28,7 @@ from cadencia.i18n import Msg
 from cadencia.store import repo
 from cadencia.store import schema as s
 
-router = APIRouter(tags=["análises"])
+router = APIRouter(tags=["insights"])
 
 
 @router.get("/sprints/{sprint_id}/forecast")

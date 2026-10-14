@@ -31,7 +31,7 @@ from cadencia.i18n import render, tr
 from cadencia.store import repo
 from cadencia.store import schema as s
 
-router = APIRouter(tags=["visões"])
+router = APIRouter(tags=["views"])
 DEFAULT_WEEKS = 12
 
 

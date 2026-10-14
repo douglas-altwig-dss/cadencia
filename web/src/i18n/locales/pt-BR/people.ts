@@ -71,11 +71,11 @@ export const people: Messages['people'] = {
 
   page: {
     tabs: {
-      semana: 'Semana',
+      week: 'Semana',
       timeline: 'Timeline',
-      capacidade: 'Capacidade',
-      historico: 'Histórico',
-      funcao: 'Função',
+      capacity: 'Capacidade',
+      history: 'Histórico',
+      role: 'Função',
     },
     noBoards: 'Sem itens nos boards acompanhados',
     thisIsYou: 'Esta é você',

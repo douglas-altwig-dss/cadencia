@@ -155,7 +155,7 @@ const SUBTASK_SIZE = { width: 190, height: 66 };
 export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: (focus: TaskFocus) => void }) {
   const t = useT();
   const m = t.epicPlan.pipeline;
-  const [tab, setTab] = useState<string | null>('tarefas');
+  const [tab, setTab] = useState<string | null>('tasks');
   const taskNodes = useMemo(
     () =>
       new Map(
@@ -177,10 +177,10 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
     <Stack gap="sm">
       <Tabs value={tab} onChange={setTab} variant="pills">
         <Tabs.List mb="sm">
-          <Tabs.Tab value="tarefas">{m.tasks}</Tabs.Tab>
-          <Tabs.Tab value="subtarefas">{m.subtasks}</Tabs.Tab>
+          <Tabs.Tab value="tasks">{m.tasks}</Tabs.Tab>
+          <Tabs.Tab value="subtasks">{m.subtasks}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="tarefas">
+        <Tabs.Panel value="tasks">
           <Diagram
             graph={view.pipeline.tarefas}
             nodes={taskNodes}
@@ -190,7 +190,7 @@ export function PipelineSection({ view, onOpen }: { view: EpicPlanView; onOpen: 
             label={m.tasksAria}
           />
         </Tabs.Panel>
-        <Tabs.Panel value="subtarefas">
+        <Tabs.Panel value="subtasks">
           <Diagram
             graph={view.pipeline.subtarefas}
             nodes={subtaskNodes}

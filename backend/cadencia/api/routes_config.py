@@ -16,7 +16,7 @@ from cadencia.i18n import Msg, configure_default_locale, render
 from cadencia.jira.errors import JiraError
 from cadencia.logging import register_secret
 
-router = APIRouter(tags=["configuração"])
+router = APIRouter(tags=["settings"])
 
 
 def _base(request: Request) -> Settings:

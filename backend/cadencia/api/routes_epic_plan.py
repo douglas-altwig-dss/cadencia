@@ -27,7 +27,7 @@ from cadencia.planner.solvers import SolverUnavailable
 from cadencia.planner.strategies import STRATEGIES
 from cadencia.store import repo
 
-router = APIRouter(tags=["plano do épico"])
+router = APIRouter(tags=["epic plan"])
 
 
 class RoleBody(BaseModel):
@@ -42,7 +42,7 @@ def _role(row: Any) -> Role:
     return Role(row.id, row.name, row.description, row.color, row.position, tuple(row.labels or ()))
 
 
-@router.get("/papeis")
+@router.get("/roles")
 def list_roles(session: SessionDep) -> JSONDict:
     return {
         "items": [
@@ -52,7 +52,7 @@ def list_roles(session: SessionDep) -> JSONDict:
     }
 
 
-@router.post("/papeis", status_code=201)
+@router.post("/roles", status_code=201)
 def create_role(body: RoleBody, session: SessionDep) -> JSONDict:
     row = repo.create_role(
         session,
@@ -65,7 +65,7 @@ def create_role(body: RoleBody, session: SessionDep) -> JSONDict:
     return role_dict(_role(row))
 
 
-@router.put("/papeis/{role_id}")
+@router.put("/roles/{role_id}")
 def update_role(role_id: int, body: RoleBody, session: SessionDep) -> JSONDict:
     row = repo.update_role(
         session,
@@ -79,7 +79,7 @@ def update_role(role_id: int, body: RoleBody, session: SessionDep) -> JSONDict:
     return role_dict(_role(row))
 
 
-@router.delete("/papeis/{role_id}", status_code=204)
+@router.delete("/roles/{role_id}", status_code=204)
 def delete_role(role_id: int, session: SessionDep) -> None:
     """Refused while anyone covers the role or any collected subtask is that role's work."""
     roles = roles_of(session)
@@ -107,7 +107,7 @@ class MemberBody(BaseModel):
     papeis: list[MemberRoleBody] = Field(default_factory=list)
 
 
-@router.get("/membros")
+@router.get("/members")
 def list_members(session: SessionDep) -> JSONDict:
     members = members_of(session)
     enrolled = {m.id for m in members}
@@ -122,7 +122,7 @@ def list_members(session: SessionDep) -> JSONDict:
     }
 
 
-@router.put("/membros/{account_id}")
+@router.put("/members/{account_id}")
 def save_member(account_id: str, body: MemberBody, session: SessionDep) -> JSONDict:
     repo.save_member(
         session, account_id, active=body.ativo, roles=[(r.papel_id, r.senioridade) for r in body.papeis]
@@ -130,22 +130,22 @@ def save_member(account_id: str, body: MemberBody, session: SessionDep) -> JSOND
     return next(member_dict(m) for m in members_of(session) if m.id == account_id)
 
 
-@router.delete("/membros/{account_id}", status_code=204)
+@router.delete("/members/{account_id}", status_code=204)
 def delete_member(account_id: str, session: SessionDep) -> None:
     repo.delete_member(session, account_id)
 
 
-@router.get("/planejamento/parametros")
+@router.get("/planning/parameters")
 def get_parameters(session: SessionDep) -> JSONDict:
     return parameters_dict(parameters_of(session))
 
 
-@router.put("/planejamento/parametros")
+@router.put("/planning/parameters")
 def put_parameters(body: dict[str, Any], session: SessionDep) -> JSONDict:
     return parameters_dict(save_parameters(session, body))
 
 
-@router.get("/planejamento/algoritmos")
+@router.get("/planning/algorithms")
 def algorithms() -> JSONDict:
     return localize({"items": [s.as_dict() for s in STRATEGIES.values()]})
 
@@ -158,7 +158,7 @@ class PlanRequest(BaseModel):
     limite_tempo_s: float | None = None
 
 
-@router.post("/planejamento")
+@router.post("/planning")
 def plan(body: PlanRequest, session: SessionDep) -> JSONDict:
     """Generate a plan. The answer is validated whatever produced it; a valid one becomes the
     epic's latest plan. ``status``: otimo | viavel | sem_solucao | heuristico | invalido."""
@@ -182,7 +182,7 @@ def plan(body: PlanRequest, session: SessionDep) -> JSONDict:
         ) from exc
 
 
-@router.get("/epics/{key}/plano")
+@router.get("/epics/{key}/plan")
 def epic_plan(key: str, session: SessionDep, settings: SettingsDep) -> JSONDict:
     return plan_view(session, key, base_url(settings))
 
@@ -191,7 +191,7 @@ class SelectionBody(BaseModel):
     membros_ids: list[str]
 
 
-@router.put("/epics/{key}/plano/selecao")
+@router.put("/epics/{key}/plan/selection")
 def put_selection(key: str, body: SelectionBody, session: SessionDep) -> JSONDict:
     """Who is available for this epic — one choice shared by capacity and planning."""
     known = {m.id for m in members_of(session)}
@@ -206,7 +206,7 @@ class SubtaskRolesBody(BaseModel):
     papeis: list[int] = Field(default_factory=list)
 
 
-@router.put("/subtarefas/{key}/papeis")
+@router.put("/subtasks/{key}/roles")
 def put_subtask_roles(key: str, body: SubtaskRolesBody, session: SessionDep) -> JSONDict:
     """Choose a subtask's role(s) by hand (one, or two for "A + B"); ``[]`` returns it to the
     automatic answer (labels, then the assignee's role, then the task's)."""

@@ -14,34 +14,34 @@ import {
 } from '@tabler/icons-react';
 
 /**
- * The Settings sections in navigation order. The ids are the `?tab=` values, unchanged from the
- * old tab bar so existing links keep landing in the right place.
+ * The Settings sections in navigation order. The ids are the `?tab=` values; the Portuguese ones
+ * they replaced are translated by `lib/legacyRoutes`, so existing links keep landing in the right place.
  */
 export const SECTIONS = [
   {
     group: 'system',
     items: [
-      { id: 'conexao', icon: IconPlugConnected },
-      { id: 'calendario', icon: IconCalendarTime },
-      { id: 'coleta', icon: IconRefresh },
+      { id: 'connection', icon: IconPlugConnected },
+      { id: 'calendar', icon: IconCalendarTime },
+      { id: 'collection', icon: IconRefresh },
       { id: 'email', icon: IconMail },
-      { id: 'ia', icon: IconSparkles },
-      { id: 'geral', icon: IconAdjustments },
+      { id: 'ai', icon: IconSparkles },
+      { id: 'general', icon: IconAdjustments },
     ],
   },
   {
     group: 'jira',
     items: [
       { id: 'boards', icon: IconLayoutKanban },
-      { id: 'campos', icon: IconForms },
-      { id: 'perfil', icon: IconAdjustmentsHorizontal },
+      { id: 'fields', icon: IconForms },
+      { id: 'profile', icon: IconAdjustmentsHorizontal },
     ],
   },
   {
     group: 'delivery',
     items: [
-      { id: 'notificacoes', icon: IconBell },
-      { id: 'plano-epico', icon: IconTimeline },
+      { id: 'notifications', icon: IconBell },
+      { id: 'epic-plan', icon: IconTimeline },
     ],
   },
 ] as const satisfies readonly { group: string; items: readonly { id: string; icon: Icon }[] }[];
@@ -55,12 +55,12 @@ export const isSection = (value: string): value is SectionId => IDS.includes(val
 
 /** The System sections are runtime configuration, each one group of `GET /config`. */
 export const CONFIG_GROUP_OF = {
-  conexao: 'jira',
-  calendario: 'calendar',
-  coleta: 'collection',
+  connection: 'jira',
+  calendar: 'calendar',
+  collection: 'collection',
   email: 'notifications',
-  ia: 'ai',
-  geral: 'general',
+  ai: 'ai',
+  general: 'general',
 } as const satisfies Partial<Record<SectionId, string>>;
 
 export type SystemSectionId = keyof typeof CONFIG_GROUP_OF;

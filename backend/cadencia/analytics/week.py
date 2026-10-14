@@ -165,7 +165,7 @@ def search(session: Session, query: str, limit: int = 8) -> list[dict[str, Any]]
                 "id": row.account_id,
                 "label": row.display_name,
                 "detail": "",
-                "path": f"/pessoas/{row.account_id}",
+                "path": f"/people/{row.account_id}",
             }
         )
 
@@ -181,7 +181,7 @@ def search(session: Session, query: str, limit: int = 8) -> list[dict[str, Any]]
                 "id": str(row.id),
                 "label": row.name,
                 "detail": row.filename,
-                "path": f"/apresentacao?modelo={row.id}",
+                "path": f"/presentation?template={row.id}",
             }
         )
     return out

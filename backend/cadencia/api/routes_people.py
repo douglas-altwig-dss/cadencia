@@ -22,7 +22,7 @@ from cadencia.errors import NotFound
 from cadencia.i18n import Msg
 from cadencia.store import repo
 
-router = APIRouter(tags=["pessoas"])
+router = APIRouter(tags=["people"])
 
 
 @router.get("/people/overview")

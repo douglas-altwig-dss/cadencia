@@ -19,7 +19,7 @@ export const discardDialog = (m: Messages['tracking']['settings']) => ({
 });
 
 /**
- * The board's own profile. It reads and writes its own ``perfil`` parameter (not the shared ``board`` filter,
+ * The board's own profile. It reads and writes its own ``profile`` parameter (not the shared ``board`` filter,
  * which the flow page uses), and it keeps the edits: a board or tab change asks first, and the save
  * bar says how many changes are waiting.
  */
@@ -28,7 +28,7 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
   const people = usePeople();
   const { get, set } = useFilters();
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const boardId = get('perfil') ? Number(get('perfil')) : selected.data?.items[0]?.id;
+  const boardId = get('profile') ? Number(get('profile')) : selected.data?.items[0]?.id;
   const detail = useBoardDetail(boardId);
   const save = useSaveBoardSettings(boardId);
   const [draft, setDraft] = useState<BoardSettings | null>(null);
@@ -59,7 +59,7 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
   const switchBoard = async (value: string | null) => {
     if (!value) return;
     if (pending && !(await confirm(discardDialog(settings)))) return;
-    set({ perfil: value });
+    set({ profile: value });
   };
 
   if (selected.data && !selected.data.items.length) return <Text size="sm">{m.selectBoardsFirst}</Text>;
@@ -211,7 +211,7 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
         </SimpleGrid>
         <Text size="xs" c="dimmed" mt="md">
           {m.personBefore}{' '}
-          <Anchor component={Link} to="/pessoas" size="xs">
+          <Anchor component={Link} to="/people" size="xs">
             {m.peopleLink}
           </Anchor>
           {m.personAfter}

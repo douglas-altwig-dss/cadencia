@@ -27,7 +27,7 @@ from cadencia.store import repo
 from cadencia.store import schema as s
 from cadencia.store.db import session_scope
 
-router = APIRouter(tags=["configuração"])
+router = APIRouter(tags=["settings"])
 
 
 def _require_jira(settings: Any) -> None:

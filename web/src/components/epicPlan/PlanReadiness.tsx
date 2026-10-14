@@ -106,7 +106,7 @@ export function PlanReadiness({ view, onGo, title }: { view: EpicPlanView; onGo:
           title={m.teamStep}
           action={
             d.membros_com_papel === 0 || teamGap.length ? (
-              <Button size="xs" variant="default" component={Link} to="/pessoas?funcoes=1">
+              <Button size="xs" variant="default" component={Link} to="/people?roles=1">
                 {m.registerRoles}
               </Button>
             ) : undefined

@@ -35,11 +35,11 @@ export function EpicPage() {
   const crumbs = [
     { label: t.tracking.crumbs.home, to: '/' },
     { label: board.data?.board.name ?? t.tracking.crumbs.board(boardId), to: `/boards/${boardId}` },
-    ...(sprint ? [{ label: sprint.name, to: `/boards/${boardId}/sprints/${sprint.id}?tab=arvore` }] : []),
+    ...(sprint ? [{ label: sprint.name, to: `/boards/${boardId}/sprints/${sprint.id}?tab=work-tree` }] : []),
     { label: key },
   ];
 
-  const tab = get('tab') ?? 'visao';
+  const tab = get('tab') ?? 'overview';
   const estimate = data.tree?.estimate_rollup;
 
   return (
@@ -59,13 +59,13 @@ export function EpicPage() {
       </Box>
       <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
-          <Tabs.Tab value="visao">{m.tabOverview}</Tabs.Tab>
-          <Tabs.Tab value="plano">{m.tabPlan}</Tabs.Tab>
+          <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
+          <Tabs.Tab value="plan">{m.tabPlan}</Tabs.Tab>
         </Tabs.List>
-        <Tabs.Panel value="plano">
+        <Tabs.Panel value="plan">
           <EpicPlanTab epicKey={key} />
         </Tabs.Panel>
-        <Tabs.Panel value="visao">
+        <Tabs.Panel value="overview">
           <Stack gap="md">
             {/* Numbers first, then the forecast, then the items they add up from. */}
             <SimpleGrid cols={{ base: 1, md: 3 }}>

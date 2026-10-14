@@ -22,17 +22,17 @@ export const config = {
   },
   /** Section names in the navigation, keyed by the `?tab=` value. */
   nav: {
-    conexao: 'Jira connection',
-    calendario: 'Calendar',
-    coleta: 'Collection',
+    connection: 'Jira connection',
+    calendar: 'Calendar',
+    collection: 'Collection',
     email: 'E-mail & links',
-    ia: 'AI narrative',
-    geral: 'General',
+    ai: 'AI narrative',
+    general: 'General',
     boards: 'Boards',
-    campos: 'Fields',
-    perfil: 'Board profile',
-    notificacoes: 'Notifications',
-    'plano-epico': 'Epic plan',
+    fields: 'Fields',
+    profile: 'Board profile',
+    notifications: 'Notifications',
+    'epic-plan': 'Epic plan',
   },
   /** One card per configuration group, keyed by the API's group id. */
   groups: {

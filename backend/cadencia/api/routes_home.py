@@ -14,7 +14,7 @@ from cadencia.errors import Invalid
 from cadencia.i18n import Msg
 from cadencia.store import repo
 
-router = APIRouter(tags=["painel"])
+router = APIRouter(tags=["home"])
 
 MAX_TILES = 40
 MAX_CONFIG = 4_000  # characters of JSON per tile: a tile's own settings, not a place to keep data

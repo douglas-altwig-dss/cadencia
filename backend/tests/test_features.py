@@ -230,14 +230,14 @@ def test_saved_views_round_trip(client):
     created = ok(
         client.post(
             "/api/views",
-            json={"name": "Riscos do Ana", "path": "/fluxo", "query": "?person=ana", "pinned": True},
+            json={"name": "Riscos do Ana", "path": "/flow", "query": "?person=ana", "pinned": True},
         )
     )
-    assert created["url"] == "/fluxo?person=ana"
+    assert created["url"] == "/flow?person=ana"
     ok(
         client.put(
             f"/api/views/{created['id']}",
-            json={"name": "Riscos da Ana", "path": "/fluxo", "query": "person=ana"},
+            json={"name": "Riscos da Ana", "path": "/flow", "query": "person=ana"},
         )
     )
     assert [v["name"] for v in ok(client.get("/api/views"))["items"]] == ["Riscos da Ana"]

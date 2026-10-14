@@ -336,5 +336,5 @@ def test_roles_are_seeded_once_in_cadencia_locale(sessions, locale, first):
 def test_the_request_language_does_not_name_the_seeded_roles(tmp_path, sessions):
     app = create_app(make_settings(tmp_path, locale="pt-BR"), sessions)
     with TestClient(app) as client:
-        names = [r["nome"] for r in client.get("/api/papeis", headers=DE).json()["items"]]
+        names = [r["nome"] for r in client.get("/api/roles", headers=DE).json()["items"]]
     assert names[0] == "Arquiteto de Software" and "Infraestrutura" in names

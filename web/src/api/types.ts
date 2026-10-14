@@ -1975,7 +1975,7 @@ export interface PlanRole {
   cor: string;
   ordem: number;
   rotulos: string[];
-  /** Only on GET /papeis: who covers it. */
+  /** Only on GET /roles: who covers it. */
   membros?: string[];
 }
 

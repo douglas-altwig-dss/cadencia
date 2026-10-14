@@ -44,7 +44,7 @@ function PersonCards({ people, indicators, loading }: { people: Person[]; indica
       {people.map((p) => (
         <PersonCard
           key={p.account_id}
-          to={carry(`/pessoas/${encodeURIComponent(p.account_id)}`)}
+          to={carry(`/people/${encodeURIComponent(p.account_id)}`)}
           name={p.name}
           roles={rolesOf.get(p.account_id) ?? []}
           indicators={loading ? undefined : indicators.get(p.account_id)}
@@ -55,7 +55,7 @@ function PersonCards({ people, indicators, loading }: { people: Person[]; indica
 }
 
 /**
- * A drawer that opens from the address (``?funcoes=1``), so a link from another page can open it. Closing it
+ * A drawer that opens from the address (``?roles=1``), so a link from another page can open it. Closing it
  * takes the parameter back out, so the address is clean again.
  */
 function useParamDrawer(key: string) {
@@ -80,12 +80,12 @@ export function PeoplePage() {
   const t = useT();
   const tl = t.people.list;
   const { get } = useFilters();
-  // ?tab=minha-semana (the palette's "Minha semana") is the same flow as the header button, started at once.
-  const startMyWeek = get('tab') === 'minha-semana';
+  // ?tab=my-week (the palette's "Minha semana") is the same flow as the header button, started at once.
+  const startMyWeek = get('tab') === 'my-week';
   const { data, isLoading, error } = usePeople();
   const [query, setQuery] = useState('');
-  const [catalog, setCatalog] = useParamDrawer('funcoes');
-  const [absences, setAbsences] = useParamDrawer('ausencias');
+  const [catalog, setCatalog] = useParamDrawer('roles');
+  const [absences, setAbsences] = useParamDrawer('absences');
   // On by default: a team page is about who is working in the sprint. Off shows everyone the boards know.
   const [onlyActive, setOnlyActive] = useLocalStorage({ key: 'cadencia-pessoas-so-ativos', defaultValue: true });
   const overview = usePeopleOverview();
@@ -170,7 +170,7 @@ export function PeoplePage() {
             {tl.noActiveBody(hidden)}
           </Empty>
         )}
-        {data && !waiting && !found && hidden === 0 && <Empty title={tl.noneFoundTitle} action={{ label: tl.seeBoards, to: '/configuracao?tab=boards' }}>{tl.noneFoundBody}</Empty>}
+        {data && !waiting && !found && hidden === 0 && <Empty title={tl.noneFoundTitle} action={{ label: tl.seeBoards, to: '/settings?tab=boards' }}>{tl.noneFoundBody}</Empty>}
         <Stack gap="lg">
           {groups.map((g) => (
             <Stack key={g.space.key ?? '__sem_espaco__'} gap="sm">
@@ -304,7 +304,7 @@ function PersonHistory({ accountId }: { accountId: string }) {
 }
 
 /** The four groups a card shows, at a glance, above the person's tabs. */
-const TABS = ['semana', 'timeline', 'capacidade', 'historico', 'funcao'] as const;
+const TABS = ['week', 'timeline', 'capacity', 'history', 'role'] as const;
 
 /** A person: the numbers of their card, then their week (and their open/recent work — RF-85's
  *  "Minha semana" is this same tab, not a second implementation), timeline, capacity, history and role. */
@@ -315,7 +315,7 @@ export function PersonPage() {
   const [catalog, setCatalog] = useState(false);
   const detail = usePersonDetail(accountId);
   const [me, setMe] = useLocalStorage<string | null>({ key: ME_KEY, defaultValue: null, getInitialValueInEffect: false });
-  const tab = TABS.some((id) => id === get('tab')) ? get('tab')! : 'semana';
+  const tab = TABS.some((id) => id === get('tab')) ? get('tab')! : 'week';
 
   if (detail.isLoading) return <Loading rows={8} />;
   if (detail.error) return <ErrorState error={detail.error} />;
@@ -328,7 +328,7 @@ export function PersonPage() {
       <PageHeader
         title={name}
         subtitle={data.indicators?.boards.map((b) => b.name).join(' · ') || t.people.page.noBoards}
-        crumbs={[{ label: t.people.list.title, to: '/pessoas' }, { label: name }]}
+        crumbs={[{ label: t.people.list.title, to: '/people' }, { label: name }]}
         actions={
           // "Sou eu" is how "Minha semana" learns who you are, from the one page that knows the account id.
           me === accountId ? (
@@ -353,7 +353,7 @@ export function PersonPage() {
               </Tabs.Tab>
             ))}
           </Tabs.List>
-          <Tabs.Panel value="semana">
+          <Tabs.Panel value="week">
             <Stack gap="lg">
               <PersonWeek detail={data} />
               <PersonWork detail={data} />
@@ -364,13 +364,13 @@ export function PersonPage() {
               <PersonTimeline timeline={data.timeline} />
             </Paper>
           </Tabs.Panel>
-          <Tabs.Panel value="capacidade">
+          <Tabs.Panel value="capacity">
             <PersonCapacity accountId={accountId} sprints={data.capacity.sprints} />
           </Tabs.Panel>
-          <Tabs.Panel value="historico">
+          <Tabs.Panel value="history">
             <PersonHistory accountId={accountId} />
           </Tabs.Panel>
-          <Tabs.Panel value="funcao">
+          <Tabs.Panel value="role">
             <PersonRoles accountId={accountId} name={name} onManage={() => setCatalog(true)} />
           </Tabs.Panel>
         </Tabs>

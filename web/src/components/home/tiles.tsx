@@ -246,7 +246,7 @@ function PeopleLinks({ people }: { people: { account_id: string; name: string }[
   return (
     <Group gap={6}>
       {people.slice(0, 4).map((p) => (
-        <Anchor key={p.account_id} component={Link} to={carry(`/pessoas/${encodeURIComponent(p.account_id)}`)} size="xs">
+        <Anchor key={p.account_id} component={Link} to={carry(`/people/${encodeURIComponent(p.account_id)}`)} size="xs">
           {p.name}
         </Anchor>
       ))}
@@ -388,7 +388,7 @@ function HealthTile() {
   const troubled = data.items.filter((i) => !i.ok).length;
   return (
     <KpiCard label={m.titles.health} value={data.problems} help={tileHelp('saude:pontos')}>
-      <Anchor component={Link} to="/status?tab=saude" size="xs">
+      <Anchor component={Link} to="/status?tab=health" size="xs">
         {data.ok ? m.healthOk : m.healthTroubled(troubled)}
       </Anchor>
     </KpiCard>

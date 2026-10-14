@@ -26,11 +26,11 @@ export function SystemSection({ section, onDirtyChange }: { section: SystemSecti
   return (
     <Stack gap="md">
       <ImportEnvBanner view={view} />
-      {section === 'conexao' ? (
+      {section === 'connection' ? (
         <ConnectionSection view={view} onDirtyChange={onDirtyChange} />
       ) : (
         <ConfigCard title={text.title} description={text.description} fields={fieldsOf(view, group)} onDirtyChange={onDirtyChange}>
-          {section === 'ia'
+          {section === 'ai'
             ? (draft) => {
                 const enabled = draft.fields.find((field) => field.key === 'ai_enabled');
                 return enabled && draft.value(enabled) ? <Note>{m.ai.privacy}</Note> : null;
@@ -38,7 +38,7 @@ export function SystemSection({ section, onDirtyChange }: { section: SystemSecti
             : undefined}
         </ConfigCard>
       )}
-      {section === 'geral' && <EnvironmentCard entries={view.bootstrap} />}
+      {section === 'general' && <EnvironmentCard entries={view.bootstrap} />}
     </Stack>
   );
 }

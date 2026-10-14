@@ -62,8 +62,8 @@ from cadencia.report.service import (
 )
 from cadencia.store import schema as s
 
-router = APIRouter(prefix="/reports", tags=["apresentação"])
-public_router = APIRouter(prefix="/public", tags=["público"])
+router = APIRouter(prefix="/reports", tags=["presentation"])
+public_router = APIRouter(prefix="/public", tags=["public"])
 
 PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 

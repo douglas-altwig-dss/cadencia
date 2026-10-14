@@ -322,8 +322,8 @@ export const useDeckPalette = () =>
 /** #5: Okabe-Ito, safe under every common colour blindness — a suggestion, never applied on its own. */
 export const useAccessiblePalette = () =>
   useQuery({
-    queryKey: ['reports', 'palette', 'acessivel'],
-    queryFn: () => api.get<{ palette: Record<string, string> }>('/reports/palette/acessivel'),
+    queryKey: ['reports', 'palette', 'accessible'],
+    queryFn: () => api.get<{ palette: Record<string, string> }>('/reports/palette/accessible'),
     staleTime: Infinity,
     enabled: false,
   });
@@ -362,7 +362,7 @@ export const useRunScene = (runId?: string) =>
 export function useReassociateRun(runId: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (templateId: number) => api.post<DeckScene>(`/reports/runs/${runId}/reassociar`, { template_id: templateId }),
+    mutationFn: (templateId: number) => api.post<DeckScene>(`/reports/runs/${runId}/reassociate`, { template_id: templateId }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['run', runId, 'scene'] }),
   });
 }
@@ -543,7 +543,7 @@ export function useCloneMapping(templateId: number) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ fromTemplateId, apply }: { fromTemplateId: number; apply?: boolean }) =>
-      api.post<CloneMappingPlan>(`/reports/templates/${templateId}/clonar-mapeamento`, {
+      api.post<CloneMappingPlan>(`/reports/templates/${templateId}/clone-mapping`, {
         from_template_id: fromTemplateId,
         aplicar: apply ?? false,
       }),

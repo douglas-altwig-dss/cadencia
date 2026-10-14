@@ -30,7 +30,7 @@ from cadencia.api.deps import (
 from cadencia.i18n import tr
 from cadencia.store import repo
 
-router = APIRouter(tags=["exportação"])
+router = APIRouter(tags=["export"])
 DATASETS = (
     "dashboard",
     "risks",

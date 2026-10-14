@@ -13,7 +13,7 @@ from cadencia.analytics.serialize import iso
 from cadencia.api.deps import JSONDict, Now, SessionDep, SettingsDep, board_data, sprint_or_404
 from cadencia.store import repo
 
-router = APIRouter(tags=["planejamento"])
+router = APIRouter(tags=["planning"])
 
 
 @router.get("/sprints/{sprint_id}/capacity")

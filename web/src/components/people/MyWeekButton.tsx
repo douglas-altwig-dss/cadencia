@@ -14,7 +14,7 @@ export const ME_KEY = 'cadencia-minha-pessoa';
 /**
  * RF-85: your own week in one click. Who you are is kept in this browser; the first time (or whenever it
  * is not known) a short picker asks, and the choice opens your week, the same Semana tab every person has.
- * ``startOpen`` is for ``?tab=minha-semana`` links: the same flow, started at once.
+ * ``startOpen`` is for ``?tab=my-week`` links: the same flow, started at once.
  */
 export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
   const t = useT();
@@ -27,7 +27,7 @@ export function MyWeekButton({ startOpen = false }: { startOpen?: boolean }) {
     .map((p) => ({ value: p.account_id, label: p.name }))
     .sort((a, b) => collator().compare(a.label, b.label));
 
-  const openWeek = (accountId: string) => navigate(carry(`/pessoas/${encodeURIComponent(accountId)}?tab=semana`));
+  const openWeek = (accountId: string) => navigate(carry(`/people/${encodeURIComponent(accountId)}?tab=week`));
   const press = () => (me ? openWeek(me) : setPicking(true));
 
   useEffect(() => {

@@ -334,7 +334,7 @@ export function DeckEditorTab({
   /** RF-83: a fix-it link (from validation or readiness) opens a slide, and a shape on it. */
   const { get: getParam, set: setParams } = useFilters();
   const focusSlide = getParam('slide');
-  const focusShape = getParam('forma');
+  const focusShape = getParam('shape');
 
   // Seed from the server exactly once per template, so a refetch cannot discard live edits.
   const seeded = useRef<number | null>(null);
@@ -988,7 +988,7 @@ export function DeckEditorTab({
   useEffect(() => {
     if (!focusSlide || !slides.length) return;
     goTo(focusSlide, focusShape);
-    setParams({ slide: null, forma: null });
+    setParams({ slide: null, shape: null });
   }, [focusSlide, focusShape, slides.length, goTo, setParams]);
 
   // Keyboard: the shortcuts a slide editor is expected to have.

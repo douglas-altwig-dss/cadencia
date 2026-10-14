@@ -81,11 +81,11 @@ export const people = {
   /** `PersonPage`: header and tabs. */
   page: {
     tabs: {
-      semana: 'Week',
+      week: 'Week',
       timeline: 'Timeline',
-      capacidade: 'Capacity',
-      historico: 'History',
-      funcao: 'Role',
+      capacity: 'Capacity',
+      history: 'History',
+      role: 'Role',
     },
     noBoards: 'No items on the tracked boards',
     thisIsYou: 'This is you',

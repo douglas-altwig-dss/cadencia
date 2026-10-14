@@ -28,7 +28,7 @@ export function SettingsNav({ active, onSelect }: { active: SectionId; onSelect:
               <NavLink
                 key={id}
                 component={Link}
-                to={`/configuracao?tab=${id}`}
+                to={`/settings?tab=${id}`}
                 label={m.nav[id]}
                 leftSection={<Icon size={16} />}
                 active={active === id}

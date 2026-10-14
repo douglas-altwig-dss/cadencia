@@ -25,6 +25,7 @@ from cadencia.api import (
     routes_setup,
     routes_views,
 )
+from cadencia.api.legacy import LegacyApiPaths
 from cadencia.api.security import SecurityHeaders, TokenAuth
 from cadencia.config import Settings, get_settings
 from cadencia.config_store import effective_from
@@ -70,7 +71,9 @@ def create_app(settings: Settings | None = None, sessions: sessionmaker[Session]
     token = settings.api_token.get_secret_value()
     register_secret(token)
     # Last added runs first: CORS answers a preflight (which never carries credentials) before the
-    # token check sees it, and both CORS and nosniff headers also reach a 401.
+    # token check sees it, and both CORS and nosniff headers also reach a 401. The old Portuguese
+    # paths redirect inside the token check, so only an authenticated caller learns the new path.
+    app.add_middleware(LegacyApiPaths)
     app.add_middleware(TokenAuth, token=token)
     app.add_middleware(SecurityHeaders)
     app.add_middleware(

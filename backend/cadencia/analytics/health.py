@@ -62,7 +62,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
                 "campos_ausentes",
                 "erro",
                 missing,
-                "/configuracao?tab=campos",
+                "/settings?tab=fields",
             )
         )
 
@@ -145,7 +145,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
                     "fora_do_time",
                     "info",
                     strangers,
-                    f"/configuracao?tab=boards&board={data.board.id}",
+                    f"/settings?tab=boards&board={data.board.id}",
                 )
             )
 

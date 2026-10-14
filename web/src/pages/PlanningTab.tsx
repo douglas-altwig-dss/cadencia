@@ -40,7 +40,7 @@ function PlanResult({ view }: { view: PlanView }) {
           fmtNum(Number(view.plan.parameters.hours_per_point ?? 0)),
           fmtNum(Number(view.plan.parameters.unestimated_item_hours ?? 0)),
         )}{' '}
-        <Anchor component={Link} to="/configuracao?tab=perfil" size="sm">
+        <Anchor component={Link} to="/settings?tab=profile" size="sm">
           {m.profileLink}
         </Anchor>
       </Text>

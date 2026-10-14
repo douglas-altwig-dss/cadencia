@@ -33,13 +33,13 @@ export function RolesCatalog() {
   return (
     <Stack gap="md">
       {confirmDialog}
-      <Tabs defaultValue="funcoes" variant="pills">
+      <Tabs defaultValue="roles" variant="pills">
         <Tabs.List mb="md">
-          <Tabs.Tab value="funcoes">{tc.rolesTab(list.length)}</Tabs.Tab>
-          <Tabs.Tab value="equipe">{tc.teamTab(team.length)}</Tabs.Tab>
+          <Tabs.Tab value="roles">{tc.rolesTab(list.length)}</Tabs.Tab>
+          <Tabs.Tab value="team">{tc.teamTab(team.length)}</Tabs.Tab>
         </Tabs.List>
 
-        <Tabs.Panel value="funcoes">
+        <Tabs.Panel value="roles">
           <Group justify="space-between" mb="sm" wrap="nowrap">
             <Text size="sm" c="dimmed">
               {tc.intro}
@@ -118,7 +118,7 @@ export function RolesCatalog() {
           </Paper>
         </Tabs.Panel>
 
-        <Tabs.Panel value="equipe">
+        <Tabs.Panel value="team">
           <Text size="sm" c="dimmed" mb="sm">
             {tc.teamIntro}
           </Text>
@@ -135,7 +135,7 @@ export function RolesCatalog() {
                   {team.map((m) => (
                     <Table.Tr key={m.id} style={{ opacity: m.ativo ? 1 : 0.6 }}>
                       <Table.Td>
-                        <Anchor component={Link} to={`/pessoas/${encodeURIComponent(m.id)}`} size="sm" fw={600}>
+                        <Anchor component={Link} to={`/people/${encodeURIComponent(m.id)}`} size="sm" fw={600}>
                           {m.nome}
                         </Anchor>
                         {!m.ativo && (

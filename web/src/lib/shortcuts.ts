@@ -37,7 +37,7 @@ export function shortcutGroups(): ShortcutGroup[] {
     {
       id: 'timeline-foco',
       title: w.groups.focusTimeline,
-      paths: ['/timeline-foco'],
+      paths: ['/focus-timeline'],
       items: [
         { keys: ['/'], label: w.searchActivity },
         { keys: ['Ctrl', 'Z'], label: w.undo },
@@ -47,7 +47,7 @@ export function shortcutGroups(): ShortcutGroup[] {
     {
       id: 'editor',
       title: w.groups.editor,
-      paths: ['/apresentacao'],
+      paths: ['/presentation'],
       items: [
         { keys: ['Ctrl', 'Z'], label: w.undo },
         { keys: ['Ctrl', 'Shift', 'Z'], label: w.redo },
@@ -74,7 +74,7 @@ export function shortcutGroups(): ShortcutGroup[] {
     {
       id: 'apresentar',
       title: w.groups.present,
-      paths: ['/apresentacao', '/apresentar'],
+      paths: ['/presentation', '/present'],
       items: [
         { keys: ['→'], label: w.nextSlide },
         { keys: ['←'], label: w.previousSlide },

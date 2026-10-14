@@ -619,7 +619,7 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
     { id: 'diagnostico', label: w.diagnostics, run: () => setDrawer('diagnostico') },
     { id: 'acessibilidade', label: w.templateA11y, run: () => setDrawer('acessibilidade') },
     { id: 'uso', label: w.usage, run: () => setDrawer('uso') },
-    { id: 'assistente', label: w.wizard, run: () => set({ assistente: '1' }) },
+    { id: 'assistente', label: w.wizard, run: () => set({ wizard: '1' }) },
     { id: 'tela-cheia', label: w.editorFullscreen, shortcut: 'F11', run: () => void full.toggle() },
     { id: 'menu', label: menuVisible ? w.hideMenu : w.showMenu, run: () => setMenuVisible((v) => !v) },
   ]);
@@ -729,7 +729,7 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
           { label: w.versions, icon: <IconHistory size={15} />, onClick: () => setDrawer('versoes') },
           { label: w.manageTemplates, icon: <IconUpload size={15} />, divider: true, onClick: () => setDrawer('modelo') },
           { label: w.reread, icon: <IconRefresh size={15} />, onClick: () => refresh.mutate() },
-          { label: w.wizard, icon: <IconWand size={15} />, onClick: () => set({ assistente: '1' }) },
+          { label: w.wizard, icon: <IconWand size={15} />, onClick: () => set({ wizard: '1' }) },
           { label: w.diagnostics, icon: <IconStethoscope size={15} />, onClick: () => setDrawer('diagnostico') },
           { label: w.accessibility, icon: <IconAccessible size={15} />, onClick: () => setDrawer('acessibilidade') },
           { label: w.usage, icon: <IconChartBar size={15} />, onClick: () => setDrawer('uso') },
@@ -888,10 +888,10 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
       />
       <TemplateWizard
         templateId={templateId}
-        opened={get('assistente') === '1'}
-        onClose={() => set({ assistente: null })}
+        opened={get('wizard') === '1'}
+        onClose={() => set({ wizard: null })}
         onVariables={() => {
-          set({ assistente: null });
+          set({ wizard: null });
           setDrawer('textos');
         }}
       />
@@ -927,7 +927,7 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
                 setDrawer('textos');
                 return;
               }
-              set({ run: fix.run ?? null, slide: fix.slide ?? null, forma: fix.shape ?? null });
+              set({ run: fix.run ?? null, slide: fix.slide ?? null, shape: fix.shape ?? null });
               setDrawer(null);
             }}
           />
@@ -938,7 +938,7 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
             templateId={templateId}
             onOpen={(slide, shape) => {
               const origin = data.manifest.slides.find((s) => s.index === slide)?.slide_id;
-              if (origin !== undefined) set({ run: null, slide: String(origin), forma: shape });
+              if (origin !== undefined) set({ run: null, slide: String(origin), shape });
               setDrawer(null);
             }}
           />
@@ -967,12 +967,12 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
           <TemplatesDrawer
             current={templateId}
             onSelect={(id) => {
-              set({ modelo: id == null ? null : String(id), slide: null, run: null });
+              set({ template: id == null ? null : String(id), slide: null, run: null });
               setDrawer(null);
             }}
             onUploaded={(id) => {
               // #23: a new template opens on its wizard.
-              set({ modelo: String(id), slide: null, run: null, assistente: '1' });
+              set({ template: String(id), slide: null, run: null, wizard: '1' });
               setDrawer(null);
             }}
           />
@@ -1097,7 +1097,7 @@ export function DeckPage() {
   const { get, set } = useFilters();
   const items = useMemo(() => templates.data?.items ?? [], [templates.data]);
   // RF-34: the model, the tab and the slide live in the URL, so a mapping in progress is a link.
-  const chosen = get('modelo');
+  const chosen = get('template');
   const selected = items.some((item) => String(item.id) === chosen) ? chosen : null;
   const [managing, setManaging] = useState(false);
   const upload = useUploadTemplate();
@@ -1107,7 +1107,7 @@ export function DeckPage() {
       <TemplateWorkspace
         key={selected}
         templateId={Number(selected)}
-        onBack={() => set({ modelo: null, slide: null, run: null })}
+        onBack={() => set({ template: null, slide: null, run: null })}
       />
     );
   }
@@ -1127,7 +1127,7 @@ export function DeckPage() {
             <UploadCard
               uploading={upload.isPending}
               error={upload.error}
-              onFile={(file) => upload.mutate({ file }, { onSuccess: (row) => set({ modelo: String(row.id), slide: null, assistente: '1' }) })}
+              onFile={(file) => upload.mutate({ file }, { onSuccess: (row) => set({ template: String(row.id), slide: null, wizard: '1' }) })}
             />
           </Box>
         </Stack>
@@ -1135,12 +1135,12 @@ export function DeckPage() {
       {items.length > 0 && (
         <TemplateGallery
           items={items}
-          onSelect={(id) => set({ modelo: String(id), slide: null })}
+          onSelect={(id) => set({ template: String(id), slide: null })}
           onManage={() => setManaging(true)}
           uploading={upload.isPending}
           uploadError={upload.error}
           onUploadFile={(file) =>
-            upload.mutate({ file }, { onSuccess: (row) => set({ modelo: String(row.id), slide: null, assistente: '1' }) })
+            upload.mutate({ file }, { onSuccess: (row) => set({ template: String(row.id), slide: null, wizard: '1' }) })
           }
         />
       )}
@@ -1148,11 +1148,11 @@ export function DeckPage() {
         <TemplatesDrawer
           current={-1}
           onSelect={(id) => {
-            if (id != null) set({ modelo: String(id), slide: null });
+            if (id != null) set({ template: String(id), slide: null });
             setManaging(false);
           }}
           onUploaded={(id) => {
-            set({ modelo: String(id), slide: null, assistente: '1' });
+            set({ template: String(id), slide: null, wizard: '1' });
             setManaging(false);
           }}
         />

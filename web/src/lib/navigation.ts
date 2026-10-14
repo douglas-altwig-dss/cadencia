@@ -27,20 +27,20 @@ export function nav(): { section: string; items: NavItem[] }[] {
       section: w.follow,
       items: [
         { to: '/', label: w.home, icon: IconLayoutDashboard, match: (p) => p === '/' || p.startsWith('/boards') || p.startsWith('/issues') },
-        { to: '/fluxo', label: w.flow, icon: IconChartDots, match: (p) => p.startsWith('/fluxo') },
-        { to: '/pessoas', label: w.people, icon: IconUsers, match: (p) => p.startsWith('/pessoas') },
-        { to: '/timeline-foco', label: w.focusTimeline, icon: IconTimeline, match: (p) => p.startsWith('/timeline-foco') },
+        { to: '/flow', label: w.flow, icon: IconChartDots, match: (p) => p.startsWith('/flow') },
+        { to: '/people', label: w.people, icon: IconUsers, match: (p) => p.startsWith('/people') },
+        { to: '/focus-timeline', label: w.focusTimeline, icon: IconTimeline, match: (p) => p.startsWith('/focus-timeline') },
       ],
     },
     {
       section: w.deliver,
-      items: [{ to: '/apresentacao', label: w.presentation, icon: IconPresentation, match: (p) => p.startsWith('/apresentacao') }],
+      items: [{ to: '/presentation', label: w.presentation, icon: IconPresentation, match: (p) => p.startsWith('/presentation') }],
     },
     {
       section: w.system,
       items: [
         { to: '/status', label: w.collectionStatus, icon: IconActivity, match: (p) => p.startsWith('/status') },
-        { to: '/configuracao', label: w.settings, icon: IconSettings, match: (p) => p.startsWith('/configuracao') },
+        { to: '/settings', label: w.settings, icon: IconSettings, match: (p) => p.startsWith('/settings') },
       ],
     },
   ];
@@ -50,11 +50,11 @@ export function nav(): { section: string; items: NavItem[] }[] {
 export function myWeekPath(): string {
   try {
     const stored: unknown = JSON.parse(window.localStorage.getItem('cadencia-minha-pessoa') ?? 'null');
-    if (typeof stored === 'string' && stored) return `/pessoas/${encodeURIComponent(stored)}?tab=semana`;
+    if (typeof stored === 'string' && stored) return `/people/${encodeURIComponent(stored)}?tab=week`;
   } catch {
     // Unreadable storage: the picker is the honest answer.
   }
-  return '/pessoas?tab=minha-semana';
+  return '/people?tab=my-week';
 }
 
 /** Every destination the command palette offers as a page: the navigation itself, then the screens beside it. */
@@ -63,8 +63,8 @@ export function palettePages(): { label: string; path: string }[] {
   return [
     ...nav().flatMap((group) => group.items.map((item) => ({ label: item.label, path: item.to }))),
     { label: w.myWeek, path: myWeekPath() },
-    { label: w.dataHygiene, path: '/status?tab=saude' },
-    { label: w.notifications, path: '/configuracao?tab=notificacoes' },
-    { label: w.gettingStarted, path: '/inicio' },
+    { label: w.dataHygiene, path: '/status?tab=health' },
+    { label: w.notifications, path: '/settings?tab=notifications' },
+    { label: w.gettingStarted, path: '/getting-started' },
   ];
 }

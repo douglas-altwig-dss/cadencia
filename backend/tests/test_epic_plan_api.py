@@ -41,11 +41,11 @@ def ok(response):
 
 
 def view(client):
-    return ok(client.get("/api/epics/ANL-1/plano"))
+    return ok(client.get("/api/epics/ANL-1/plan"))
 
 
 def role_id(client, name):
-    return next(r["id"] for r in ok(client.get("/api/papeis"))["items"] if r["nome"] == name)
+    return next(r["id"] for r in ok(client.get("/api/roles"))["items"] if r["nome"] == name)
 
 
 def test_the_page_reads_the_epic_from_jira_and_its_numbers_close(client):
@@ -70,7 +70,7 @@ def test_the_page_reads_the_epic_from_jira_and_its_numbers_close(client):
 def test_planning_contract_and_the_plan_becomes_the_latest(client):
     selection = view(client)["selecao"]
     body = {"epico": "ANL-1", "algoritmo": "cpsat", "membros_ids": selection, "limite_tempo_s": 10}
-    result = ok(client.post("/api/planejamento", json=body))
+    result = ok(client.post("/api/planning", json=body))
     assert {"status", "gap", "makespan_dias", "alocacoes"} <= set(result)
     assert result["status"] == "otimo" and result["gap"] == 0 and result["violacoes"] == []
     allocation = result["alocacoes"][0]
@@ -80,7 +80,7 @@ def test_planning_contract_and_the_plan_becomes_the_latest(client):
     # Deselecting somebody changes the inputs: the stored plan is stale and the greedy answers.
     ok(
         client.put(
-            "/api/epics/ANL-1/plano/selecao",
+            "/api/epics/ANL-1/plan/selection",
             json={"membros_ids": [m for m in selection if m != "demo-bruno"]},
         )
     )
@@ -107,9 +107,7 @@ def test_every_result_is_validated_even_a_solvers(client, monkeypatch):
     )
     selection = view(client)["selecao"]
     result = ok(
-        client.post(
-            "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "cpsat", "membros_ids": selection}
-        )
+        client.post("/api/planning", json={"epico": "ANL-1", "algoritmo": "cpsat", "membros_ids": selection})
     )
     assert result["status"] == "invalido" and result["violacoes"]
     assert view(client)["plano"]["origem"] == "automatico"  # an invalid plan is never kept
@@ -125,14 +123,12 @@ def test_without_a_solver_the_exact_options_fail_clearly_and_greedy_still_works(
         )
     selection = view(client)["selecao"]
     response = client.post(
-        "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "milp", "membros_ids": selection}
+        "/api/planning", json={"epico": "ANL-1", "algoritmo": "milp", "membros_ids": selection}
     )
     assert response.status_code == 503
     assert response.json()["detail"]["cause"] == "solver indisponível"
     greedy = ok(
-        client.post(
-            "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "guloso", "membros_ids": selection}
-        )
+        client.post("/api/planning", json={"epico": "ANL-1", "algoritmo": "guloso", "membros_ids": selection})
     )
     assert greedy["status"] == HEURISTIC and greedy["violacoes"] == []
 
@@ -140,14 +136,14 @@ def test_without_a_solver_the_exact_options_fail_clearly_and_greedy_still_works(
 def test_a_registered_strategy_reaches_the_picker_without_touching_the_views(client, monkeypatch):
     extra = strategies.Strategy("teste", "Estratégia de teste", "Só para o teste.", strategies.GREEDY.run)
     monkeypatch.setitem(strategies.STRATEGIES, "teste", extra)
-    items = ok(client.get("/api/planejamento/algoritmos"))["items"]
+    items = ok(client.get("/api/planning/algorithms"))["items"]
     assert [i["id"] for i in items] == ["guloso", "milp", "cpsat", "teste"]
     assert next(i for i in items if i["id"] == "guloso")["padrao"]
     selection = view(client)["selecao"]
     assert (
         ok(
             client.post(
-                "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "teste", "membros_ids": selection}
+                "/api/planning", json={"epico": "ANL-1", "algoritmo": "teste", "membros_ids": selection}
             )
         )["violacoes"]
         == []
@@ -157,14 +153,12 @@ def test_a_registered_strategy_reaches_the_picker_without_touching_the_views(cli
 def test_bad_planning_requests_are_explained(client):
     selection = view(client)["selecao"]
     unknown = client.post(
-        "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "magia", "membros_ids": selection}
+        "/api/planning", json={"epico": "ANL-1", "algoritmo": "magia", "membros_ids": selection}
     )
     assert unknown.status_code == 400 and "Algoritmo desconhecido" in unknown.json()["detail"]["message"]
-    nobody = client.post(
-        "/api/planejamento", json={"epico": "ANL-1", "algoritmo": "guloso", "membros_ids": []}
-    )
+    nobody = client.post("/api/planning", json={"epico": "ANL-1", "algoritmo": "guloso", "membros_ids": []})
     assert nobody.status_code == 400 and "Nenhum membro selecionado" in nobody.json()["detail"]["message"]
-    assert client.get("/api/epics/NADA-1/plano").status_code == 404
+    assert client.get("/api/epics/NADA-1/plan").status_code == 404
 
 
 def test_a_role_left_without_people_names_the_subtasks_it_blocks(client):
@@ -172,7 +166,8 @@ def test_a_role_left_without_people_names_the_subtasks_it_blocks(client):
     selection = view(client)["selecao"]
     ok(
         client.put(
-            "/api/epics/ANL-1/plano/selecao", json={"membros_ids": [m for m in selection if m != "demo-iris"]}
+            "/api/epics/ANL-1/plan/selection",
+            json={"membros_ids": [m for m in selection if m != "demo-iris"]},
         )
     )
     page = view(client)
@@ -186,26 +181,26 @@ def test_a_role_left_without_people_names_the_subtasks_it_blocks(client):
 def test_roles_crud_refuses_deleting_a_role_in_use(client):
     created = ok(
         client.post(
-            "/api/papeis", json={"nome": "QA", "descricao": "Testa.", "cor": "#123abc", "rotulos": ["qa"]}
+            "/api/roles", json={"nome": "QA", "descricao": "Testa.", "cor": "#123abc", "rotulos": ["qa"]}
         )
     )
-    assert client.post("/api/papeis", json={"nome": "qa", "cor": "#123abc"}).status_code == 400
-    assert client.post("/api/papeis", json={"nome": "Outro", "cor": "azul"}).status_code == 400
+    assert client.post("/api/roles", json={"nome": "qa", "cor": "#123abc"}).status_code == 400
+    assert client.post("/api/roles", json={"nome": "Outro", "cor": "azul"}).status_code == 400
     renamed = ok(
-        client.put(f"/api/papeis/{created['id']}", json={"nome": "Qualidade", "cor": "#123abc", "ordem": 9})
+        client.put(f"/api/roles/{created['id']}", json={"nome": "Qualidade", "cor": "#123abc", "ordem": 9})
     )
     assert renamed["nome"] == "Qualidade" and renamed["ordem"] == 9
-    assert client.delete(f"/api/papeis/{created['id']}").status_code == 204
+    assert client.delete(f"/api/roles/{created['id']}").status_code == 204
 
     backend = role_id(client, "Backend")
-    refused = client.delete(f"/api/papeis/{backend}")
+    refused = client.delete(f"/api/roles/{backend}")
     assert refused.status_code == 400
     message = refused.json()["detail"]["message"]
     assert "Bruno Lima" in message and "ANL-" in message
 
 
 def test_members_get_roles_with_seniority_and_everything_follows(client):
-    members = ok(client.get("/api/membros"))
+    members = ok(client.get("/api/members"))
     assert [m["nome"] for m in members["items"]] == sorted(
         (m["nome"] for m in members["items"]), key=str.casefold
     )
@@ -213,7 +208,7 @@ def test_members_get_roles_with_seniority_and_everything_follows(client):
     frontend = role_id(client, "Frontend")
     saved = ok(
         client.put(
-            "/api/membros/demo-bruno",
+            "/api/members/demo-bruno",
             json={
                 "ativo": True,
                 "papeis": [
@@ -226,31 +221,31 @@ def test_members_get_roles_with_seniority_and_everything_follows(client):
     assert saved["flutuante"] and saved["papeis"][1]["senioridade_rotulo"] == "Júnior"
     assert (
         client.put(
-            "/api/membros/demo-bruno", json={"papeis": [{"papel_id": frontend, "senioridade": "mestre"}]}
+            "/api/members/demo-bruno", json={"papeis": [{"papel_id": frontend, "senioridade": "mestre"}]}
         ).status_code
         == 400
     )
-    assert client.put("/api/membros/ninguem", json={"papeis": []}).status_code == 404
+    assert client.put("/api/members/ninguem", json={"papeis": []}).status_code == 404
     page = view(client)
     assert "demo-bruno" in page["capacidade"]["flutuantes"]
     card = next(c for c in page["capacidade"]["por_papel"] if c["papel_id"] == frontend)
     assert card["potencial"] == 60
     # An inactive member leaves the selection and the plan.
-    ok(client.put("/api/membros/demo-iris", json={"ativo": False, "papeis": [{"papel_id": frontend}]}))
+    ok(client.put("/api/members/demo-iris", json={"ativo": False, "papeis": [{"papel_id": frontend}]}))
     assert "demo-iris" not in view(client)["selecao"]
 
 
 def test_a_role_description_belongs_to_the_role_and_editing_it_keeps_every_member(client):
     """What the person's page does (item 4): the description is the role's, shared by everyone who
     has it, and changing it — or taking someone out and back in — never touches anyone else's roles."""
-    backend = next(r for r in ok(client.get("/api/papeis"))["items"] if r["nome"] == "Backend")
+    backend = next(r for r in ok(client.get("/api/roles"))["items"] if r["nome"] == "Backend")
     holders = sorted(backend["membros"])
     assert len(holders) > 1
-    before = {m["id"]: m["papeis"] for m in ok(client.get("/api/membros"))["items"]}
+    before = {m["id"]: m["papeis"] for m in ok(client.get("/api/members"))["items"]}
 
     edited = ok(
         client.put(
-            f"/api/papeis/{backend['id']}",
+            f"/api/roles/{backend['id']}",
             json={
                 "nome": backend["nome"],
                 "descricao": "Serviços e APIs.",
@@ -261,15 +256,15 @@ def test_a_role_description_belongs_to_the_role_and_editing_it_keeps_every_membe
         )
     )
     assert edited["descricao"] == "Serviços e APIs."
-    again = next(r for r in ok(client.get("/api/papeis"))["items"] if r["id"] == backend["id"])
+    again = next(r for r in ok(client.get("/api/roles"))["items"] if r["id"] == backend["id"])
     assert sorted(again["membros"]) == holders and again["rotulos"] == backend["rotulos"]
-    assert {m["id"]: m["papeis"] for m in ok(client.get("/api/membros"))["items"]} == before
+    assert {m["id"]: m["papeis"] for m in ok(client.get("/api/members"))["items"]} == before
 
     # Out of the team and back: the person shows up as not enrolled, then as enrolled again.
-    assert client.delete("/api/membros/demo-bruno").status_code == 204
-    assert "demo-bruno" in [p["id"] for p in ok(client.get("/api/membros"))["pessoas"]]
-    ok(client.put("/api/membros/demo-bruno", json={"ativo": True, "papeis": [{"papel_id": backend["id"]}]}))
-    after = {m["id"]: m["papeis"] for m in ok(client.get("/api/membros"))["items"]}
+    assert client.delete("/api/members/demo-bruno").status_code == 204
+    assert "demo-bruno" in [p["id"] for p in ok(client.get("/api/members"))["pessoas"]]
+    ok(client.put("/api/members/demo-bruno", json={"ativo": True, "papeis": [{"papel_id": backend["id"]}]}))
+    after = {m["id"]: m["papeis"] for m in ok(client.get("/api/members"))["items"]}
     assert set(after) == set(before)
     assert {k: v for k, v in after.items() if k != "demo-bruno"} == {
         k: v for k, v in before.items() if k != "demo-bruno"
@@ -278,14 +273,14 @@ def test_a_role_description_belongs_to_the_role_and_editing_it_keeps_every_membe
 
 def test_parameters_change_every_view(client):
     before = view(client)
-    params = ok(client.put("/api/planejamento/parametros", json={"jornada_h": 8, "overhead_jira_h": 2}))
+    params = ok(client.put("/api/planning/parameters", json={"jornada_h": 8, "overhead_jira_h": 2}))
     assert params["jornada_h"] == 8 and params["horas_semana"] == 40
     after = view(client)
     assert after["capacidade"]["real"] == 9 * 40
     assert after["horas"]["jira"] == 2 * before["horas"]["jira_subtarefas"]
     assert after["base"]["duracao"]["total_dias"] < before["base"]["duracao"]["total_dias"]
-    assert client.put("/api/planejamento/parametros", json={"jornada_h": 6.2}).status_code == 400
-    assert client.put("/api/planejamento/parametros", json={"inventado": 1}).status_code == 400
+    assert client.put("/api/planning/parameters", json={"jornada_h": 6.2}).status_code == 400
+    assert client.put("/api/planning/parameters", json={"inventado": 1}).status_code == 400
 
 
 def test_a_dependency_cycle_blocks_every_schedule_and_names_the_subtasks(client, sessions):
@@ -320,7 +315,7 @@ def test_a_subtask_role_chosen_by_hand_wins_and_can_be_cleared(client):
     page = view(client)
     subtask = next(s for s in page["subtarefas"] if s["origem_papel"] == "rotulo")
     backend, frontend = role_id(client, "Backend"), role_id(client, "Frontend")
-    ok(client.put(f"/api/subtarefas/{subtask['id']}/papeis", json={"papeis": [frontend, backend]}))
+    ok(client.put(f"/api/subtasks/{subtask['id']}/roles", json={"papeis": [frontend, backend]}))
     changed = next(s for s in view(client)["subtarefas"] if s["id"] == subtask["id"])
     assert (
         changed["origem_papel"] == "manual"
@@ -328,15 +323,13 @@ def test_a_subtask_role_chosen_by_hand_wins_and_can_be_cleared(client):
         and changed["composta"]
     )
     # A role chosen by hand counts as "in use".
-    refused = client.delete(f"/api/papeis/{frontend}")
+    refused = client.delete(f"/api/roles/{frontend}")
     assert refused.status_code == 400 and subtask["id"] in refused.json()["detail"]["message"]
-    ok(client.put(f"/api/subtarefas/{subtask['id']}/papeis", json={"papeis": []}))
+    ok(client.put(f"/api/subtasks/{subtask['id']}/roles", json={"papeis": []}))
     back = next(s for s in view(client)["subtarefas"] if s["id"] == subtask["id"])
     assert back["origem_papel"] == "rotulo" and back["papeis"] == subtask["papeis"]
-    assert (
-        client.put(f"/api/subtarefas/{subtask['id']}/papeis", json={"papeis": [1, 2, 3]}).status_code == 400
-    )
-    assert client.put("/api/subtarefas/ANL-2/papeis", json={"papeis": [backend]}).status_code == 404  # a task
+    assert client.put(f"/api/subtasks/{subtask['id']}/roles", json={"papeis": [1, 2, 3]}).status_code == 400
+    assert client.put("/api/subtasks/ANL-2/roles", json={"papeis": [backend]}).status_code == 404  # a task
 
 
 def test_the_diagnosis_says_what_is_missing_and_the_hours_source_switches(client):
@@ -346,12 +339,12 @@ def test_the_diagnosis_says_what_is_missing_and_the_hours_source_switches(client
     assert diagnosis["sem_papel"] == [] and diagnosis["membros_com_papel"] == 9
     assert sum(diagnosis["papel_por_origem"].values()) == 37
     # The demo keeps no hours in the estimate field: switching empties every subtask, loudly.
-    params = ok(client.put("/api/planejamento/parametros", json={"fonte_horas": "campo_estimativa"}))
+    params = ok(client.put("/api/planning/parameters", json={"fonte_horas": "campo_estimativa"}))
     assert params["fonte_horas"] == "campo_estimativa"
     page = view(client)
     [missing] = [p for p in page["problemas"] if p["codigo"] == "sem_estimativa"]
     assert len(missing["subtarefas"]) == 37 and page["horas"]["planejamento"] == 0
-    assert client.put("/api/planejamento/parametros", json={"fonte_horas": "pontos"}).status_code == 400
+    assert client.put("/api/planning/parameters", json={"fonte_horas": "pontos"}).status_code == 400
 
 
 def test_migration_0011_adds_the_subtask_roles(tmp_path):
@@ -369,8 +362,8 @@ def test_migration_0011_adds_the_subtask_roles(tmp_path):
 
 
 def test_the_plan_page_speaks_english_and_german(client):
-    english = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "en-US"}))
-    german = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "de-DE"}))
+    english = ok(client.get("/api/epics/ANL-1/plan", headers={"Accept-Language": "en-US"}))
+    german = ok(client.get("/api/epics/ANL-1/plan", headers={"Accept-Language": "de-DE"}))
     portuguese = view(client)
     # Same plan, same numbers: only the words change.
     assert english["plano"]["alocacoes"] == german["plano"]["alocacoes"] == portuguese["plano"]["alocacoes"]
@@ -396,9 +389,9 @@ def test_the_plan_page_speaks_english_and_german(client):
 
 
 def test_plan_problems_and_errors_speak_the_request_language(client):
-    ok(client.put("/api/planejamento/parametros", json={"fonte_horas": "campo_estimativa"}))
-    english = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "en-US"}))
-    german = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "de-DE"}))
+    ok(client.put("/api/planning/parameters", json={"fonte_horas": "campo_estimativa"}))
+    english = ok(client.get("/api/epics/ANL-1/plan", headers={"Accept-Language": "en-US"}))
+    german = ok(client.get("/api/epics/ANL-1/plan", headers={"Accept-Language": "de-DE"}))
     [en] = [p for p in english["problemas"] if p["codigo"] == "sem_estimativa"]
     [de] = [p for p in german["problemas"] if p["codigo"] == "sem_estimativa"]
     assert en["mensagem"].startswith("37 of 37 subtasks without hours in the Jira field “estimate field”")
@@ -406,7 +399,7 @@ def test_plan_problems_and_errors_speak_the_request_language(client):
     assert en["mensagem"].endswith(" and 25 more.") and de["mensagem"].endswith(" und 25 weitere.")
 
     unknown = client.post(
-        "/api/planejamento",
+        "/api/planning",
         json={"epico": "ANL-1", "algoritmo": "magia", "membros_ids": []},
         headers={"Accept-Language": "de-DE"},
     )
@@ -414,14 +407,14 @@ def test_plan_problems_and_errors_speak_the_request_language(client):
     assert unknown.json()["detail"]["message"] == (
         "Unbekannter Algorithmus: magia. Optionen: guloso, milp, cpsat."
     )
-    missing = client.get("/api/epics/NADA-1/plano", headers={"Accept-Language": "en-US"})
+    missing = client.get("/api/epics/NADA-1/plan", headers={"Accept-Language": "en-US"})
     assert missing.status_code == 404
     assert missing.json()["detail"]["message"] == "The epic NADA-1 was not collected from Jira."
     bad = client.put(
-        "/api/planejamento/parametros", json={"jornada_h": 6.2}, headers={"Accept-Language": "en-US"}
+        "/api/planning/parameters", json={"jornada_h": 6.2}, headers={"Accept-Language": "en-US"}
     )
     assert bad.json()["detail"]["message"] == "The workday must be a multiple of the scheduling granularity."
-    algorithms = ok(client.get("/api/planejamento/algoritmos", headers={"Accept-Language": "de-DE"}))
+    algorithms = ok(client.get("/api/planning/algorithms", headers={"Accept-Language": "de-DE"}))
     assert [a["nome"] for a in algorithms["items"]] == [
         "List Scheduling (Greedy-Heuristik)",
         "Exaktes MS-RCPSP (MILP)",
@@ -439,7 +432,7 @@ def test_the_solver_503_and_the_role_in_use_speak_the_request_language(client, m
     )
     selection = view(client)["selecao"]
     response = client.post(
-        "/api/planejamento",
+        "/api/planning",
         json={"epico": "ANL-1", "algoritmo": "cpsat", "membros_ids": selection},
         headers={"Accept-Language": "en-US"},
     )
@@ -449,7 +442,7 @@ def test_the_solver_503_and_the_role_in_use_speak_the_request_language(client, m
         "message": "OR-Tools (CP-SAT) is not installed on the backend.",
         "action": "Install the backend dependencies (ortools) or use the greedy algorithm.",
     }
-    refused = client.delete(f"/api/papeis/{role_id(client, 'Backend')}", headers={"Accept-Language": "de-DE"})
+    refused = client.delete(f"/api/roles/{role_id(client, 'Backend')}", headers={"Accept-Language": "de-DE"})
     assert refused.status_code == 400
     message = refused.json()["detail"]["message"]
     assert message.startswith("Die Rolle Backend wird verwendet: zugewiesen an ")

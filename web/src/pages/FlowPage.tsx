@@ -152,7 +152,7 @@ export function FlowPage() {
                     <Table.Tr key={p.account_id ?? 'none'}>
                       <Table.Td>
                         {p.account_id ? (
-                          <Anchor component={Link} to={carry(`/pessoas/${encodeURIComponent(p.account_id)}`)}>
+                          <Anchor component={Link} to={carry(`/people/${encodeURIComponent(p.account_id)}`)}>
                             {p.name}
                           </Anchor>
                         ) : (

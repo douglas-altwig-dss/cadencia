@@ -32,6 +32,7 @@ import { PreferencesMenu, SaveViewButton, SearchButton, SearchIconButton } from 
 import { ShortcutsHelp } from './components/ShortcutsHelp';
 import { FetchBar } from './components/FetchBar';
 import { useT } from './i18n';
+import { normalizeLegacyUrl } from './lib/legacyRoutes';
 import { nav } from './lib/navigation';
 import { useApplyPreferences } from './lib/preferences';
 import { useScrollHints } from './lib/scrollHints';
@@ -132,13 +133,17 @@ export function App() {
   const location = useLocation();
   useApplyPreferences();
   useScrollHints();
+  // Old Portuguese URLs (bookmarks, saved views, e-mails, share links) land on the English ones,
+  // before any branch is chosen so the public and audience windows are covered too.
+  const legacy = normalizeLegacyUrl(location.pathname, location.search);
+  if (legacy) return <Navigate to={legacy + location.hash} replace />;
   // RF-100: the projector window is the slide and nothing else — no menu, no header.
-  if (location.pathname.startsWith('/apresentar/plateia')) return <AudienceView />;
+  if (location.pathname.startsWith('/present/audience')) return <AudienceView />;
   // #14: a read-only share link — no shell, no sign-in, one deck.
-  if (location.pathname.startsWith('/compartilhado/')) {
+  if (location.pathname.startsWith('/shared/')) {
     return (
       <Routes>
-        <Route path="/compartilhado/:token" element={<SharedDeckPage />} />
+        <Route path="/shared/:token" element={<SharedDeckPage />} />
       </Routes>
     );
   }
@@ -156,7 +161,10 @@ function PinnedViews({ rail }: { rail: boolean }) {
     <>
       {!rail && <div className="nav-section">{t.shell.app.savedViews}</div>}
       {pinned.map((view) => {
-        const active = location.pathname + location.search === view.url;
+        // A view saved before the English URLs is compared as the URL it now redirects to.
+        const [viewPath, viewQuery = ''] = view.url.split('?');
+        const target = normalizeLegacyUrl(viewPath, viewQuery ? `?${viewQuery}` : '') ?? view.url;
+        const active = location.pathname + location.search === target;
         const link = (
           <NavLink
             key={view.id}
@@ -295,24 +303,24 @@ function Shell() {
           )}
         </AppShell.Navbar>
         <AppShell.Main id="conteudo">
-          <div className={location.pathname.startsWith('/apresentacao') ? 'page is-wide' : 'page'}>
+          <div className={location.pathname.startsWith('/presentation') ? 'page is-wide' : 'page'}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/inicio" element={<WizardPage />} />
-              {/* Now a tab of Pessoas — kept as a redirect so an old bookmark or link still lands. */}
-              <Route path="/minha-semana" element={<Navigate to="/pessoas?tab=minha-semana" replace />} />
+              <Route path="/getting-started" element={<WizardPage />} />
+              {/* Now a tab of People — kept as a redirect so an old bookmark or link still lands. */}
+              <Route path="/my-week" element={<Navigate to="/people?tab=my-week" replace />} />
               <Route path="/boards/:boardId" element={<BoardPage />} />
               <Route path="/boards/:boardId/sprints/:sprintId" element={<SprintPage />} />
               <Route path="/boards/:boardId/epics/:epicKey" element={<EpicPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
-              <Route path="/fluxo" element={<FlowPage />} />
-              <Route path="/pessoas" element={<PeoplePage />} />
-              <Route path="/pessoas/:accountId" element={<PersonPage />} />
-              <Route path="/apresentacao" element={<DeckPage />} />
-              <Route path="/timeline-foco" element={<TimelineFocusPage />} />
+              <Route path="/flow" element={<FlowPage />} />
+              <Route path="/people" element={<PeoplePage />} />
+              <Route path="/people/:accountId" element={<PersonPage />} />
+              <Route path="/presentation" element={<DeckPage />} />
+              <Route path="/focus-timeline" element={<TimelineFocusPage />} />
               <Route path="/status" element={<StatusPage />} />
-              <Route path="/configuracao" element={<SettingsPage />} />
-              <Route path="/configuracao/assistente" element={<ConfigWizardPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/wizard" element={<ConfigWizardPage />} />
               <Route path="*" element={<Empty title={t.shell.app.notFoundTitle}>{t.shell.app.notFoundBody}</Empty>} />
             </Routes>
           </div>
