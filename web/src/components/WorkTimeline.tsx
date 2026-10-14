@@ -32,7 +32,7 @@ import {
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 
-import type { Situation, SprintTimelineNode, SprintTimelineView, TimelineState } from '../api/types';
+import type { Situation, SprintTimelineNode, SprintTimelineView, TimelineCounts, TimelineState } from '../api/types';
 import { type Messages, useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { fmtDate } from '../lib/format';
@@ -59,7 +59,7 @@ import {
   summaryOf,
   ticksOf,
   weekends,
-} from '../lib/sprintTimeline';
+} from '../lib/timeline';
 import { InfoTip } from './common';
 import { EvidenceList, RiskBadge, SITUATIONS } from './risk';
 
@@ -96,15 +96,45 @@ const toggled = <T,>(set: ReadonlySet<T>, value: T): Set<T> => {
   return next;
 };
 
-/**
- * The sprint on a time axis, in two readings of the same items: by hierarchy (the work tree, an epic's
- * bar spanning what is under it) or by person (one lane each). Interaction is layered on top and never
- * the only way to a fact: the summary chips filter, the bars and rows open their details, the keyboard
- * walks the rows, and the cursor reads the date and how much was in progress that day.
- */
+/** What a period timeline says instead of the sprint's own words. */
+export interface PeriodText {
+  summaryTitle: string;
+  /** How the summary is counted, behind its "i". */
+  summaryHelp: string;
+  none: string;
+  listAria: string;
+  help: string;
+}
+
+/** The sprint's timeline: the reference every other timeline follows. */
 export function SprintTimeline({ view }: { view: SprintTimelineView }) {
+  return <WorkTimeline window={view.window} nodes={view.nodes} counts={view.counts} />;
+}
+
+/**
+ * Work on a time axis. For a sprint (no `period`) there are two readings of the same items: by
+ * hierarchy (the work tree, an epic's bar spanning what is under it) or by person (one lane each), plus
+ * the sprint's own marks — its end, how far into it today is, what came in after the start. For a
+ * `period` (a person's last weeks) it is the hierarchy alone, over the window, without those marks.
+ * Interaction is the same for both and never the only way to a fact: the summary chips filter, the
+ * bars and rows open their details, the keyboard walks the rows, and the cursor reads the date and
+ * how much was in progress that day.
+ */
+export function WorkTimeline({
+  window,
+  nodes,
+  counts,
+  period,
+}: {
+  window: SprintTimelineView['window'];
+  nodes: SprintTimelineNode[];
+  counts: TimelineCounts;
+  period?: PeriodText;
+}) {
   const { carry } = useFilters();
   const m = useT().tracking.timeline;
+  const sprint = period === undefined;
+  const view = { window, nodes, counts };
   const [mode, setMode] = useState<View>('hierarquia');
   const [zoom, setZoom] = useState(1);
   const [query, setQuery] = useState('');
@@ -155,7 +185,6 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
   const sprintEnd = position(new Date(view.window.end).getTime(), axis);
   const beyondEnd = new Date(view.window.end).getTime() < axis.end;
   const filtered = query.trim() !== '' || state !== 'todos' || atRisk || situation !== null;
-  const { counts } = view;
   const empty = mode === 'hierarquia' ? rows.length === 0 : lanes.length === 0;
   const doneItems = summary.states.concluido;
   const detail = detailKey ? byKey.get(detailKey) ?? null : null;
@@ -214,9 +243,9 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
         <Group justify="space-between" align="baseline" mb="xs" wrap="wrap" gap="xs">
           <Group gap={6} wrap="nowrap">
             <Text fw={600} size="sm">
-              {m.summaryTitle}
+              {period?.summaryTitle ?? m.summaryTitle}
             </Text>
-            <InfoTip label={HELP['timeline:summary']} about={m.summaryTitle} />
+            <InfoTip label={period?.summaryHelp ?? HELP['timeline:summary']} about={period?.summaryTitle ?? m.summaryTitle} />
           </Group>
           <Text size="sm" c="dimmed">
             {m.summaryDone(doneItems, summary.items)}
@@ -266,27 +295,31 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
             })}
           </Group>
         </Group>
-        <Group gap="xs" mt="md" wrap="nowrap" align="center">
-          <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-            {m.day(day.day, day.total)}
-          </Text>
-          <Progress value={day.share} size="xs" radius="sm" aria-label={m.dayAria(day.day, day.total)} style={{ flex: 1 }} />
-          <InfoTip label={HELP['timeline:time']} about={m.sprintTime} />
-        </Group>
+        {sprint && (
+          <Group gap="xs" mt="md" wrap="nowrap" align="center">
+            <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+              {m.day(day.day, day.total)}
+            </Text>
+            <Progress value={day.share} size="xs" radius="sm" aria-label={m.dayAria(day.day, day.total)} style={{ flex: 1 }} />
+            <InfoTip label={HELP['timeline:time']} about={m.sprintTime} />
+          </Group>
+        )}
       </Paper>
 
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="sm">
         <Group align="flex-end" wrap="wrap" gap="sm">
-          <SegmentedControl
-            aria-label={m.groupBy}
-            value={mode}
-            onChange={(value) => setMode(value as View)}
-            size="xs"
-            data={[
-              { value: 'hierarquia', label: m.byHierarchy },
-              { value: 'pessoa', label: m.byPerson },
-            ]}
-          />
+          {sprint && (
+            <SegmentedControl
+              aria-label={m.groupBy}
+              value={mode}
+              onChange={(value) => setMode(value as View)}
+              size="xs"
+              data={[
+                { value: 'hierarquia', label: m.byHierarchy },
+                { value: 'pessoa', label: m.byPerson },
+              ]}
+            />
+          )}
           <TextInput
             aria-label={m.search}
             placeholder={m.searchPlaceholder}
@@ -373,13 +406,17 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
             {m.counts(counts.epicos, counts.itens, counts.subtarefas)}
           </Text>
           <Text size="xs" c="dimmed" component="span">
-            <span className="tl-end-mark" aria-hidden /> {m.sprintEnd}
-            {view.window.today && m.todayOn(fmtDate(view.window.today))}
+            {sprint && (
+              <>
+                <span className="tl-end-mark" aria-hidden /> {m.sprintEnd}
+              </>
+            )}
+            {view.window.today && (sprint ? m.todayOn(fmtDate(view.window.today)) : m.todayIs(fmtDate(view.window.today)))}
           </Text>
         </Group>
         {empty ? (
           <Text size="sm" c="dimmed">
-            {filtered ? m.noneFiltered : m.none}
+            {filtered ? m.noneFiltered : (period?.none ?? m.none)}
           </Text>
         ) : (
           <div ref={scrollRef} className={`tl-scroll${zoom > 1 ? ' is-wide' : ''}`}>
@@ -387,7 +424,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
               ref={listRef}
               className="tl tl-sprint"
               role="list"
-              aria-label={mode === 'pessoa' ? m.listByPerson : m.listOverTime}
+              aria-label={mode === 'pessoa' ? m.listByPerson : (period?.listAria ?? m.listOverTime)}
               onMouseMove={onMove}
               onMouseLeave={() => setCursor(null)}
               onKeyDown={onListKey}
@@ -422,10 +459,12 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                       today={today}
                       sprintEnd={sprintEnd}
                       beyondEnd={beyondEnd}
+                      sprint={sprint}
                       open={detailKey === row.node.key}
                       onToggle={toggle}
                       onOpen={openDetail}
                       onLabelClick={onLabelClick}
+                      showOwner={sprint}
                     />
                   ))
                 : lanes.map((lane) => (
@@ -440,6 +479,7 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
                       today={today}
                       sprintEnd={sprintEnd}
                       beyondEnd={beyondEnd}
+                      sprint={sprint}
                       detailKey={detailKey}
                       onOpen={openDetail}
                       onLabelClick={onLabelClick}
@@ -451,7 +491,13 @@ export function SprintTimeline({ view }: { view: SprintTimelineView }) {
       </Paper>
 
       <Text size="xs" c="dimmed" component="div">
-        {m.helpBefore} <IconPlus size={11} style={{ verticalAlign: '-1px' }} aria-hidden /> {m.helpAfter}
+        {period ? (
+          period.help
+        ) : (
+          <>
+            {m.helpBefore} <IconPlus size={11} style={{ verticalAlign: '-1px' }} aria-hidden /> {m.helpAfter}
+          </>
+        )}
       </Text>
 
       <Drawer
@@ -571,6 +617,8 @@ interface TrackProps {
   today: number;
   sprintEnd: number;
   beyondEnd: boolean;
+  /** A sprint draws its end and what went past it; a period has neither. */
+  sprint: boolean;
 }
 
 function LaneBlock({
@@ -609,8 +657,8 @@ function LaneBlock({
             <span key={`w${i}`} className="tl-weekend" style={{ left: `${w.left}%`, width: `${w.width}%` }} aria-hidden />
           ))}
           <span className="tl-todayline" style={{ left: `${track.today}%` }} aria-hidden />
-          {track.beyondEnd && <span className="tl-beyond" style={{ left: `${track.sprintEnd}%` }} aria-hidden />}
-          <span className="tl-sprint-end" style={{ left: `${track.sprintEnd}%` }} aria-hidden />
+          {track.sprint && track.beyondEnd && <span className="tl-beyond" style={{ left: `${track.sprintEnd}%` }} aria-hidden />}
+          {track.sprint && <span className="tl-sprint-end" style={{ left: `${track.sprintEnd}%` }} aria-hidden />}
         </div>
       </div>
       {!folded &&
@@ -640,7 +688,7 @@ interface RowProps extends TrackProps {
 }
 
 /** One row of either reading: its label on the left, its bar on the axis. Focusable, and clickable anywhere but its links. */
-function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onToggle, onOpen, onLabelClick, showOwner = true }: RowProps) {
+function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, sprint, open, onToggle, onOpen, onLabelClick, showOwner = true }: RowProps) {
   const { node, depth, hasChildren, collapsed: folded } = row;
   const m = useT().tracking.timeline;
   const kind = kindOf(node, m);
@@ -715,8 +763,8 @@ function ItemRow({ row, axis, off, ticks, today, sprintEnd, beyondEnd, open, onT
         {ticks.map((tick) => (
           <span key={tick.at} className="tl-grid" style={{ left: `${position(tick.at, axis)}%` }} aria-hidden />
         ))}
-        {beyondEnd && <span className="tl-beyond" style={{ left: `${sprintEnd}%` }} aria-hidden />}
-        <span className="tl-sprint-end" style={{ left: `${sprintEnd}%` }} aria-hidden />
+        {sprint && beyondEnd && <span className="tl-beyond" style={{ left: `${sprintEnd}%` }} aria-hidden />}
+        {sprint && <span className="tl-sprint-end" style={{ left: `${sprintEnd}%` }} aria-hidden />}
         <span className="tl-todayline" style={{ left: `${today}%` }} aria-hidden />
         {bar ? (
           <span

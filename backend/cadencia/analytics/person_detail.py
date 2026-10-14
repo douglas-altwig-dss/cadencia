@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 from cadencia.analytics.data import BoardData
 from cadencia.analytics.people_overview import CommittedLookup, blocked_days, severity
 from cadencia.analytics.serialize import assessment_dict, iso, issue_brief
+from cadencia.analytics.sprint import group_row, iso_rows, timeline_rows
 from cadencia.domain.calendar import sprint_timeline
 from cadencia.domain.capacity import Absence, Availability, item_cost_hours, sprint_capacity, sprint_dates
 from cadencia.domain.commitment import commitment_report
@@ -99,45 +100,65 @@ def _items(data: BoardData, account_id: str, now: datetime, base_url: str | None
     return out
 
 
-def _timeline(data: BoardData, account_id: str, now: datetime, start: datetime) -> list[dict[str, Any]]:
-    """One bar per item, from the moment it started (first in an in-progress status) to done, or to now."""
+def _worked_on(data: BoardData, account_id: str, now: datetime, start: datetime) -> set[str]:
+    """The person's items (subtasks included) that were in progress at some point of the period:
+    held by them when done, or now, and started — an item never begun has nothing to draw."""
     profile = data.profile
-    bars: list[dict[str, Any]] = []
+    keys: set[str] = set()
     for history in data.trackable():
         done_at = history.done_at(now)
         end = done_at or now
         owner = history.assignee_at(end)
         if owner is None or owner.account_id != account_id or history.status_at(now) is None:
             continue
-        began = (
-            history.first_entry(profile.is_wip)
-            if done_at is not None
-            else history.current_run_start(profile.is_wip, now) or history.first_entry(profile.is_wip)
-        )
-        if began is None or end < start:
+        if history.issue.hierarchy_level >= HierarchyLevel.EPIC or end < start:
             continue
-        state = "concluido"
-        if done_at is None:
-            assessment = data.assess([history], now)[history.issue.key]
-            blocked = any(e.situation is Situation.BLOCKED for e in assessment.evidence)
-            state = (
-                "bloqueado"
-                if blocked
-                else ("andamento" if profile.is_wip(history.status_at(now)) else "aberto")
-            )  # type: ignore[arg-type]
-        bars.append(
-            {
-                "key": history.issue.key,
-                "summary": history.issue.summary,
-                "level": history.issue.hierarchy_level,
-                "board": {"id": data.board.id, "name": data.board.name},
-                "start": iso(max(began, start)),
-                "began": iso(began),
-                "end": iso(end),
-                "state": state,
-            }
-        )
-    return bars
+        if history.first_entry(profile.is_wip) is None and done_at is None:
+            continue
+        keys.add(history.issue.key)
+    return keys
+
+
+def _with_ancestors(data: BoardData, keys: set[str]) -> set[str]:
+    """The items plus the epics (and initiatives) above them, for grouping — and not anybody
+    else's subtasks, which the sprint's own timeline adds."""
+    out = set(keys)
+    frontier = list(keys)
+    while frontier:
+        issue = data.issues.get(frontier.pop())
+        parent = issue.parent_key if issue else None
+        if parent and parent in data.issues and parent not in out:
+            out.add(parent)
+            frontier.append(parent)
+    return out
+
+
+def _timeline(
+    boards: Sequence[BoardData], account_id: str, now: datetime, start: datetime, base_url: str | None
+) -> dict[str, Any]:
+    """The sprint timeline's own shape over the person's last weeks: the same tree of rows (their
+    items under their epics), so the person page draws it with the same component. Someone on more
+    than one board gets one group per board."""
+    per_board: list[tuple[BoardData, list[dict[str, Any]]]] = []
+    counts = {"epicos": 0, "itens": 0, "subtarefas": 0}
+    for data in boards:
+        members = _worked_on(data, account_id, now, start)
+        if not members:
+            continue
+        rows, found = timeline_rows(data, _with_ancestors(data, members), members, now, None, base_url)
+        per_board.append((data, rows))
+        for kind, n in found.items():
+            counts[kind] += n
+    if len(per_board) == 1:
+        nodes = per_board[0][1]
+    else:
+        per_board.sort(key=lambda pair: pair[0].board.name.casefold())
+        nodes = [group_row(f"board:{data.board.id}", data.board.name, rows) for data, rows in per_board]
+    return {
+        "window": {"start": iso(start), "end": iso(now), "today": iso(now)},
+        "counts": {**counts, "total": sum(counts.values())},
+        "nodes": [iso_rows(n) for n in nodes],
+    }
 
 
 def _capacity(
@@ -247,13 +268,11 @@ def person_detail(
 ) -> dict[str, Any]:
     person = Person(account_id, name)
     items: list[dict[str, Any]] = []
-    bars: list[dict[str, Any]] = []
     capacity: list[dict[str, Any]] = []
     start = now - timedelta(weeks=TIMELINE_WEEKS)
     tz = ZoneInfo(boards[0].profile.timezone) if boards else ZoneInfo("UTC")
     for data in boards:
         items.extend(_items(data, account_id, now, base_url))
-        bars.extend(_timeline(data, account_id, now, start))
         capacity.extend(_capacity(data, person, now, absences, availability, committed))
         if any(i["board"]["id"] == data.board.id for i in items):
             tz = ZoneInfo(data.profile.timezone)
@@ -282,7 +301,6 @@ def person_detail(
             entry["finished"] += 1
     blocks = [i for i in items if i["open"] and i["blocked"]]
     blocks.sort(key=lambda i: -(i["blocked_days"] or 0))
-    bars.sort(key=lambda b: (b["began"], b["key"]))
     return {
         "person": {"account_id": account_id, "name": name},
         "indicators": indicators,
@@ -293,6 +311,6 @@ def person_detail(
             key=lambda e: (-e["open"], e["key"]),
         ),
         "blocks": blocks,
-        "timeline": {"start": iso(start), "end": iso(now), "items": bars},
+        "timeline": _timeline(boards, account_id, now, start, base_url),
         "capacity": {"sprints": capacity},
     }

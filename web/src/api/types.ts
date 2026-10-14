@@ -241,10 +241,17 @@ export interface SprintTimelineNode {
   children: SprintTimelineNode[];
 }
 
+export interface TimelineCounts {
+  epicos: number;
+  itens: number;
+  subtarefas: number;
+  total: number;
+}
+
 export interface SprintTimelineView {
   sprint: Sprint;
   window: { start: string; end: string; today: string };
-  counts: { epicos: number; itens: number; subtarefas: number; total: number };
+  counts: TimelineCounts;
   nodes: SprintTimelineNode[];
   freshness: Freshness;
 }
@@ -566,19 +573,6 @@ export interface PersonEpic {
   boards: string[];
 }
 
-export interface TimelineBar {
-  key: string;
-  summary: string;
-  level: number;
-  board: { id: number; name: string };
-  /** Clipped to the timeline's start. */
-  start: string;
-  /** When it really began, even before the window. */
-  began: string;
-  end: string;
-  state: 'concluido' | 'andamento' | 'bloqueado' | 'aberto';
-}
-
 export interface CapacitySprint {
   board: { id: number; name: string };
   sprint: { id: number; name: string; state: string };
@@ -603,7 +597,8 @@ export interface PersonDetail {
   items: PersonItem[];
   epics: PersonEpic[];
   blocks: PersonItem[];
-  timeline: { start: string; end: string; items: TimelineBar[] };
+  /** The sprint timeline's shape over the person's last weeks; one synthetic group per board when there are several. */
+  timeline: { window: { start: string; end: string; today: string }; counts: TimelineCounts; nodes: SprintTimelineNode[] };
   capacity: { sprints: CapacitySprint[] };
 }
 

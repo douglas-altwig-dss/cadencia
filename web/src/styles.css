@@ -420,6 +420,49 @@ body.is-resizing * {
   min-height: 34px;
 }
 
+/* The cursor, as on the sprint timeline: one line over every track at --gantt-cursor, and a label
+   naming the point of the plan. It never takes the pointer, so the bars stay clickable. */
+.gantt-chart {
+  position: relative;
+}
+
+.gantt-chart::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--gantt-cursor, -10px);
+  width: 1px;
+  background: var(--mantine-color-blue-6);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gantt-cursor-label {
+  position: absolute;
+  top: 2px;
+  z-index: 4;
+  transform: translateX(6px);
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  background: var(--mantine-color-body);
+  border: 1px solid var(--border-soft);
+}
+
+.gantt-cursor-label.is-left {
+  transform: translateX(calc(-100% - 6px));
+}
+
+.gantt-bar:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 1px;
+  z-index: 2;
+}
+
 .gantt-label {
   position: sticky;
   left: 0;
@@ -1068,6 +1111,12 @@ body.is-resizing * {
 /* Sprint timeline (RF-111 follow-up): the summary, the by-person lanes, zoom and the sprint's end. */
 .tl-scroll {
   overflow-x: auto;
+}
+
+/* `overflow-x: auto` makes the scroll box the axis's sticky container, so the page header's 60px
+   offset would push the axis below the first row. Inside the box it sticks to the box's own top. */
+.tl-scroll .tl-head {
+  top: 0;
 }
 
 .tl-scroll.is-wide .tl-label {

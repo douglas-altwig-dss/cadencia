@@ -508,6 +508,7 @@ export const tracking: Messages['tracking'] = {
       `${plural(epics, 'épico', 'épicos')} · ${plural(items, 'item', 'itens')} · ${plural(subtasks, 'subtarefa', 'subtarefas')}`,
     sprintEnd: 'fim da sprint',
     todayOn: (date) => ` · hoje: ${date}`,
+    todayIs: (date) => `hoje: ${date}`,
     noneFiltered: 'Nenhum item com esses filtros.',
     none: 'Nenhum item nesta sprint.',
     listByPerson: 'Itens da sprint por pessoa',

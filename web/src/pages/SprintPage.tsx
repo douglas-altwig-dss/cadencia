@@ -11,7 +11,7 @@ import { ChangesPanel } from '../components/ChangesPanel';
 import { ForecastCard } from '../components/ForecastCard';
 import { RiskCountsInline } from '../components/risk';
 import { RiskTable } from '../components/RiskTable';
-import { SprintTimeline } from '../components/SprintTimeline';
+import { SprintTimeline } from '../components/WorkTimeline';
 import { TreeTable } from '../components/TreeTable';
 import { WeeklyWindows } from '../components/WeeklyWindows';
 import { useT } from '../i18n';

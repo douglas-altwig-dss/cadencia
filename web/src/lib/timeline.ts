@@ -2,8 +2,9 @@ import type { Situation, SprintTimelineNode, TimelineState } from '../api/types'
 import { collator, t as t_ } from '../i18n';
 
 /**
- * The sprint timeline as pure functions: which rows to show, and where each bar goes.
- * `components/SprintTimeline.tsx` draws; nothing here knows React.
+ * The work timeline as pure functions: which rows to show, and where each bar goes — for a sprint or
+ * for a period such as a person's last weeks. `components/WorkTimeline.tsx` draws; nothing here knows
+ * React.
  */
 
 const DAY = 86_400_000;

@@ -115,8 +115,11 @@ flowchart TD
       - Monte Carlo forecast: probability of finishing in time, and P50/P85/P95 dates.
     - **Work tree** (`work-tree`): members, their subtasks and ancestors, with done ratio and
       estimate.
-    - **Timeline** (`timeline`): Gantt-style bars per item, states, carried-over and added marks,
-      due-date diamonds, and state/search filters.
+    - **Timeline** (`timeline`), the reference for every timeline: a summary by state and risk
+      whose chips filter, the sprint's day, by hierarchy or by person, search, state and at-risk
+      filters, subtasks, zoom and today, weekends, the sprint's end, a date cursor counting what was
+      in progress, carried-over and added marks, due-date diamonds, and a detail drawer with
+      previous/next and keyboard navigation.
     - **Open items** (`risks`): the sprint's items by situation, with evidence.
     - **What changed** (`changes`): only this sprint's checkpoints. A running sprint compares its
       last checkpoint with now; a past one, its first checkpoint with its last.
@@ -139,7 +142,9 @@ flowchart TD
       - Team and capacity.
       - Estimate and overhead breakdown.
       - Task/subtask pipeline.
-      - Weekly Gantt.
+      - Weekly Gantt: role chips that filter, search, expand/collapse, Fit/Days/Hours, a cursor
+        reading week, day, hour and how many bars run, arrow keys between bars; a bar opens its
+        task.
       - Scheduling with greedy, MILP or CP-SAT.
       - Subtask roles, Jira problems and a readiness checklist.
       - Parameters.
@@ -167,7 +172,10 @@ flowchart TD
       - Signals: overload, blocks, overdue, stalled, due soon.
       - Items in progress, and items finished since Monday.
       - Open work.
-    - **Timeline** (`timeline`): in-progress → done bars, striped when blocked.
+    - **Timeline** (`timeline`): the sprint timeline's component over the last 8 weeks — the
+      person's items under their epics (one group per board when they work on several), with the
+      state summary and chips, search, state and at-risk filters, subtasks, zoom, today, weekends,
+      a date cursor, due marks and a detail drawer with previous/next and keyboard navigation.
     - **Capacity** (`capacity`): per sprint, capacity against committed and delivered hours, plus
       availability and absences.
     - **History** (`history`, 6, 12 or 26 weeks):

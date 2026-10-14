@@ -623,6 +623,8 @@ export const shell: Messages['shell'] = {
     'col:data': 'Quando este board foi coletado com sucesso pela última vez. Aparece um alerta se a última coleta falhou ou se passou de 26 horas.',
 
     'person:load': `Horas abertas ÷ capacidade que resta.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES} Se nenhum item tem estimativa, o número é só um palpite e aparece “sem estimativa”.`,
+    'person:timeline':
+      'Os itens que estavam com a pessoa — quando concluídos, ou agora — e estiveram em andamento em algum momento das últimas 8 semanas, subtarefas incluídas, sob seus épicos (e um grupo por board quando são vários). Concluído, em andamento, bloqueado e não iniciado são o estado de hoje de cada item; bloqueado quer dizer que uma regra de bloqueio disparou (flag, status de bloqueio ou um link “é bloqueado por” aberto). Um item pode estar atrasado e bloqueado ao mesmo tempo, então os chips de risco não somam o total.',
     'person:delivered':
       'Itens concluídos na sprint atual, de quantos foram comprometidos no início. Compromisso e entrega ficam com quem tinha o item no início; itens que entraram depois e já foram concluídos também contam. Sem sprint ativa, conta o que foi concluído na semana.',
     'person:blocks': BLOCK,

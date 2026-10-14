@@ -326,6 +326,17 @@ export const epicPlan = {
     week: (week: number) => `Week ${week}`,
     weekPlanning: (week: number) => `Week ${week} · planning`,
     weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+    groupsAria: 'Show or hide groups',
+    groupChip: (label: string, n: number) => `${label} · ${n}`,
+    summary: (items: number, days: number) => `${plural(items, 'bar', 'bars')} · ${plural(days, 'workday', 'workdays')} of plan`,
+    search: 'Search the schedule',
+    searchPlaceholder: 'Key, title or person',
+    clearFilters: 'Clear filters',
+    expand: 'Expand',
+    collapse: 'Collapse',
+    noneFiltered: 'Nothing in the schedule matches these filters.',
+    cursor: (week: string, day: string, hour: number, n: number) => `${week} · ${day}, hour ${hour} · ${n} running`,
+    help: 'Click a bar to open its task; the arrow keys move between bars (left and right along a row, up and down to the nearest bar of the next row). Hover over the chart to read the week, day and hour and how many bars run then. The chips show or hide a group; the axis is working time only, with no calendar dates.',
   },
   /** `PlanParametersSettings` (Settings → epic plan). */
   settings: {

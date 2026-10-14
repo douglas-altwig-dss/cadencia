@@ -242,7 +242,29 @@ def sprint_timeline_view(
     reference = data.reference_for(sprint, now)
     timeline = sprint_timeline(sprint, data.profile)
     members = {h.issue.key for h in data.sprint_members(sprint.id, reference)}
-    keys = _with_family(data, members)
+    rows, counts = timeline_rows(data, _with_family(data, members), members, reference, sprint, base_url)
+    return {
+        "sprint": sprint_dict(sprint),
+        "window": {"start": iso(timeline.start), "end": iso(timeline.end), "today": iso(reference)},
+        "counts": {**counts, "total": sum(counts.values())},
+        "nodes": [iso_rows(r) for r in rows],
+        "freshness": data.freshness(now),
+    }
+
+
+def timeline_rows(
+    data: BoardData,
+    keys: set[str],
+    members: set[str],
+    reference: datetime,
+    sprint: Sprint | None = None,
+    base_url: str | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """The timeline's tree over ``keys`` (the items and the ancestors they are grouped under), each
+    row with its own bar or, for a container, the span of what is under it. ``members`` are the rows
+    that belong to the view in their own right; ``sprint`` adds the sprint's own marks (carried over,
+    added after the start) and is ``None`` for a period such as a person's last weeks. Datetimes stay
+    datetimes here: ``iso_rows`` serialises them."""
     nodes = build_tree(
         [data.issues[k] for k in keys], is_done=lambda i: data.histories[i.key].is_done_at(reference)
     )
@@ -255,8 +277,6 @@ def sprint_timeline_view(
     def row(node: Any) -> dict[str, Any]:
         children = [row(c) for c in node.children]
         issue = node.issue
-        begun = [c["start"] for c in children if c["start"] is not None]
-        ended = [c["end"] for c in children]
         out: dict[str, Any] = {
             "key": node.key,
             "label": render(node.label),
@@ -270,8 +290,6 @@ def sprint_timeline_view(
             "carried": False,
             "added": False,
         }
-        own_start: datetime | None = None
-        own_end: datetime | None = None
         container = issue is None or issue.hierarchy_level >= HierarchyLevel.EPIC
         if issue is not None and not container:
             history = data.histories[issue.key]
@@ -284,7 +302,8 @@ def sprint_timeline_view(
             out["risk"] = None if done else assessment_dict(assessment)
             out["blocked"] = blocked
             out["added"] = (
-                node.key in members
+                sprint is not None
+                and node.key in members
                 and sprint.start is not None
                 and not history.in_sprint_at(sprint.id, sprint.start)
             )
@@ -298,48 +317,71 @@ def sprint_timeline_view(
                 else "aberto"
             )
             counts["subtarefas" if issue.is_subtask else "itens"] += 1
+            if own_start is not None:
+                out["start"], out["end"] = own_start, own_end
         # RF-111: an initiative is a container too (same bar-spanning rule as an epic, just one
         # level further up), but "N épicos" would be wrong once one sits in the tree — it is
         # named in its own node's label instead, not folded into a count that promises epics.
         elif issue is not None and issue.hierarchy_level == HierarchyLevel.EPIC:
             counts["epicos"] += 1
-        # A container, or an item with no time of its own, spans its children.
-        start = own_start if own_start is not None else (min(begun) if begun else None)
-        if own_start is not None:
-            end = own_end
-        else:
-            # It ends when everything under it has; one child still open keeps the bar running.
-            finished = [e for e in ended if e is not None]
-            still_open = any(c["state"] != "concluido" for c in children)
-            end = None if still_open or not finished else max(finished)
-        if container or "state" not in out:
-            everyone_done = bool(children) and all(
-                c["state"] == "concluido" for c in children if c.get("state")
-            )
-            out["state"] = "concluido" if everyone_done else "andamento" if start is not None else "aberto"
-            out["blocked"] = any(c["blocked"] for c in children)
-        out["start"] = start
-        out["end"] = end
-        out["carried"] = bool(start and sprint.start and start < sprint.start)
+        if "start" not in out:
+            # A container, or an item with no time of its own, spans its children.
+            out.update(span_of(children))
+            if container or "state" not in out:
+                out["state"] = span_state(out["start"], children)
+                out["blocked"] = any(c["blocked"] for c in children)
+        out["carried"] = bool(sprint and out["start"] and sprint.start and out["start"] < sprint.start)
         out["children"] = children
         return out
 
-    rows = [row(n) for n in nodes]
+    return [row(n) for n in nodes], counts
 
-    def iso_all(r: dict[str, Any]) -> dict[str, Any]:
-        return {
-            **r,
-            "start": iso(r["start"]),
-            "end": iso(r["end"]),
-            "children": [iso_all(c) for c in r["children"]],
-        }
 
+def span_of(children: list[dict[str, Any]]) -> dict[str, Any]:
+    """Where a row with no time of its own starts and ends: with its first child, and only once
+    every child is done — one child still open keeps the bar running."""
+    begun = [c["start"] for c in children if c["start"] is not None]
+    finished = [c["end"] for c in children if c["end"] is not None]
+    still_open = any(c["state"] != "concluido" for c in children)
     return {
-        "sprint": sprint_dict(sprint),
-        "window": {"start": iso(timeline.start), "end": iso(timeline.end), "today": iso(reference)},
-        "counts": {**counts, "total": sum(counts.values())},
-        "nodes": [iso_all(r) for r in rows],
-        "freshness": data.freshness(now),
+        "start": min(begun) if begun else None,
+        "end": None if still_open or not finished else max(finished),
+    }
+
+
+def span_state(start: datetime | None, children: list[dict[str, Any]]) -> str:
+    """A container's state: done when every child is, in progress once anything under it started."""
+    everyone_done = bool(children) and all(c["state"] == "concluido" for c in children if c.get("state"))
+    return "concluido" if everyone_done else "andamento" if start is not None else "aberto"
+
+
+def group_row(key: str, label: str, children: list[dict[str, Any]]) -> dict[str, Any]:
+    """A synthetic row grouping others (a person's boards, say), spanning them like an epic does."""
+    span = span_of(children)
+    return {
+        "key": key,
+        "label": label,
+        "synthetic": True,
+        "missing": False,
+        "issue": None,
+        "member": False,
+        "progress": None,
+        "risk": None,
+        "blocked": any(c["blocked"] for c in children),
+        "carried": False,
+        "added": False,
+        "state": span_state(span["start"], children),
+        **span,
+        "children": children,
+    }
+
+
+def iso_rows(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **row,
+        "start": iso(row["start"]),
+        "end": iso(row["end"]),
+        "children": [iso_rows(c) for c in row["children"]],
     }
 
 

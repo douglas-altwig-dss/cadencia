@@ -17,7 +17,7 @@ import {
   ticksOf,
   weekends,
   type Filters,
-} from './sprintTimeline';
+} from './timeline';
 
 const node = (
   key: string,

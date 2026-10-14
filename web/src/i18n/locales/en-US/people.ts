@@ -221,18 +221,10 @@ export const people = {
 
   /** `PersonTimeline`. */
   timeline: {
-    state: {
-      concluido: 'done',
-      andamento: 'in progress',
-      bloqueado: 'blocked',
-      aberto: 'open',
-    },
+    summaryTitle: 'Last 8 weeks',
     empty: "None of this person's items went into progress in the last weeks.",
-    withSubtasks: 'Include subtasks',
     listAria: "The person's items over time",
-    bar: (key: string, state: string, from: string, to: string) => `${key}, ${state}, from ${from} to ${to}`,
-    today: 'today',
-    foot: 'From the first move into progress to completion. Last 8 weeks; a bar cut off on the left started earlier.',
+    help: 'Click a bar or a name to see the item alongside; arrows move between rows and Enter opens the focused one. Hover over the axis to read the date and how many items were in progress on it. Each bar runs from when the item went into progress until it was done, or until today; a bar cut off on the left started before these weeks.',
   },
 
   /** `PersonWeek`. */

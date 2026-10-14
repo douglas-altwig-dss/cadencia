@@ -508,6 +508,7 @@ export const tracking: Messages['tracking'] = {
       `${plural(epics, 'Epic', 'Epics')} · ${plural(items, 'Vorgang', 'Vorgänge')} · ${plural(subtasks, 'Unteraufgabe', 'Unteraufgaben')}`,
     sprintEnd: 'Sprint-Ende',
     todayOn: (date) => ` · heute: ${date}`,
+    todayIs: (date) => `heute: ${date}`,
     noneFiltered: 'Keine Vorgänge mit diesen Filtern.',
     none: 'Keine Vorgänge in diesem Sprint.',
     listByPerson: 'Vorgänge des Sprints nach Person',
