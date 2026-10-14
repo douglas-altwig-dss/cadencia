@@ -68,7 +68,7 @@ def test_the_forecast_is_reproducible_and_honest_about_its_edges():
     assert first.p50_date == business_dates(start, first.p50_days)[-1]
     assert monte_carlo([1, 1], 0, start).p50_days == 0  # nothing left is done today
     stuck = monte_carlo([0, 0, 0], 3, start)
-    assert stuck.p50_days is None and "Nenhum item" in stuck.reason
+    assert stuck.p50_days is None and "Nenhum item" in str(stuck.reason)
     certain = monte_carlo([2] * 20, 4, start, horizon_days=2)
     assert (certain.p95_days, certain.probability, certain.low_confidence) == (2, 1.0, False)
 
@@ -417,7 +417,7 @@ def test_table_widths_and_cell_styles_are_written_as_valid_ooxml(tmp_path):
     )
     assert DeckEdits(slides={"x": edits}).touched() == {"x"}
     problems = apply_shape_edits(slide, edits, {})
-    assert problems == [f"A célula 10,10 saiu da tabela {key}."]
+    assert [str(p) for p in problems] == [f"A célula 10,10 saiu da tabela {key}."]
     table = shape.table
     assert int(table.columns[0].width) == Inches(3) and int(shape.width) == Inches(5)
     cell = table.cell(0, 0)

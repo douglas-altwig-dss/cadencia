@@ -8,6 +8,7 @@ from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
+from cadencia.i18n import localize
 from cadencia.report.core import layout as lay
 from cadencia.report.core import pptx_utils as px
 from cadencia.report.core.context import (
@@ -551,7 +552,7 @@ def test_an_unregistered_variable_stops_the_deck_instead_of_printing_nothing(tem
     out = tmp_path / "sem-registro.pptx"
     result = generate_deck(template, mapping, data, out)
     problem = next(p for p in result.problems if p.kind == "variavel_nao_registrada")
-    assert "{{texto.definicao}}" in problem.message and "Semanal" in problem.message
+    assert "{{texto.definicao}}" in str(problem.msg) and "Semanal" in str(problem.msg)
     assert problem.kind in ERROR_KINDS
     shape = next(
         s
@@ -577,7 +578,7 @@ def test_a_registered_variable_nobody_filled_in_is_refused(template, manifest, t
     )
     result = generate_deck(template, mapping, data, tmp_path / "sem-valor.pptx")
     problem = next(p for p in result.problems if p.kind == "variavel_sem_valor")
-    assert "Produto Digital" in problem.message and "{{texto.definicao}}" in problem.message
+    assert "Produto Digital" in str(problem.msg) and "{{texto.definicao}}" in str(problem.msg)
     assert problem.kind in ERROR_KINDS
 
 
@@ -825,9 +826,10 @@ def test_the_preview_reports_what_will_be_wrong_before_generating(template, mani
     assert view["items"][1]["unregistered_texts"] == []
     assert view["items"][2]["unregistered_texts"] == ["texto.fantasma"]
     assert view["items"][2]["missing_texts"] == []
-    assert any("não existe no catálogo" in w for w in view["warnings"])
-    assert any("não tem valor para “Produto Digital”" in w for w in view["warnings"])
-    assert any("não está registrada" in w for w in view["warnings"])
+    warnings = localize(view["warnings"])
+    assert any("não existe no catálogo" in w for w in warnings)
+    assert any("não tem valor para “Produto Digital”" in w for w in warnings)
+    assert any("não está registrada" in w for w in warnings)
 
 
 # ---------------------------------------------------------------- the editor (RF-46, RF-47)

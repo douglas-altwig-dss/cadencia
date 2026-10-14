@@ -10,6 +10,7 @@ visual inspection.
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -17,6 +18,7 @@ from typing import Any
 
 from pptx import Presentation
 
+from cadencia.i18n.message import Msg
 from cadencia.report.core import pptx_utils as px
 from cadencia.report.core.generate import GenerationResult
 from cadencia.report.core.manifest import target_ids
@@ -53,7 +55,9 @@ def _overflow(path: Path) -> list[dict[str, Any]]:
                         {
                             "slide": number,
                             "area": shape.name,
-                            "message": f"Slide {number}: a tabela “{shape.name}” ultrapassa o fim do slide.",
+                            "message": Msg(
+                                "deck_problem.table_overflow", slide=number, area=shape.name
+                            ).to_json(),
                         }
                     )
                 elif (
@@ -65,7 +69,9 @@ def _overflow(path: Path) -> list[dict[str, Any]]:
                         {
                             "slide": number,
                             "area": shape.name,
-                            "message": f"Slide {number}: o texto de “{shape.name}” excede a área prevista.",
+                            "message": Msg(
+                                "deck_problem.text_exceeds_area", slide=number, area=shape.name
+                            ).to_json(),
                         }
                     )
             elif (
@@ -80,7 +86,9 @@ def _overflow(path: Path) -> list[dict[str, Any]]:
                         {
                             "slide": number,
                             "area": shape.name,
-                            "message": f"Slide {number}: o texto de “{shape.name}” não cabe na caixa.",
+                            "message": Msg(
+                                "deck_problem.text_does_not_fit", slide=number, area=shape.name
+                            ).to_json(),
                         }
                     )
     return found
@@ -88,13 +96,12 @@ def _overflow(path: Path) -> list[dict[str, Any]]:
 
 def render_previews(pptx_path: Path, out_dir: Path, *, dpi: int = 40) -> dict[str, Any]:
     """Render every slide to PNG. ``dpi`` 40 is enough to eyeball a deck; the mapping screen asks
-    for more, because it draws clickable areas on top of the image."""
+    for more, because it draws clickable areas on top of the image.
+
+    A ``reason`` is a ``{"$msg": …}`` record: the caller renders it for whoever reads it."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if not soffice:
-        return {
-            "rendered": False,
-            "reason": "LibreOffice não instalado: conferência visual automática indisponível.",
-        }
+        return {"rendered": False, "reason": Msg("deck_problem.libreoffice_missing").to_json()}
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
@@ -104,7 +111,10 @@ def render_previews(pptx_path: Path, out_dir: Path, *, dpi: int = 40) -> dict[st
             timeout=240,
         )
     except (subprocess.SubprocessError, OSError) as exc:
-        return {"rendered": False, "reason": f"Falha ao renderizar com LibreOffice: {exc}"}
+        return {
+            "rendered": False,
+            "reason": Msg("deck_problem.libreoffice_failed", error=str(exc)).to_json(),
+        }
     pdf = out_dir / f"{pptx_path.stem}.pdf"
     images: list[str] = []
     pdftoppm = shutil.which("pdftoppm")
@@ -124,16 +134,19 @@ def validate_deck(
     current_manifest: dict[str, Any],
     render_dir: Path | None = None,
 ) -> dict[str, Any]:
+    # Every ``message`` (and every ``info`` entry) is a ``{"$msg": …}`` record, not text: the
+    # report service stores it with a rendered copy beside it, and readers render it in their own
+    # language (docs/i18n-backend.md, 2.7).
     errors: list[dict[str, Any]] = []
     warnings: list[dict[str, Any]] = []
-    info: list[str] = []
+    info: list[dict[str, Any]] = []
 
     current_sha = current_manifest.get("template", {}).get("sha256")
     if mapped_sha256 and current_sha and mapped_sha256 != current_sha:
         warnings.append(
             {
                 "kind": "modelo_alterado",
-                "message": "O modelo mudou desde que o mapeamento foi salvo; confira as áreas.",
+                "message": Msg("deck_problem.template_changed").to_json(),
             }
         )
     known = target_ids(current_manifest)
@@ -143,7 +156,7 @@ def validate_deck(
                 {
                     "kind": "area_ausente",
                     "target": target,
-                    "message": f"A área {target} não existe na versão atual do modelo.",
+                    "message": Msg("deck_problem.area_missing_in_template", target=target).to_json(),
                 }
             )
 
@@ -164,7 +177,9 @@ def validate_deck(
                 {
                     "kind": "marcador_restante",
                     "slide": number,
-                    "message": f"Slide {number}: marcador {{{{{name}}}}} não foi substituído.",
+                    "message": Msg(
+                        "deck_problem.leftover_marker", slide=number, marker=f"{{{{{name}}}}}"
+                    ).to_json(),
                 }
             )
     for item in _overflow(result.path):
@@ -176,11 +191,12 @@ def validate_deck(
         if not preview.get("rendered") and preview.get("reason"):
             info.append(preview["reason"])
 
-    # De-duplicate identical messages (e.g. the same empty field on every cloned slide).
+    # De-duplicate identical messages (e.g. the same empty field on every cloned slide), compared
+    # as the message's key and parameters rather than as text in any one language.
     def unique(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         seen, out = set(), []
         for it in items:
-            key = (it.get("kind"), it.get("message"))
+            key = (it.get("kind"), json.dumps(it.get("message"), sort_keys=True, ensure_ascii=False))
             if key not in seen:
                 seen.add(key)
                 out.append(it)

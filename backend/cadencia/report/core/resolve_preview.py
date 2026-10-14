@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from cadencia.i18n.message import Msg
 from cadencia.report.core import layout as lay
 from cadencia.report.core.context import MISSING, BoardDeck, DeckData, Series, resolve, spec_for
 from cadencia.report.core.generate import MarkerReport, expand_markers, render_marker
@@ -38,7 +39,9 @@ def _series_dict(series: Series) -> dict[str, Any]:
 def _as_text(kind: str | None, value: Any, mapping: DeckMapping) -> str:
     if value is MISSING:
         # The preview names it; it must never read as a deliberately blank line.
-        raise AssertionError("MISSING chegou a _as_text: o chamador tem de recusar antes")
+        raise AssertionError(
+            "MISSING chegou a _as_text: o chamador tem de recusar antes"  # i18n: out of scope
+        )
     if value is None:
         return ""
     if kind == "status":
@@ -213,25 +216,24 @@ def slide_preview(
                     "text": text if text is not None else f"{{{{{name}}}}}",
                 }
             )
-    warnings: list[str] = []
+    # Messages, not text: the report service renders them for whoever asked (R1). The items and
+    # markers above are deck content and stay exactly what the generator would write.
+    warnings: list[Msg] = []
     if spec.scope == "board" and spec.board_id is None:
-        warnings.append("Este slide é de um board fixo, mas nenhum board foi escolhido.")
+        warnings.append(Msg("deck_problem.preview.fixed_board_unset"))
     if board is None and spec.scope != "deck":
-        warnings.append("Sem dados do board: a prévia mostra apenas o modelo.")
+        warnings.append(Msg("deck_problem.preview.no_board_data"))
     space = (board.space_name or board.space_key or board.name) if board else None
 
-    def unregistered(name: str) -> str:
-        return (
-            f"A variável {{{{{name}}}}} não está registrada"
-            + (f" no modelo “{deck.template_name}”" if deck.template_name else "")
-            + ". Registre-a no gerenciador de variáveis antes de usá-la."
+    def unregistered(name: str) -> Msg:
+        return Msg(
+            "deck_problem.preview.variable_unregistered",
+            marker=f"{{{{{name}}}}}",
+            template=deck.template_name or "",
         )
 
-    def unfilled(name: str) -> str:
-        return (
-            f"A variável {{{{{name}}}}} não tem valor para “{space or '—'}” "
-            "e o registro não define um padrão."
-        )
+    def unfilled(name: str) -> Msg:
+        return Msg("deck_problem.preview.variable_unfilled", marker=f"{{{{{name}}}}}", target=space or "—")
 
     for item in items:
         if item.get("unknown"):
@@ -239,7 +241,7 @@ def slide_preview(
             warnings.append(
                 unregistered(field_key)
                 if field_key.startswith("texto.")
-                else f"O campo {field_key} não existe no catálogo."
+                else Msg("deck_problem.preview.unknown_field", field=field_key)
             )
         if item.get("unfilled"):
             warnings.append(unfilled(item["field"]))
@@ -253,7 +255,7 @@ def slide_preview(
             and not item.get("unknown")
             and not item.get("unfilled")
         ):
-            warnings.append(f"{item.get('field') or 'Texto fixo'} está vazio agora.")
+            warnings.append(Msg("deck_problem.preview.empty", field=item.get("field")))
     for marker in markers:
         if marker["unfilled"]:
             warnings.append(unfilled(marker["name"]))
@@ -263,7 +265,7 @@ def slide_preview(
         "action": spec.action,
         "items": items,
         "markers": markers,
-        "warnings": warnings,
+        "warnings": [w.to_json() for w in warnings],
         "unresolved_markers": sorted({m["name"] for m in markers if not m["known"] or m["unfilled"]}),
     }
 

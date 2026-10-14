@@ -8,6 +8,7 @@ from pptx import Presentation
 from cadencia.api import routes_setup
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
+from cadencia.i18n import Msg
 from cadencia.jira.errors import JiraAuthError
 from cadencia.report.core.sample_template import build_sample_template
 from tests.support import NOW, PT_BR, collect_demo
@@ -619,7 +620,15 @@ def test_a_malformed_package_fails_the_generation_instead_of_reaching_the_user(c
 
     def broken(path):
         report = real(path)
-        report.fail("ordem_de_esquema", "simulação: filhos fora da ordem do esquema")
+        report.fail(
+            "ordem_de_esquema",
+            Msg(
+                "package.ordem_de_esquema",
+                part="ppt/slides/slide1.xml",
+                element="pPr",
+                children=["defRPr", "buChar"],
+            ),
+        )
         return report
 
     monkeypatch.setattr(validate_module, "check_package", broken)

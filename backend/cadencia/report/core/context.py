@@ -12,6 +12,8 @@ from datetime import datetime
 from types import MappingProxyType
 from typing import Any, Literal
 
+from cadencia.i18n.message import Msg
+
 Kind = Literal["text", "number", "groups", "rows", "row_groups", "status", "series"]
 
 
@@ -27,7 +29,7 @@ class _Missing:
     __slots__ = ()
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return "<variável sem valor>"
+        return "<variável sem valor>"  # i18n: out of scope
 
     def __bool__(self) -> bool:
         return False
@@ -155,7 +157,8 @@ class FieldSpec:
     label: str
     columns: tuple[str, ...] = ()
     group: str = "Geral"
-    hint: str = ""
+    #: A message for the field picker (``fields.variable_hint.*``), rendered by the report service.
+    hint: str | Msg = ""
 
 
 ROW_COLUMNS = (
@@ -178,23 +181,46 @@ PLAN_COLUMNS = ("chave", "epico", "horas", "base_dias", "plano_dias", "ganho", "
 CHANGE_COLUMNS = ("chave", "resumo", "responsavel", "de", "para", "motivo")
 HEALTH_COLUMNS = ("problema", "gravidade", "quantidade", "exemplos", "acao")
 
-# Groups are only for how the field picker is organised; they carry no behaviour.
-G_REPORT = "Relatório"
-G_SPACE = "Espaço (time)"
+# Groups are only for how the field picker is organised; they carry no behaviour. The pt-BR names
+# are the catalogue's own copy; the API shows `fields.group.<GROUP_IDS[...]>` in the reader's
+# language instead (docs/i18n-backend.md, 2.7, D7).
+G_REPORT = "Relatório"  # deck text: pt-BR by design
+G_SPACE = "Espaço (time)"  # deck text: pt-BR by design
 G_BOARD = "Board"
-G_SPRINT = "Sprint e janela"
-G_NUMBERS = "Números do resumo"
-G_LISTS = "Listas agrupadas"
+G_SPRINT = "Sprint e janela"  # deck text: pt-BR by design
+G_NUMBERS = "Números do resumo"  # deck text: pt-BR by design
+G_LISTS = "Listas agrupadas"  # deck text: pt-BR by design
 G_TABLES = "Tabelas"
-G_STATUS = "Semáforos"
-G_CHARTS = "Gráficos"
-G_FIXED = "Variáveis"
-G_FORECAST = "Previsão e fluxo"
-G_CHANGES = "O que mudou"
-G_PLAN = "Plano do épico"
-G_HEALTH = "Saúde dos dados"
+G_STATUS = "Semáforos"  # deck text: pt-BR by design
+G_CHARTS = "Gráficos"  # deck text: pt-BR by design
+G_FIXED = "Variáveis"  # deck text: pt-BR by design
+G_FORECAST = "Previsão e fluxo"  # deck text: pt-BR by design
+G_CHANGES = "O que mudou"  # deck text: pt-BR by design
+G_PLAN = "Plano do épico"  # deck text: pt-BR by design
+G_HEALTH = "Saúde dos dados"  # deck text: pt-BR by design
+
+#: A stable id per group, for the API (``group_id``) and the catalogue keys ``fields.group.<id>``.
+GROUP_IDS = {
+    G_REPORT: "report",
+    G_SPACE: "space",
+    G_BOARD: "board",
+    G_SPRINT: "sprint",
+    G_NUMBERS: "numbers",
+    G_LISTS: "lists",
+    G_TABLES: "tables",
+    G_STATUS: "status",
+    G_CHARTS: "charts",
+    G_FIXED: "variables",
+    G_FORECAST: "forecast",
+    G_CHANGES: "changes",
+    G_PLAN: "plan",
+    G_HEALTH: "health",
+    "Geral": "general",
+}
 
 FIELDS: tuple[FieldSpec, ...] = (
+    # deck text: pt-BR by design (docs/i18n.md) — these labels are the charts' alt text in the .pptx;
+    # the field picker shows `fields.label.<key>` in the reader's language instead.
     # ---- deck-wide
     FieldSpec("relatorio.data", "text", "deck", "Data de geração do relatório", group=G_REPORT),
     FieldSpec("relatorio.semana", "text", "deck", "Data do checkpoint de referência", group=G_REPORT),
@@ -523,7 +549,9 @@ def fixed_text_spec(name: str, label: str = "", kind: Kind = "text", source: str
         scope="board",
         label=label or name,
         group=G_FIXED,
-        hint=(f"variável lida de {source}" if source else "variável; muda sozinha conforme o alvo do slide"),
+        hint=(
+            Msg("fields.variable_hint.source", source=source) if source else Msg("fields.variable_hint.hand")
+        ),
     )
 
 
@@ -565,7 +593,7 @@ def catalog(extra: Sequence[FieldSpec] = ()) -> list[dict[str, object]]:
             "label": f.label,
             "columns": list(f.columns),
             "group": f.group,
-            "hint": f.hint,
+            "hint": f.hint.to_json() if isinstance(f.hint, Msg) else f.hint,
         }
         for f in (*FIELDS, *extra)
     ]

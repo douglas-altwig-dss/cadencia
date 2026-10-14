@@ -28,6 +28,8 @@ from typing import Any
 
 from lxml import etree
 
+from cadencia.i18n.message import Msg
+
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 PKG_REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
@@ -102,13 +104,18 @@ ILLEGAL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 #: Microsoft extensions whose value identifies its parent and must not repeat inside it. A cloned
 #: table row or shape inherits the original's, which PowerPoint reports as a content problem.
 A16 = "{http://schemas.microsoft.com/office/drawing/2014/main}"
-IDENTITY_EXTENSIONS = ((f"{A16}rowId", "val", "linha de tabela"), (f"{A16}colId", "val", "coluna de tabela"))
+#: The last item names the identity in messages (`package.identity.*`).
+IDENTITY_EXTENSIONS = ((f"{A16}rowId", "val", "row"), (f"{A16}colId", "val", "column"))
 _RID_IN_XML = re.compile(r"\{[^}]*officeDocument/2006/relationships\}(?:id|embed|link|pict|dm|lo|qs|cs)")
 
 
 @dataclass
 class PackageReport:
-    """What the checks found. ``ok`` false means the file must not be delivered."""
+    """What the checks found. ``ok`` false means the file must not be delivered.
+
+    Each entry's ``message`` is a ``{"$msg": …}`` record (namespace ``package``): whoever shows it
+    renders it in the reader's language — the report service when it stores a run, ``localize``
+    in the CLI."""
 
     errors: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[dict[str, Any]] = field(default_factory=list)
@@ -119,11 +126,11 @@ class PackageReport:
     def ok(self) -> bool:
         return not self.errors
 
-    def fail(self, kind: str, message: str, **extra: Any) -> None:
-        self.errors.append({"kind": kind, "message": message, **extra})
+    def fail(self, kind: str, message: Msg, **extra: Any) -> None:
+        self.errors.append({"kind": kind, "message": message.to_json(), **extra})
 
-    def warn(self, kind: str, message: str, **extra: Any) -> None:
-        self.warnings.append({"kind": kind, "message": message, **extra})
+    def warn(self, kind: str, message: Msg, **extra: Any) -> None:
+        self.warnings.append({"kind": kind, "message": message.to_json(), **extra})
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -146,14 +153,14 @@ def _check_zip(z: zipfile.ZipFile, report: PackageReport) -> list[str]:
     seen: set[str] = set()
     for name in names:
         if "\\" in name:
-            report.fail("zip_backslash", f"Entrada do pacote com barra invertida: {name!r}")
+            report.fail("zip_backslash", Msg("package.zip_backslash", name=name))
         if name.startswith("/") or ".." in name.split("/"):
-            report.fail("zip_path", f"Caminho de entrada inválido: {name!r}")
+            report.fail("zip_path", Msg("package.zip_path", name=name))
         if name in seen:
-            report.fail("zip_duplicada", f"Entrada duplicada no pacote: {name!r}")
+            report.fail("zip_duplicada", Msg("package.zip_duplicada", name=name))
         seen.add(name)
     if "[Content_Types].xml" not in seen:
-        report.fail("sem_content_types", "O pacote não tem [Content_Types].xml.")
+        report.fail("sem_content_types", Msg("package.sem_content_types"))
     return names
 
 
@@ -161,7 +168,7 @@ def _check_content_types(z: zipfile.ZipFile, names: list[str], report: PackageRe
     try:
         root = etree.fromstring(z.read("[Content_Types].xml"))
     except (KeyError, etree.XMLSyntaxError) as exc:
-        report.fail("content_types_ilegivel", f"[Content_Types].xml não pôde ser lido: {exc}")
+        report.fail("content_types_ilegivel", Msg("package.content_types_ilegivel", error=str(exc)))
         return
     defaults = {e.get("Extension", "").lower() for e in root.findall(f"{CT}Default")}
     overrides = {e.get("PartName") for e in root.findall(f"{CT}Override")}
@@ -174,14 +181,14 @@ def _check_content_types(z: zipfile.ZipFile, names: list[str], report: PackageRe
         if extension not in defaults:
             report.fail(
                 "sem_content_type",
-                f"A parte {name} não tem tipo de conteúdo (nem Override nem Default para .{extension}).",
+                Msg("package.sem_content_type", part=name, extension=extension),
                 part=name,
             )
     for part in overrides:
         if part and part.lstrip("/") not in names:
             report.fail(
                 "override_orfao",
-                f"[Content_Types].xml declara {part}, que não existe no pacote.",
+                Msg("package.override_orfao", part=part),
                 part=part,
             )
 
@@ -199,13 +206,13 @@ def _check_relationships(z: zipfile.ZipFile, names: list[str], report: PackageRe
         try:
             root = etree.fromstring(z.read(rels))
         except etree.XMLSyntaxError as exc:
-            report.fail("rels_ilegivel", f"{rels} não é XML válido: {exc}", part=rels)
+            report.fail("rels_ilegivel", Msg("package.rels_ilegivel", part=rels, error=str(exc)), part=rels)
             continue
         ids: set[str] = set()
         for rel in root.findall(f"{PKG_REL}Relationship"):
             rid = rel.get("Id")
             if rid in ids:
-                report.fail("rid_duplicado", f"{rels}: Id {rid} declarado duas vezes.", part=rels)
+                report.fail("rid_duplicado", Msg("package.rid_duplicado", part=rels, rid=rid), part=rels)
             ids.add(rid)
             if rel.get("TargetMode") == "External":
                 continue
@@ -219,7 +226,7 @@ def _check_relationships(z: zipfile.ZipFile, names: list[str], report: PackageRe
             if resolved not in known:
                 report.fail(
                     "rel_quebrado",
-                    f"{rels}: {rid} aponta para {target}, que não existe no pacote.",
+                    Msg("package.rel_quebrado", part=rels, rid=rid, target=target),
                     part=rels,
                     target=target,
                 )
@@ -228,7 +235,7 @@ def _check_relationships(z: zipfile.ZipFile, names: list[str], report: PackageRe
             continue
         report.warn(
             "parte_sem_relacionamento",
-            f"A parte {name} não é alcançável por nenhuma relação.",
+            Msg("package.parte_sem_relacionamento", part=name),
             part=name,
         )
 
@@ -241,7 +248,7 @@ def _check_rid_references(z: zipfile.ZipFile, names: list[str], report: PackageR
         try:
             root = etree.fromstring(z.read(name))
         except etree.XMLSyntaxError as exc:
-            report.fail("xml_malformado", f"{name} não é XML bem formado: {exc}", part=name)
+            report.fail("xml_malformado", Msg("package.xml_malformado", part=name, error=str(exc)), part=name)
             continue
         rels = _rels_path(name)
         declared: set[str] = set()
@@ -258,7 +265,13 @@ def _check_rid_references(z: zipfile.ZipFile, names: list[str], report: PackageR
                 if attribute.startswith(OFF_REL) and value and value not in declared:
                     report.fail(
                         "rid_pendente",
-                        f"{name}: <{_local(element)}> usa {value}, ausente de {posixpath.basename(rels)}.",
+                        Msg(
+                            "package.rid_pendente",
+                            part=name,
+                            element=_local(element),
+                            rid=value,
+                            rels=posixpath.basename(rels),
+                        ),
                         part=name,
                         rid=value,
                     )
@@ -266,7 +279,7 @@ def _check_rid_references(z: zipfile.ZipFile, names: list[str], report: PackageR
 
 def _check_presentation(z: zipfile.ZipFile, names: list[str], report: PackageReport) -> None:
     if "ppt/presentation.xml" not in names:
-        report.fail("sem_presentation", "O pacote não tem ppt/presentation.xml.")
+        report.fail("sem_presentation", Msg("package.sem_presentation"))
         return
     root = etree.fromstring(z.read("ppt/presentation.xml"))
     rels_root = etree.fromstring(z.read("ppt/_rels/presentation.xml.rels"))
@@ -276,7 +289,7 @@ def _check_presentation(z: zipfile.ZipFile, names: list[str], report: PackageRep
     for entry in root.findall(f"{P}sldIdLst/{P}sldId"):
         sid, rid = entry.get("id"), entry.get(f"{OFF_REL}id")
         if sid in seen_ids:
-            report.fail("sldid_duplicado", f"presentation.xml lista o slide id {sid} duas vezes.")
+            report.fail("sldid_duplicado", Msg("package.sldid_duplicado", id=sid))
         seen_ids.add(sid)
         try:
             number = int(sid or "0")
@@ -284,18 +297,18 @@ def _check_presentation(z: zipfile.ZipFile, names: list[str], report: PackageRep
             number = 0
         # ECMA-376 constrains a slide id to 256 .. 2147483647; PowerPoint enforces it.
         if not 256 <= number <= 2147483647:
-            report.fail("sldid_invalido", f"O slide id {sid} está fora da faixa permitida (256–2147483647).")
+            report.fail("sldid_invalido", Msg("package.sldid_invalido", id=sid))
         target = rels.get(rid)
         if target is None:
-            report.fail("sldid_sem_rel", f"presentation.xml referencia {rid}, ausente do .rels.")
+            report.fail("sldid_sem_rel", Msg("package.sldid_sem_rel", rid=rid))
             continue
         listed.add(posixpath.normpath(posixpath.join("ppt", target)))
     actual = {n for n in names if n.startswith("ppt/slides/slide") and n.endswith(".xml")}
     report.slides = len(actual)
     for missing in sorted(listed - actual):
-        report.fail("slide_ausente", f"A lista de slides aponta para {missing}, que não existe.")
+        report.fail("slide_ausente", Msg("package.slide_ausente", part=missing))
     for extra in sorted(actual - listed):
-        report.fail("slide_fora_da_lista", f"{extra} existe no pacote mas não está em sldIdLst.")
+        report.fail("slide_fora_da_lista", Msg("package.slide_fora_da_lista", part=extra))
 
 
 def _check_sequence(root: Any, name: str, report: PackageReport) -> None:
@@ -315,7 +328,7 @@ def _check_sequence(root: Any, name: str, report: PackageReport) -> None:
             if ranks != sorted(ranks):
                 report.fail(
                     "ordem_de_esquema",
-                    f"{name}: <{_local(parent)}> tem filhos fora da ordem exigida pelo esquema: {children}",
+                    Msg("package.ordem_de_esquema", part=name, element=_local(parent), children=children),
                     part=name,
                     element=_local(parent),
                 )
@@ -326,7 +339,7 @@ def _check_slides(z: zipfile.ZipFile, names: list[str], report: PackageReport) -
         try:
             root = etree.fromstring(z.read(name))
         except etree.XMLSyntaxError as exc:
-            report.fail("xml_malformado", f"{name} não é XML bem formado: {exc}", part=name)
+            report.fail("xml_malformado", Msg("package.xml_malformado", part=name, error=str(exc)), part=name)
             continue
         seen: set[str] = set()
         for nv in root.iter(f"{P}cNvPr"):
@@ -334,37 +347,47 @@ def _check_slides(z: zipfile.ZipFile, names: list[str], report: PackageReport) -
             if shape_id in seen:
                 report.fail(
                     "id_de_forma_duplicado",
-                    f"{name}: duas formas usam o id {shape_id} (deve ser único no slide).",
+                    Msg("package.id_de_forma_duplicado", part=name, id=shape_id),
                     part=name,
                 )
             seen.add(shape_id)
             if shape_id in (None, "0"):
-                report.fail("id_de_forma_invalido", f"{name}: forma com id {shape_id!r}.", part=name)
+                report.fail(
+                    "id_de_forma_invalido",
+                    Msg("package.id_de_forma_invalido", part=name, id=shape_id),
+                    part=name,
+                )
         for body in list(root.iter(f"{A}txBody")) + list(root.iter(f"{P}txBody")):
             if body.find(f"{A}bodyPr") is None:
-                report.fail("txbody_sem_bodypr", f"{name}: corpo de texto sem <a:bodyPr>.", part=name)
+                report.fail("txbody_sem_bodypr", Msg("package.txbody_sem_bodypr", part=name), part=name)
             if not body.findall(f"{A}p"):
-                report.fail("txbody_vazio", f"{name}: corpo de texto sem nenhum parágrafo.", part=name)
+                report.fail("txbody_vazio", Msg("package.txbody_vazio", part=name), part=name)
         for run in root.iter(f"{A}r"):
             if run.find(f"{A}t") is None:
-                report.fail("run_sem_texto", f"{name}: <a:r> sem <a:t>.", part=name)
+                report.fail("run_sem_texto", Msg("package.run_sem_texto", part=name), part=name)
         for table in root.iter(f"{A}tbl"):
             columns = len(table.findall(f"{A}tblGrid/{A}gridCol"))
             rows = table.findall(f"{A}tr")
             if not rows:
-                report.fail("tabela_sem_linhas", f"{name}: tabela sem nenhuma linha.", part=name)
+                report.fail("tabela_sem_linhas", Msg("package.tabela_sem_linhas", part=name), part=name)
             for index, row in enumerate(rows):
                 if row.get("h") is None:
                     report.fail(
                         "linha_sem_altura",
-                        f"{name}: linha {index + 1} sem o atributo 'h'.",
+                        Msg("package.linha_sem_altura", part=name, row=index + 1),
                         part=name,
                     )
                 span = sum(int(c.get("gridSpan") or 1) for c in row.findall(f"{A}tc"))
                 if span != columns:
                     report.fail(
                         "tabela_inconsistente",
-                        f"{name}: linha {index + 1} cobre {span} colunas, mas a grade tem {columns}.",
+                        Msg(
+                            "package.tabela_inconsistente",
+                            part=name,
+                            row=index + 1,
+                            span=span,
+                            columns=columns,
+                        ),
                         part=name,
                     )
         for tag, attribute, what in IDENTITY_EXTENSIONS:
@@ -377,7 +400,14 @@ def _check_slides(z: zipfile.ZipFile, names: list[str], report: PackageReport) -
                     if count > 1:
                         report.fail(
                             "id_de_extensao_duplicado",
-                            f"{name}: tabela {index + 1} repete o id de {what} {value} em {count} lugares.",
+                            Msg(
+                                "package.id_de_extensao_duplicado",
+                                part=name,
+                                table=index + 1,
+                                what=Msg(f"package.identity.{what}"),
+                                id=value,
+                                count=count,
+                            ),
                             part=name,
                         )
         _check_sequence(root, name, report)
@@ -392,7 +422,7 @@ def _check_characters(z: zipfile.ZipFile, names: list[str], report: PackageRepor
         if match:
             report.fail(
                 "caractere_ilegal",
-                f"{name}: caractere {hex(ord(match.group()))} não é permitido em XML 1.0.",
+                Msg("package.caractere_ilegal", part=name, char=hex(ord(match.group()))),
                 part=name,
             )
 
@@ -404,7 +434,7 @@ def check_package(path: str | Path) -> PackageReport:
         with zipfile.ZipFile(path) as z:
             broken = z.testzip()
             if broken is not None:
-                report.fail("zip_corrompido", f"Entrada corrompida no pacote: {broken}")
+                report.fail("zip_corrompido", Msg("package.zip_corrompido", name=broken))
                 return report
             names = _check_zip(z, report)
             _check_content_types(z, names, report)
@@ -414,7 +444,7 @@ def check_package(path: str | Path) -> PackageReport:
             _check_slides(z, names, report)
             _check_characters(z, names, report)
     except zipfile.BadZipFile as exc:
-        report.fail("zip_invalido", f"O arquivo não é um pacote ZIP válido: {exc}")
+        report.fail("zip_invalido", Msg("package.zip_invalido", error=str(exc)))
     except OSError as exc:
-        report.fail("io", f"Não foi possível ler o arquivo: {exc}")
+        report.fail("io", Msg("package.io", error=str(exc)))
     return report

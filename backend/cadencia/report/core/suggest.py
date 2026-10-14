@@ -12,6 +12,7 @@ import copy
 import re
 from typing import Any
 
+from cadencia.i18n.message import Msg
 from cadencia.report.core.manifest import area_id, parse_target
 
 LABEL_FIELDS = [
@@ -160,7 +161,7 @@ def as_repeat(suggestion: dict[str, Any]) -> dict[str, Any]:
 def suggest_mapping(manifest: dict[str, Any], boards: list[dict[str, Any]]) -> dict[str, Any]:
     palette, labels = _legend(manifest)
     slides: dict[str, Any] = {}
-    notes: list[str] = []
+    notes: list[Msg] = []
     name_targets: dict[str, str] = {}
     previous_signature: tuple[str, frozenset[str]] | None = None
     for slide in manifest.get("slides", []):
@@ -244,10 +245,7 @@ def suggest_mapping(manifest: dict[str, Any], boards: list[dict[str, Any]]) -> d
         entry: dict[str, Any] = {"action": "keep", "scope": "deck", "overflow": "clone", "bindings": bindings}
         if captions and previous_signature == signature:
             entry = {"action": "remove", "scope": "deck", "bindings": []}
-            notes.append(
-                f"Slide {slide['index']} parece continuação do anterior: marcado para remoção "
-                "(a paginação recria as continuações)."
-            )
+            notes.append(Msg("deck_problem.suggest.continuation", slide=slide["index"]))
         elif any(b["field"] and not b["field"].startswith("relatorio.") for b in bindings):
             headline = (slide.get("headline") or "").casefold()
             match = next(
@@ -266,7 +264,11 @@ def suggest_mapping(manifest: dict[str, Any], boards: list[dict[str, Any]]) -> d
             entry.update(scope="board", board_id=match["id"] if match else None)
             if not match:
                 notes.append(
-                    f"Slide {slide['index']} ({slide.get('headline') or 'sem título'}): escolha o board."
+                    Msg(
+                        "deck_problem.suggest.choose_board",
+                        slide=slide["index"],
+                        headline=slide.get("headline"),
+                    )
                 )
         slides[str(slide["slide_id"])] = entry
         if captions:
@@ -275,7 +277,8 @@ def suggest_mapping(manifest: dict[str, Any], boards: list[dict[str, Any]]) -> d
         "slides": slides,
         "palette": palette,
         "status_labels": labels,
-        "notes": notes,
+        # `{"$msg": …}` records: whoever shows the suggestion renders them (`localize`).
+        "notes": [note.to_json() for note in notes],
         "name_targets": name_targets,
     }
 

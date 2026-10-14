@@ -7,13 +7,16 @@ Three things a screen-reader user or somebody at the back of the room notices fi
   text of 18 pt, 14 pt bold);
 * a slide whose title placeholder is not first in reading order is read out of order.
 
-Pure: it takes the scene dict `scene.deck_scene` produces and returns findings.
+Pure: it takes the scene dict `scene.deck_scene` produces and returns findings. A finding's
+``message`` is a ``{"$msg": …}`` record; the boundary renders it in the reader's language.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
+
+from cadencia.i18n.message import Msg
 
 SILENT_KINDS = frozenset({"image", "chart"})
 
@@ -55,7 +58,7 @@ def audit(scene: Mapping[str, Any]) -> list[dict[str, Any]]:
                         "kind": "sem_texto_alternativo",
                         "slide": number,
                         "shape": shape.get("key"),
-                        "message": f"Slide {number}: “{name}” não tem texto alternativo.",
+                        "message": Msg("a11y.no_alt_text", slide=number, shape=name).to_json(),
                     }
                 )
             text = shape.get("text")
@@ -80,10 +83,9 @@ def audit(scene: Mapping[str, Any]) -> list[dict[str, Any]]:
                         "kind": "contraste_baixo",
                         "slide": number,
                         "shape": shape.get("key"),
-                        "message": (
-                            f"Slide {number}: texto em “{name}” com contraste {worst[0]:g}:1 "
-                            f"(mínimo {worst[1]:g}:1)."
-                        ),
+                        "message": Msg(
+                            "a11y.low_contrast", slide=number, shape=name, ratio=worst[0], minimum=worst[1]
+                        ).to_json(),
                     }
                 )
         titles = [
@@ -101,7 +103,7 @@ def audit(scene: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "kind": "ordem_de_leitura",
                     "slide": number,
                     "shape": shapes[titles[0]].get("key"),
-                    "message": f"Slide {number}: o título não é o primeiro na ordem de leitura.",
+                    "message": Msg("a11y.title_order", slide=number).to_json(),
                 }
             )
     return findings

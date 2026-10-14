@@ -22,6 +22,7 @@ from typing import Any
 
 from pptx import Presentation
 
+from cadencia.i18n.message import Msg
 from cadencia.report.core import layout as lay
 from cadencia.report.core import pptx_utils as px
 from cadencia.report.core.charts import render_chart_png, replace_chart_data
@@ -45,19 +46,30 @@ from cadencia.report.core.text import MARKER, MODIFIERS, replace_in_paragraph, r
 
 BOTTOM_MARGIN = 0.04
 TABLE_MODES = {"table_rows", "grouped_rows"}
-CONTINUED = " (cont.)"
+CONTINUED = " (cont.)"  # deck text: pt-BR by design (docs/i18n.md)
 
 
 @dataclass
 class Problem:
+    """Something generation wants a person to know. ``msg`` is a message, not text: this module
+    cannot know who reads it or in which language (docs/i18n-backend.md, R1)."""
+
     kind: str  # vazio | area_ausente | campo_desconhecido | marcador_desconhecido | sem_dados | truncado
-    message: str
+    msg: Msg
     slide: int | None = None
     target: str | None = None
     field: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return self.__dict__.copy()
+        """``message`` is the ``{"$msg": …}`` record; the report service renders the stored text
+        beside it, and ``localize`` renders it wherever else the dict is shown."""
+        return {
+            "kind": self.kind,
+            "message": self.msg.to_json(),
+            "slide": self.slide,
+            "target": self.target,
+            "field": self.field,
+        }
 
 
 @dataclass
@@ -240,11 +252,9 @@ def _structure(prs: Any, mapping: DeckMapping, deck: DeckData, result: Generatio
                 for s in block:
                     px.delete_slide(prs, s)
                 why = (
-                    "Nenhum board alcança o escopo deste bloco"
-                    if spec.conditional
-                    else "Nenhum board na geração"
+                    "deck_problem.repeat.out_of_scope" if spec.conditional else "deck_problem.repeat.no_board"
                 )
-                result.problems.append(Problem("sem_dados", f"{why}: slides repetíveis removidos."))
+                result.problems.append(Problem("sem_dados", Msg(why)))
             else:
                 insert_at = px.slide_index(prs, block[-1]) + 1
                 kept: list[tuple[Any, Any]] = []
@@ -281,7 +291,7 @@ def _structure(prs: Any, mapping: DeckMapping, deck: DeckData, result: Generatio
                 result.problems.append(
                     Problem(
                         "sem_dados",
-                        f"Slide {i + 1}: o board {spec.board_id} não tem dados nesta geração.",
+                        Msg("deck_problem.board_without_data", slide=i + 1, board=spec.board_id),
                         slide=i + 1,
                     )
                 )
@@ -411,7 +421,9 @@ def _as_text(kind: str | None, value: Any, mapping: DeckMapping, modifier: str |
             return "\n".join(item for g in value or () for item in g.items)
     if value is MISSING:
         # Only reachable if a caller forgot to check; make it visible rather than blank.
-        raise AssertionError("MISSING chegou a _as_text: o chamador tem de recusar antes")
+        raise AssertionError(
+            "MISSING chegou a _as_text: o chamador tem de recusar antes"  # i18n: out of scope
+        )
     if value is None:
         return ""
     if kind == "status":
@@ -423,10 +435,8 @@ def _as_text(kind: str | None, value: Any, mapping: DeckMapping, modifier: str |
     return str(value)
 
 
-def _variable_label(deck: DeckData, name: str) -> str:
-    """How an error refers to the name: the marker, and the template it appeared in."""
-    where = f" no modelo “{deck.template_name}”" if deck.template_name else ""
-    return f"{{{{{name}}}}}{where}"
+def _marker(name: str) -> str:
+    return f"{{{{{name}}}}}"
 
 
 def _unknown_problem(deck: DeckData, name: str, number: int, target: str | None = None) -> Problem:
@@ -436,13 +446,15 @@ def _unknown_problem(deck: DeckData, name: str, number: int, target: str | None 
     makes a variable exist, so the message says how to fix it rather than just that it is unknown.
     """
     if variable_name(name) is not None:
-        message = (
-            f"Slide {number}: a variável {_variable_label(deck, name)} não está registrada. "
-            "Registre-a no gerenciador de variáveis antes de usá-la no modelo."
+        message = Msg(
+            "deck_problem.variable_unregistered",
+            slide=number,
+            marker=_marker(name),
+            template=deck.template_name or "",
         )
         kind = "variavel_nao_registrada"
     else:
-        message = f"Slide {number}: o campo {name} não existe no catálogo."
+        message = Msg("deck_problem.unknown_field", slide=number, field=name)
         kind = "marcador_desconhecido"
     return Problem(kind, message, slide=number, target=target, field=name)
 
@@ -451,11 +463,17 @@ def _unfilled_problem(
     deck: DeckData, board: BoardDeck | None, name: str, number: int, target: str | None = None
 ) -> Problem:
     """Registered, but nobody ever said what it means here and the registration has no default."""
-    where = (board.space_name or board.space_key or board.name) if board else "o relatório"
+    # No board: the whole report is what is short of it, which the catalogue words per language.
+    where = (board.space_name or board.space_key or board.name) if board else None
     return Problem(
         "variavel_sem_valor",
-        f"Slide {number}: a variável {_variable_label(deck, name)} não tem valor para “{where}” "
-        "e o registro não define um padrão.",
+        Msg(
+            "deck_problem.variable_unfilled",
+            slide=number,
+            marker=_marker(name),
+            template=deck.template_name or "",
+            target=where,
+        ),
         slide=number,
         target=target,
         field=name,
@@ -476,8 +494,12 @@ def _marker_resolver(
             result.problems.append(
                 Problem(
                     "marcador_desconhecido",
-                    f"Slide {number}: {{{{{name}}}}} usa um modificador desconhecido; "
-                    f"use {', '.join(MODIFIERS)}.",
+                    Msg(
+                        "deck_problem.unknown_modifier",
+                        slide=number,
+                        marker=_marker(name),
+                        modifiers=", ".join(MODIFIERS),
+                    ),
                     slide=number,
                     field=name,
                 )
@@ -494,7 +516,9 @@ def _marker_resolver(
         text = rendered or ""
         if not text:
             result.problems.append(
-                Problem("vazio", f"Marcador {{{{{name}}}}} ficou vazio.", slide=number, field=name)
+                Problem(
+                    "vazio", Msg("deck_problem.marker_empty", marker=_marker(name)), slide=number, field=name
+                )
             )
         return text
 
@@ -684,7 +708,7 @@ def _paginate_and_bind(
             result.problems.append(
                 Problem(
                     "vazio",
-                    f"Slide {number}: {binding.key} não tem linhas.",
+                    Msg("deck_problem.no_rows", slide=number, field=binding.key),
                     slide=number,
                     target=binding.target,
                     field=binding.key,
@@ -697,7 +721,7 @@ def _paginate_and_bind(
             result.problems.append(
                 Problem(
                     "truncado",
-                    f"Slide {number}: {dropped} linha(s) não couberam e foram omitidas.",
+                    Msg("deck_problem.truncated", slide=number, count=dropped),
                     slide=number,
                     target=binding.target,
                 )
@@ -832,7 +856,7 @@ def _apply(
         result.problems.append(
             Problem(
                 "area_ausente",
-                f"Slide {number}: a área {binding.target} não existe no modelo.",
+                Msg("deck_problem.missing_area", slide=number, target=binding.target),
                 slide=number,
                 target=binding.target,
             )
@@ -857,7 +881,7 @@ def _apply(
         result.problems.append(
             Problem(
                 "vazio",
-                f"Slide {number}: {binding.key or 'valor'} ficou vazio.",
+                Msg("deck_problem.empty", slide=number, field=binding.key),
                 slide=number,
                 target=binding.target,
                 field=binding.key,
@@ -877,7 +901,7 @@ def _apply(
             result.problems.append(
                 Problem(
                     "area_ausente",
-                    f"Slide {number}: {binding.target} não aceita texto.",
+                    Msg("deck_problem.not_text", slide=number, target=binding.target),
                     slide=number,
                     target=binding.target,
                 )
@@ -961,16 +985,20 @@ def _apply(
         render_qr_png(text, png, error=binding.qr_error)
         # Fitted, not stretched: a QR out of square stops scanning.
         picture = px.place_picture(slide, shape, str(png), fit=True)
-        px.set_alt_text(picture, binding.alt_text or f"Código QR: {text}")
+        px.set_alt_text(
+            picture,
+            binding.alt_text or f"Código QR: {text}",  # deck text: pt-BR by design (docs/i18n.md)
+        )
 
 
 def chart_description(key: str | None, series: Series, deck: DeckData, most: int = 12) -> str:
     """#15: a chart said in words, for a screen reader — its name, then category: value pairs."""
     spec = spec_for(key or "", deck.variables) if key else None
-    title = spec.label if spec else "Gráfico"
+    title = spec.label if spec else "Gráfico"  # deck text: pt-BR by design (docs/i18n.md)
     if series.style == "gantt":
         lanes = ", ".join(series.categories[:most])
-        return f"{title}: {len(series.marks)} barras em {len(series.categories)} linhas ({lanes})."
+        bars, rows = len(series.marks), len(series.categories)
+        return f"{title}: {bars} barras em {rows} linhas ({lanes})."  # deck text: pt-BR by design
     if series.style == "scatter":
         points = "; ".join(f"{m.get('label', '')}: {m['y']:g}" for m in series.marks[:most])
         return f"{title}: {points}."

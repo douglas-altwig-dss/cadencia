@@ -27,6 +27,7 @@ from typing import Any, Literal
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE_TYPE
 from pydantic import BaseModel, Field
 
+from cadencia.i18n.message import Msg
 from cadencia.report.core import pptx_utils as px
 
 GROUP = MSO_SHAPE_TYPE.GROUP
@@ -393,9 +394,9 @@ def _insert_shape(slide: Any, key: str, edit: ShapeEdit, assets: Mapping[str, st
     return shape
 
 
-def _apply_cells(slide: Any, edits: SlideEdits, existing: Mapping[str, Any]) -> list[str]:
+def _apply_cells(slide: Any, edits: SlideEdits, existing: Mapping[str, Any]) -> list[Msg]:
     """Table cell text, addressed by shape and coordinates."""
-    problems: list[str] = []
+    problems: list[Msg] = []
     for address, text in edits.cells.items():
         key, _, position = address.rpartition(":")
         row_key, _, column = key.rpartition(":")
@@ -405,11 +406,18 @@ def _apply_cells(slide: Any, edits: SlideEdits, existing: Mapping[str, Any]) -> 
             continue
         shape = existing.get(row_key)
         if shape is None or not getattr(shape, "has_table", False) or not shape.has_table:
-            problems.append(f"A tabela {row_key} não existe mais neste slide.")
+            problems.append(Msg("deck_problem.edit.table_gone", table=row_key))
             continue
         table = shape.table
         if row_index >= len(table.rows) or column_index >= len(table.columns):
-            problems.append(f"A célula {row_index + 1},{column_index + 1} saiu da tabela {row_key}.")
+            problems.append(
+                Msg(
+                    "deck_problem.edit.cell_outside",
+                    row=row_index + 1,
+                    column=column_index + 1,
+                    table=row_key,
+                )
+            )
             continue
         px.set_frame_text(table.cell(row_index, column_index).text_frame, text)
     return problems
@@ -429,13 +437,13 @@ def _style_cell(cell: Any, style: CellStyle) -> None:
             )
 
 
-def _apply_tables(edits: SlideEdits, existing: Mapping[str, Any]) -> list[str]:
+def _apply_tables(edits: SlideEdits, existing: Mapping[str, Any]) -> list[Msg]:
     """RF-91: column widths and cell styles, after the data (and any typed cell text) is in."""
-    problems: list[str] = []
+    problems: list[Msg] = []
     for key, table_edit in edits.tables.items():
         shape = existing.get(key)
         if shape is None or not getattr(shape, "has_table", False) or not shape.has_table:
-            problems.append(f"A tabela {key} não existe mais neste slide.")
+            problems.append(Msg("deck_problem.edit.table_gone", table=key))
             continue
         table = shape.table
         if table_edit.col_widths:
@@ -450,15 +458,23 @@ def _apply_tables(edits: SlideEdits, existing: Mapping[str, Any]) -> list[str]:
             except ValueError:
                 continue
             if row_index >= len(table.rows) or column_index >= len(table.columns):
-                problems.append(f"A célula {row_index + 1},{column_index + 1} saiu da tabela {key}.")
+                problems.append(
+                    Msg(
+                        "deck_problem.edit.cell_outside",
+                        row=row_index + 1,
+                        column=column_index + 1,
+                        table=key,
+                    )
+                )
                 continue
             _style_cell(table.cell(row_index, column_index), style)
     return problems
 
 
-def apply_shape_edits(slide: Any, edits: SlideEdits, assets: Mapping[str, str]) -> list[str]:
-    """Apply one slide's edits in place. Returns the problems worth telling the user about."""
-    problems: list[str] = []
+def apply_shape_edits(slide: Any, edits: SlideEdits, assets: Mapping[str, str]) -> list[Msg]:
+    """Apply one slide's edits in place. Returns the problems worth telling the user about, as
+    messages for the boundary to render."""
+    problems: list[Msg] = []
     # Ungrouping first: it changes which shapes exist, and every later edit addresses the result.
     for key in edits.ungrouped:
         group = next(
@@ -466,7 +482,7 @@ def apply_shape_edits(slide: Any, edits: SlideEdits, assets: Mapping[str, str]) 
             None,
         )
         if group is None:
-            problems.append(f"O grupo {key} não existe mais neste slide.")
+            problems.append(Msg("deck_problem.edit.group_gone", group=key))
             continue
         px.ungroup(slide, group)
 
@@ -481,11 +497,11 @@ def apply_shape_edits(slide: Any, edits: SlideEdits, assets: Mapping[str, str]) 
         shape = existing.get(key)
         if shape is None:
             if edit.op != "insert":
-                problems.append(f"A forma {key} não existe mais neste slide; a edição foi ignorada.")
+                problems.append(Msg("deck_problem.edit.shape_gone", shape=key))
                 continue
             shape = _insert_shape(slide, key, edit, assets)
             if shape is None:
-                problems.append(f"A imagem da forma {key} não está mais disponível.")
+                problems.append(Msg("deck_problem.edit.image_gone", shape=key))
                 continue
         if edit.frame is not None:
             _apply_frame(shape, edit.frame)
@@ -522,13 +538,13 @@ def apply_shape_edits(slide: Any, edits: SlideEdits, assets: Mapping[str, str]) 
 
 def apply_deck_edits(
     prs: Any, produced: list[dict[str, Any]], edits: DeckEdits, assets: Mapping[str, str]
-) -> tuple[list[str], dict[str, int]]:
+) -> tuple[list[Msg], dict[str, int]]:
     """Replay a whole edit document onto a freshly generated deck.
 
     Returns the problems and the slide key -> 1-based index map of the result, which is what the
     editor needs to line its scene up with the file.
     """
-    problems: list[str] = []
+    problems: list[Msg] = []
     slides = list(prs.slides)
     by_key: dict[str, Any] = {}
     for entry in produced:
@@ -541,7 +557,7 @@ def apply_deck_edits(
     for new_key, source_key in edits.duplicates.items():
         source = by_key.get(source_key)
         if source is None:
-            problems.append(f"O slide duplicado {new_key} perdeu a origem; não foi recriado.")
+            problems.append(Msg("deck_problem.edit.duplicate_orphaned", slide=new_key))
             continue
         copy_at = px.slide_index(prs, source) + 1
         by_key[new_key] = px.duplicate_slide(prs, source, index=copy_at)

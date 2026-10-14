@@ -24,13 +24,16 @@ from sqlalchemy.orm import Session
 from cadencia.config import Settings
 from cadencia.domain.calendar import last_checkpoints
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import DECK_LOCALE, STORAGE_LOCALE, Msg, localize, render, stored_text, tr, using_locale
 from cadencia.logging import new_run_id
 from cadencia.report.adapters.jira_source import JiraSource
 from cadencia.report.core.a11y import audit
 from cadencia.report.core.a11y import summary as a11y_summary
 from cadencia.report.core.context import (
+    FIELD_INDEX,
     FIELDS,
     FIXED_PREFIX,
+    GROUP_IDS,
     MISSING,
     Kind,
     VariableSpec,
@@ -141,10 +144,7 @@ def check_writable(session: Session, variable_id: int) -> None:
         return
     kind = source_kind(row.source_field)
     if kind != "text":
-        raise Invalid(
-            f"{row.name} lê de {row.source_field}, que é do tipo “{kind}”. "
-            "Variáveis desse tipo vêm inteiras da fonte e não recebem valor escrito à mão."
-        )
+        raise Invalid(Msg("deck_service.writable.typed", name=row.name, source=row.source_field, kind=kind))
 
 
 def check_source_field(key: str) -> str:
@@ -156,10 +156,10 @@ def check_source_field(key: str) -> str:
     `resolve` is an infinite loop on a user's deck, not a warning.
     """
     if variable_name(key) is not None:
-        raise Invalid(f"{key} é outra variável. Ligue a variável a um campo de dados, não a outra variável.")
+        raise Invalid(Msg("deck_service.source.is_variable", key=key))
     spec = next((f for f in FIELDS if f.key == key), None)
     if spec is None:
-        raise Invalid(f"{key} não existe no catálogo de campos.")
+        raise Invalid(Msg("deck_service.source.unknown", key=key))
     return spec.key
 
 
@@ -186,12 +186,9 @@ def check_package(content: bytes, max_bytes: int) -> None:
         with zipfile.ZipFile(io.BytesIO(content)) as package:
             unpacked = sum(info.file_size for info in package.infolist())
     except zipfile.BadZipFile as exc:
-        raise Invalid("Arquivo não é um .pptx válido: não é um pacote zip.") from exc
+        raise Invalid(Msg("deck_service.upload.not_zip")) from exc
     if unpacked > max_bytes:
-        raise Invalid(
-            f"O .pptx descompactado passa de {max_bytes // (1024 * 1024)} MB; "
-            "confira se o arquivo é mesmo o modelo da apresentação."
-        )
+        raise Invalid(Msg("deck_service.upload.too_big", mb=max_bytes // (1024 * 1024)))
 
 
 def store_template(
@@ -210,7 +207,7 @@ def store_template(
         manifest = extract_manifest(path)
     except Exception as exc:
         path.unlink(missing_ok=True)
-        raise Invalid(f"Arquivo não é um .pptx válido: {exc}") from exc
+        raise Invalid(Msg("deck_service.upload.not_pptx", error=str(exc))) from exc
     manifest["template"]["filename"] = filename
     return repo.add_template(
         session,
@@ -253,7 +250,7 @@ def template_previews(settings: Settings, template: s.TemplateRow) -> dict[str, 
     if images:
         return {"rendered": True, "images": images}
     if not Path(template.path).exists():
-        return {"rendered": False, "images": [], "reason": "O arquivo do modelo não está mais no disco."}
+        return {"rendered": False, "images": [], "reason": tr("deck_service.previews.file_missing")}
 
     # Render into a scratch directory and move it into place, so two requests racing on the first
     # view of a template cannot serve a half-written set of images.
@@ -262,7 +259,7 @@ def template_previews(settings: Settings, template: s.TemplateRow) -> dict[str, 
     try:
         result = render_previews(Path(template.path), scratch, dpi=90)
         if not any(scratch.glob("slide-*.png")):
-            reason = result.get("reason") or "Nada foi renderizado."
+            reason = render(result.get("reason") or Msg("deck_service.previews.nothing"))
             return {"rendered": False, "images": [], "reason": reason}
         try:
             scratch.rename(target)
@@ -342,7 +339,8 @@ def preview_fields(
     )
     board = deck.boards[0] if deck.boards else None
     specs = [*source.catalog(), *catalog_extras(session)]
-    fields = {spec.key: _sample(*resolve(deck, board, spec.key)) for spec in specs}
+    with using_locale(DECK_LOCALE):  # samples of deck content, as the deck will print them
+        fields = {spec.key: _sample(*resolve(deck, board, spec.key)) for spec in specs}
     return {
         "board": {
             "id": board_row.id,
@@ -375,7 +373,7 @@ def preview_slide(
         (sl for sl in template.manifest.get("slides", []) if sl.get("slide_id") == slide_id), None
     )
     if manifest_slide is None:
-        raise NotFound(slide_id, f"Slide {slide_id} do modelo {template.id}.")
+        raise NotFound(slide_id, Msg("deck_service.slide.not_found", slide=slide_id, template=template.id))
     spec = mapping.for_slide(slide_id)
     # A slide pinned to one board previews that board, whatever the picker says: that is what will
     # be generated.
@@ -410,7 +408,12 @@ def preview_slide(
             template_name=template.name,
         )
 
-    result = slide_preview(manifest_slide, spec, mapping, deck, deck_board)
+    # What the slide will say is deck content, resolved exactly as generation does — in the deck's
+    # language whatever the request's (docs/i18n-backend.md, 2.8). Only the warnings are the
+    # reader's, rendered after the block.
+    with using_locale(DECK_LOCALE):
+        result = slide_preview(manifest_slide, spec, mapping, deck, deck_board)
+    result["warnings"] = [render(w) for w in result["warnings"]]
     result["board"] = (
         {
             "id": board_row.id,
@@ -509,7 +512,8 @@ def restore_version(
         template.id,
         version.kind,
         current,
-        label=f"antes de restaurar a versão {version.id}",
+        # Written once in the requester's language and not re-translated (decision 8).
+        label=tr("deck_service.version.before_restore", version=version.id),
         auto=False,
         author=author,
         now=now,
@@ -544,9 +548,7 @@ def store_asset(session: Session, settings: Settings, filename: str, content: by
         image = PptxImage.from_blob(content)
         width, height = image.size
     except Exception as exc:  # PIL has its own zoo of errors for bytes that are not an image
-        raise Invalid(
-            "O arquivo não é uma imagem que a apresentação aceite (PNG, JPEG, GIF, BMP, TIFF ou WMF)."
-        ) from exc
+        raise Invalid(Msg("deck_service.asset.not_image")) from exc
     digest = hashlib.sha256(content).hexdigest()
     existing = session.get(s.AssetRow, digest)
     if existing is not None:
@@ -573,7 +575,7 @@ def store_asset(session: Session, settings: Settings, filename: str, content: by
 def run_scene(session: Session, run: s.ReportRunRow) -> dict[str, object]:
     """The generated deck read back as the editable scene (RF-46)."""
     if not run.path or not Path(run.path).exists():
-        raise NotFound(run.id, f"O arquivo da geração {run.id} não está mais no disco.")
+        raise NotFound(run.id, Msg("deck_service.run.file_missing", run=run.id))
     # The template may have been deleted since; the deck still opens, it just loses the theme and
     # the "this shape is data-bound" markers, which both live in the template.
     template = session.get(s.TemplateRow, run.template_id)
@@ -602,9 +604,9 @@ def reassociate_run(session: Session, run: s.ReportRunRow, template_id: int) -> 
     showing none of that, exactly as it did before this call — this can only help, never corrupt.
     """
     if session.get(s.TemplateRow, run.template_id) is not None:
-        raise Invalid("Esta geração já tem um modelo; só uma órfã pode ser reassociada.")
+        raise Invalid(Msg("deck_service.run.has_template"))
     if session.get(s.TemplateRow, template_id) is None:
-        raise NotFound(template_id, "Modelo não encontrado.")
+        raise NotFound(template_id, Msg("deck_service.template.not_found"))
     run.template_id = template_id
     session.flush()
     return run
@@ -623,7 +625,7 @@ def template_scene(session: Session, template: s.TemplateRow) -> dict[str, objec
     has been generated — which is the one thing the old hotspot view was genuinely good at.
     """
     if not Path(template.path).exists():
-        raise NotFound(template.id, f"O arquivo do modelo {template.id} não está mais no disco.")
+        raise NotFound(template.id, Msg("deck_service.template.file_missing", template=template.id))
     mapping = load_mapping(session, template.id)
     scene = deck_scene(template.path, [], mapping, None, theme=template.manifest.get("theme"))
     scene["template_id"] = template.id
@@ -688,7 +690,7 @@ def generate_report(
     now = now or datetime.now(UTC)
     template = session.get(s.TemplateRow, template_id)
     if template is None:
-        raise NotFound(template_id, f"Modelo {template_id}.")
+        raise NotFound(template_id, Msg("deck_service.template.not_found_id", template=template_id))
     mapping_row = repo.get_mapping(session, template_id)
     mapping = load_mapping(session, template_id)
 
@@ -708,34 +710,38 @@ def generate_report(
     settings.decks_dir.mkdir(parents=True, exist_ok=True)
     out = settings.decks_dir / f"{run_id}.pptx"
     if audience and audience not in mapping.audiences:
-        raise Invalid(f"Público desconhecido neste modelo: {audience}.")
-    result = generate_deck(
-        template.path,
-        mapping,
-        deck,
-        out,
-        theme=template.manifest.get("theme"),
-        audience=audience,
-        only_slides=set(only_slides) if only_slides is not None else None,
-    )
-    # The data is in; now replay the manual edits on top, which is what makes a re-run keep them.
+        raise Invalid(Msg("deck_service.audience.unknown", audience=audience))
     edits = load_edits(session, template_id)
-    if edits.touched():
-        prs = Presentation(str(out))
-        problems, placement = apply_deck_edits(prs, result.produced, edits, asset_paths(session))
-        prs.save(str(out))
-        result.slide_count = len(prs.slides)
-        for entry in result.produced:
-            key = f"{entry['origin_slide_id']}:{entry.get('board_id') or 0}:{entry.get('page', 1)}"
-            if key in placement:
-                entry["index"] = placement[key]
-        result.produced.sort(key=lambda r: r["index"])
-        for message in problems:
-            result.problems.append(Problem("edicao_perdida", message))
-        # RF-94: notes typed in the editor may carry markers too; fill them for each slide's board.
-        prs = Presentation(str(out))
-        expand_notes(prs, result.produced, deck, mapping, result)
-        prs.save(str(out))
+    # Everything that writes into the .pptx runs in the deck's language (R5): `deck_data` already
+    # pins it while the data is built, and this pins it again for anything a value renders lazily
+    # on its way into a shape. The problems it reports are messages, rendered further down.
+    with using_locale(DECK_LOCALE):
+        result = generate_deck(
+            template.path,
+            mapping,
+            deck,
+            out,
+            theme=template.manifest.get("theme"),
+            audience=audience,
+            only_slides=set(only_slides) if only_slides is not None else None,
+        )
+        # The data is in; now replay the manual edits on top, which is what makes a re-run keep them.
+        if edits.touched():
+            prs = Presentation(str(out))
+            problems, placement = apply_deck_edits(prs, result.produced, edits, asset_paths(session))
+            prs.save(str(out))
+            result.slide_count = len(prs.slides)
+            for entry in result.produced:
+                key = f"{entry['origin_slide_id']}:{entry.get('board_id') or 0}:{entry.get('page', 1)}"
+                if key in placement:
+                    entry["index"] = placement[key]
+            result.produced.sort(key=lambda r: r["index"])
+            for message in problems:
+                result.problems.append(Problem("edicao_perdida", message))
+            # RF-94: notes typed in the editor may carry markers too; fill them for each slide's board.
+            prs = Presentation(str(out))
+            expand_notes(prs, result.produced, deck, mapping, result)
+            prs.save(str(out))
     validation = validate_deck(
         result,
         mapping,
@@ -746,10 +752,7 @@ def generate_report(
     if not mapping_row:
         validation["warnings"].insert(
             0,
-            {
-                "kind": "sem_mapeamento",
-                "message": "Modelo sem mapeamento salvo: só os marcadores {{…}} foram preenchidos.",
-            },
+            {"kind": "sem_mapeamento", "message": Msg("deck_service.no_mapping").to_json()},
         )
     validation["produced"] = result.produced
     validation["edited_slides"] = sorted(edits.touched())
@@ -759,7 +762,10 @@ def generate_report(
     # Not ``kind``: that name is this run's kind (entrega, previa, parcial) and is read below.
     for finding_kind, count in a11y_summary(findings).items():
         validation["warnings"].append(
-            {"kind": f"acessibilidade_{finding_kind}", "message": A11Y_WORDS[finding_kind].format(n=count)}
+            {
+                "kind": f"acessibilidade_{finding_kind}",
+                "message": Msg(f"{A11Y_SUMMARY}{finding_kind}", n=count).to_json(),
+            }
         )
     if kind == "previa":
         prune_previews(session, settings, template_id)
@@ -773,7 +779,7 @@ def generate_report(
         sprint_ids=[b.sprint_id for b in deck.boards if b.sprint_id],
         status="ok" if validation["ok"] else "invalid",
         path=str(out),
-        validation=validation,
+        validation=stored_validation(validation),
         anonymized=mapping.anonymize if anonymize is None else anonymize,
         kind=kind,
         audience=audience,
@@ -782,21 +788,94 @@ def generate_report(
     )
 
 
-A11Y_WORDS = {
-    "sem_texto_alternativo": "{n} imagem(ns) ou gráfico(s) sem texto alternativo.",
-    "contraste_baixo": "{n} texto(s) com contraste abaixo do mínimo de leitura.",
-    "ordem_de_leitura": "{n} slide(s) com o título fora da ordem de leitura.",
-}
+#: The a11y warnings' keys: ``deck_service.a11y_summary.<finding kind>`` (one per kind `a11y.audit`
+#: reports: sem_texto_alternativo, contraste_baixo, ordem_de_leitura).
+A11Y_SUMMARY = "deck_service.a11y_summary."
 
 
 def run_accessibility(session: Session, run: s.ReportRunRow) -> dict[str, Any]:
     findings = audit(run_scene(session, run))
-    return {"summary": a11y_summary(findings), "findings": findings}
+    return {"summary": a11y_summary(findings), "findings": localize(findings)}
 
 
 def template_accessibility(session: Session, template: s.TemplateRow) -> dict[str, Any]:
     findings = audit(template_scene(session, template))
-    return {"summary": a11y_summary(findings), "findings": findings}
+    return {"summary": a11y_summary(findings), "findings": localize(findings)}
+
+
+# ---------------------------------------------------------------- validation text (R4)
+
+
+def _stored_entry(entry: Any) -> Any:
+    """One validation entry as it is persisted: the ``$msg`` record in ``msg`` and its pt-BR text
+    in ``message``, so old readers, rollbacks and ad-hoc SQL keep reading a sentence."""
+    if not isinstance(entry, dict) or not Msg.is_json(entry.get("message")):
+        return entry
+    return {**entry, "msg": entry["message"], "message": render(entry["message"], STORAGE_LOCALE)}
+
+
+def stored_validation(validation: Mapping[str, Any]) -> dict[str, Any]:
+    """``validate_deck``'s report (messages as ``$msg`` records) in the shape ``report_run`` keeps
+    (docs/i18n-backend.md, 2.7). ``info`` keeps its strings, with the records in ``info_msgs``;
+    ``preview.reason`` likewise in ``reason_msg``."""
+    out = dict(validation)
+    for name in ("errors", "warnings"):
+        if name in out:
+            out[name] = [_stored_entry(e) for e in out[name] or []]
+    info = list(out.get("info") or [])
+    if any(Msg.is_json(i) for i in info):
+        out["info_msgs"] = [i if Msg.is_json(i) else None for i in info]
+        out["info"] = [render(i, STORAGE_LOCALE) for i in info]
+    preview = out.get("preview")
+    if isinstance(preview, dict) and Msg.is_json(preview.get("reason")):
+        out["preview"] = {
+            **preview,
+            "reason_msg": preview["reason"],
+            "reason": render(preview["reason"], STORAGE_LOCALE),
+        }
+    accessibility = out.get("accessibility")
+    if isinstance(accessibility, dict) and accessibility.get("findings"):
+        out["accessibility"] = {
+            **accessibility,
+            "findings": [_stored_entry(f) for f in accessibility["findings"]],
+        }
+    return out
+
+
+def _read_entry(entry: Any) -> Any:
+    if not isinstance(entry, dict):
+        return entry
+    out = {k: v for k, v in entry.items() if k != "msg"}
+    if "message" in entry:
+        out["message"] = stored_text(entry.get("msg"), entry.get("message"))
+    return out
+
+
+def localized_validation(validation: Mapping[str, Any] | None) -> dict[str, Any]:
+    """A stored validation for a reader: every message rendered from its record in the ambient
+    language, the records themselves left out. Rows stored before the records existed keep their
+    stored pt-BR text (decision 7)."""
+    out = dict(validation or {})
+    for name in ("errors", "warnings"):
+        if name in out:
+            out[name] = [_read_entry(e) for e in out[name] or []]
+    records = out.pop("info_msgs", None)
+    if records is not None:
+        stored = list(out.get("info") or [])
+        out["info"] = [
+            stored_text(record, stored[i] if i < len(stored) else None) for i, record in enumerate(records)
+        ]
+    preview = out.get("preview")
+    if isinstance(preview, dict) and "reason_msg" in preview:
+        out["preview"] = {k: v for k, v in preview.items() if k != "reason_msg"}
+        out["preview"]["reason"] = stored_text(preview.get("reason_msg"), preview.get("reason"))
+    accessibility = out.get("accessibility")
+    if isinstance(accessibility, dict) and accessibility.get("findings"):
+        out["accessibility"] = {
+            **accessibility,
+            "findings": [_read_entry(f) for f in accessibility["findings"]],
+        }
+    return out
 
 
 #: Previews kept per template; older ones (and their files) go — they were never meant to last.
@@ -827,7 +906,7 @@ def run_dict(row: s.ReportRunRow) -> dict[str, object]:
         "board_ids": row.board_ids,
         "sprint_ids": row.sprint_ids,
         "status": row.status,
-        "validation": row.validation,
+        "validation": localized_validation(row.validation),
         "anonymized": row.anonymized,
         "kind": row.kind,
         "parent_run_id": row.parent_run_id,
@@ -870,19 +949,19 @@ def review_run(
     what the validation refused, or while a reviewer's question is unanswered, is exactly the
     decision the workflow exists to prevent."""
     if action not in REVIEW_FROM:
-        raise Invalid(f"Ação desconhecida: {action}.")
+        raise Invalid(Msg("deck_service.review.unknown_action", action=action))
     if run.kind != "entrega":
-        raise Invalid("Só uma apresentação de entrega passa por revisão, não uma prévia ou parcial.")
+        raise Invalid(Msg("deck_service.review.only_delivery"))
     if run.review_status not in REVIEW_FROM[action]:
-        raise Invalid(f"Não é possível {action} uma apresentação em “{run.review_status}”.")
+        raise Invalid(Msg("deck_service.review.wrong_state", action=action, state=run.review_status))
     if action == "aprovar":
         if run.status != "ok":
-            raise Invalid("A apresentação foi reprovada na validação; corrija os erros antes de aprovar.")
+            raise Invalid(Msg("deck_service.review.not_valid"))
         pending = open_comments(session, run.template_id)
         if pending:
-            raise Invalid(f"Há {pending} comentário(s) em aberto no modelo; resolva-os antes de aprovar.")
+            raise Invalid(Msg("deck_service.review.open_comments", count=pending))
     if action == "reprovar" and not note.strip():
-        raise Invalid("Diga o que precisa mudar ao reprovar.")
+        raise Invalid(Msg("deck_service.review.note_required"))
     now = datetime.now(UTC)
     run.review_status = REVIEW_TO[action]
     run.reviewed_by = author
@@ -901,15 +980,15 @@ def download_blocker(session: Session, run: s.ReportRunRow) -> dict[str, Any] | 
     """Why a download needs ``force``: validation first (RF-70), then approval (#12)."""
     if run.status != "ok":
         return {
-            "cause": "apresentação reprovada na validação",
-            "action": "Corrija os erros listados ou baixe mesmo assim com ?force=true.",
-            "validation": run.validation,
+            "cause": tr("deck_service.blocker.invalid.cause"),
+            "action": tr("deck_service.blocker.invalid.action"),
+            "validation": localized_validation(run.validation),
         }
     needs_approval = run.kind == "entrega" and load_mapping(session, run.template_id).require_approval
     if needs_approval and run.review_status != "aprovado":
         return {
-            "cause": "apresentação ainda não aprovada",
-            "action": "Envie para revisão e aprove, ou baixe mesmo assim com ?force=true.",
+            "cause": tr("deck_service.blocker.unapproved.cause"),
+            "action": tr("deck_service.blocker.unapproved.action"),
         }
     return None
 
@@ -920,14 +999,15 @@ def download_blocker(session: Session, run: s.ReportRunRow) -> dict[str, Any] | 
 def run_pdf(settings: Settings, run: s.ReportRunRow) -> Path:
     """The run's PDF: the one validation already rendered, or rendered now."""
     if not run.path or not Path(run.path).exists():
-        raise NotFound(run.id, f"O arquivo da geração {run.id} não está mais no disco.")
+        raise NotFound(run.id, Msg("deck_service.run.file_missing", run=run.id))
     folder = settings.decks_dir / run.id
     existing = folder / f"{Path(run.path).stem}.pdf"
     if existing.exists():
         return existing
     rendered = render_previews(Path(run.path), folder)
     if not rendered.get("pdf"):
-        raise Invalid(rendered.get("reason") or "Não foi possível gerar o PDF.")
+        reason = rendered.get("reason")
+        raise Invalid(Msg.from_json(reason) if Msg.is_json(reason) else Msg("deck_service.pdf.failed"))
     return Path(rendered["pdf"])
 
 
@@ -957,7 +1037,7 @@ def _chart_lines(shape: Any) -> list[str]:
     for plot in chart.plots:
         for series in plot.series:
             values = ", ".join(f"{cat}={val}" for cat, val in zip(categories, series.values, strict=False))
-            lines.append(f"gráfico {series.name}: {values}")
+            lines.append(tr("deck_service.compare.chart", name=str(series.name), values=values))
     return lines
 
 
@@ -968,7 +1048,7 @@ def _run_texts(run: s.ReportRunRow) -> dict[str, dict[str, Any]]:
     behind an unchanged word, or a bar's own value changing, are both real differences a
     text-only diff would otherwise call "same"."""
     if not run.path or not Path(run.path).exists():
-        raise NotFound(run.id, f"O arquivo da geração {run.id} não está mais no disco.")
+        raise NotFound(run.id, Msg("deck_service.run.file_missing", run=run.id))
     slides = list(Presentation(run.path).slides)
     out: dict[str, dict[str, Any]] = {}
     for entry in run.validation.get("produced") or []:
@@ -986,7 +1066,9 @@ def _run_texts(run: s.ReportRunRow) -> dict[str, dict[str, Any]]:
                         lines.append(" | ".join(cells))
                     fills = [_cell_fill_hex(c) for c in row.cells]
                     if any(fills):
-                        lines.append("cores: " + " | ".join(f or "-" for f in fills))
+                        lines.append(
+                            tr("deck_service.compare.colors", fills=" | ".join(f or "-" for f in fills))
+                        )
             if getattr(shape, "has_chart", False) and shape.has_chart:
                 lines += _chart_lines(shape)
         key = f"{entry.get('origin_slide_id')}:{entry.get('board_id') or 0}:{entry.get('page', 1)}"
@@ -1030,9 +1112,9 @@ def create_share(
     session: Session, run: s.ReportRunRow, author: str | None, days: int = SHARE_DAYS
 ) -> s.DeckShareRow:
     if run.kind != "entrega":
-        raise Invalid("Só uma apresentação de entrega pode ser compartilhada.")
+        raise Invalid(Msg("deck_service.share.only_delivery"))
     if not 1 <= days <= 90:
-        raise Invalid("O link vale de 1 a 90 dias.")
+        raise Invalid(Msg("deck_service.share.days"))
     now = datetime.now(UTC)
     row = s.DeckShareRow(
         token=secrets.token_urlsafe(24),
@@ -1051,10 +1133,10 @@ def shared_run(session: Session, token: str) -> s.ReportRunRow:
     NotFound, so probing learns nothing about which tokens ever existed."""
     share = session.get(s.DeckShareRow, token)
     if share is None or share.revoked_at is not None or share.expires_at <= datetime.now(UTC):
-        raise NotFound("link", "Link inexistente, expirado ou revogado.")
+        raise NotFound("link", Msg("deck_service.share.not_found"))
     run = session.get(s.ReportRunRow, share.run_id)
     if run is None:
-        raise NotFound("link", "Link inexistente, expirado ou revogado.")
+        raise NotFound("link", Msg("deck_service.share.not_found"))
     return run
 
 
@@ -1095,7 +1177,7 @@ def template_variable_names(template: s.TemplateRow, mapping: DeckMapping) -> di
                 note(marker_base(name), f"slide {slide.get('index')} · {area.get('id')}")
     for slide_id, spec in mapping.slides.items():
         if spec.hide_when_empty:
-            note(spec.hide_when_empty, f"slide {slide_id} · ocultar quando vazio")
+            note(spec.hide_when_empty, f"slide {slide_id} · {tr('deck_service.audit.hide_when_empty')}")
         for binding in spec.bindings:
             if binding.key and binding.value is None:
                 note(binding.key, f"slide {slide_id} · {binding.target}")
@@ -1187,13 +1269,11 @@ def variable_conflicts(session: Session, template_id: int | None = None) -> list
                 {
                     "kind": "sombreada",
                     "name": name,
-                    "message": (
-                        f"A variável {name} está registrada {len(rows)} vezes. "
-                        + (
-                            "A do modelo é a que vale."
-                            if winner.template_id is not None
-                            else "A compartilhada é a que vale."
-                        )
+                    "message": tr(
+                        "deck_service.conflict.shadowed",
+                        name=name,
+                        count=len(rows),
+                        template_wins=winner.template_id is not None,
                     ),
                     "winner_template_id": winner.template_id,
                 }
@@ -1204,7 +1284,7 @@ def variable_conflicts(session: Session, template_id: int | None = None) -> list
                 {
                     "kind": "colide_com_campo",
                     "name": name,
-                    "message": f"{key} é também um campo do catálogo; renomeie a variável.",
+                    "message": tr("deck_service.conflict.field", key=key),
                     "winner_template_id": None,
                 }
             )
@@ -1222,8 +1302,29 @@ def field_catalog(session: Session, template_id: int | None = None) -> list[JSON
     """
     return [
         {**entry, "origin": "variavel" if str(entry["key"]).startswith(FIXED_PREFIX) else "jira"}
-        for entry in catalog(catalog_extras(session, template_id))
+        for entry in localized_catalog(catalog(catalog_extras(session, template_id)))
     ]
+
+
+def localized_catalog(entries: Iterable[Mapping[str, Any]]) -> list[JSONDict]:
+    """`context.catalog()` entries for a person, in the ambient language (D7).
+
+    `FIELDS` keeps its pt-BR labels because the deck prints them (chart alt text); the picker shows
+    ``fields.label.<key>`` instead. A variable keeps its registered label, which is user data —
+    only its hint is translated. ``group_id`` is the stable group to sort and group by, now that
+    ``group`` is a translated word."""
+    out: list[JSONDict] = []
+    for entry in entries:
+        item = dict(entry)
+        key = str(item.get("key", ""))
+        if key in FIELD_INDEX:
+            item["label"] = tr(f"fields.label.{key}")
+        group_id = GROUP_IDS.get(str(item.get("group", "")))
+        if group_id is not None:
+            item["group"] = tr(f"fields.group.{group_id}")
+        item["group_id"] = group_id
+        out.append(localize(item))
+    return out
 
 
 def resolve_source_fields(
@@ -1259,10 +1360,11 @@ def resolve_source_fields(
     )
     board = deck.boards[0] if deck.boards else None
     out: dict[str, str] = {}
-    for name in connected:
-        _kind, value = resolve(deck, board, f"{FIXED_PREFIX}{name}")
-        if value is not None and not isinstance(value, type(MISSING)):
-            out[name] = str(value)
+    with using_locale(DECK_LOCALE):  # what the deck will really carry, so in the deck's language
+        for name in connected:
+            _kind, value = resolve(deck, board, f"{FIXED_PREFIX}{name}")
+            if value is not None and not isinstance(value, type(MISSING)):
+                out[name] = str(value)
     return out
 
 
@@ -1331,10 +1433,8 @@ def plan_binding_migration(session: Session, template_id: int | None = None) -> 
                 {
                     **entry,
                     "name": name,
-                    "reason": (
-                        f"já existe uma variável chamada {name}"
-                        + (f", ligada a {existing.source_field}" if existing.source_field else "")
-                        + "; renomeie uma das duas antes de converter."
+                    "reason": tr(
+                        "deck_service.migration.name_taken", name=name, source=existing.source_field
                     ),
                 }
             )
@@ -1361,7 +1461,7 @@ def apply_binding_migration(session: Session, template_id: int | None = None) ->
     """
     plan = plan_binding_migration(session, template_id)
     if not plan["ok"]:
-        raise Invalid("há conflitos de nome; resolva-os antes de converter")
+        raise Invalid(Msg("deck_service.migration.conflicts"))
 
     created: list[JSONDict] = []
     for entry in plan["create"]:
@@ -1369,7 +1469,7 @@ def apply_binding_migration(session: Session, template_id: int | None = None) ->
             session,
             name=str(entry["name"]),
             label=str(entry["label"]),
-            description=f"Convertida do campo {entry['field']} (RF-59).",
+            description=tr("deck_service.migration.description", field=str(entry["field"])),
             source_field=str(entry["field"]),
         )
         created.append({"id": row.id, "name": row.name, "source_field": row.source_field})
@@ -1469,7 +1569,7 @@ def template_readiness(session: Session, settings: Settings, template_id: int, n
     """
     template = session.get(s.TemplateRow, template_id)
     if template is None:
-        raise NotFound(template_id, f"Modelo {template_id}.")
+        raise NotFound(template_id, Msg("deck_service.template.not_found_id", template=template_id))
     mapping = load_mapping(session, template_id)
     registry = variable_registry(session, template_id)
     lookup = variable_lookup(session, template_id)
@@ -1556,7 +1656,7 @@ def replace_in_variables(
     before anybody commits to renaming a product across thirty values.
     """
     if not find:
-        raise Invalid("informe o texto a procurar")
+        raise Invalid(Msg("deck_service.find.required"))
     pattern = re.compile(re.escape(find), 0 if match_case else re.IGNORECASE)
 
     def swap(text: str) -> str:

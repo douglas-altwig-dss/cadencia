@@ -23,7 +23,7 @@ from cadencia.api.deps import (
     stored_file,
 )
 from cadencia.errors import Invalid, NotFound
-from cadencia.i18n import Msg, tr
+from cadencia.i18n import Msg, localize, tr
 from cadencia.report.core.context import FIXED_PREFIX, catalog
 from cadencia.report.core.edits import DeckEdits, merge_edits
 from cadencia.report.core.fonts import face_file, font_plan
@@ -41,6 +41,7 @@ from cadencia.report.service import (
     field_catalog,
     generate_report,
     load_edits,
+    localized_catalog,
     preview_fields,
     preview_slide,
     reassociate_run,
@@ -107,7 +108,7 @@ def _boards(session: SessionDep) -> list[dict[str, object]]:
 @router.get("/catalog")
 def fields_catalog(session: SessionDep, template_id: int | None = None) -> JSONDict:
     """The field picker: the fixed catalogue plus the variables this template may use."""
-    return {"fields": catalog(catalog_extras(session, template_id))}
+    return {"fields": localized_catalog(catalog(catalog_extras(session, template_id)))}
 
 
 # ------------------------------------------------------------ variables (RF-45, RF-52)
@@ -375,7 +376,7 @@ def template_detail(template_id: int, session: SessionDep) -> JSONDict:
         "mapping_sha256": mapping.template_sha256 if mapping else None,
         "mapping_outdated": bool(mapping and mapping.template_sha256 != row.sha256),
         "missing_targets": missing,
-        "suggestion": suggest_mapping(row.manifest, _boards(session)),
+        "suggestion": localize(suggest_mapping(row.manifest, _boards(session))),
         "boards": _boards(session),
     }
 
