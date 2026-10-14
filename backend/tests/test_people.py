@@ -204,14 +204,45 @@ def test_the_week_reads_as_signals_not_a_verdict(client):
     assert all(s["kind"] != "bloqueios" for s in ana["signals"])
 
 
+def _rows(nodes):
+    for node in nodes:
+        yield node
+        yield from _rows(node["children"])
+
+
 def test_the_timeline_runs_from_in_progress_to_done_or_now(client):
-    bars = {b["key"]: b for b in detail(client, "demo-ana")["timeline"]["items"]}
-    assert bars["CAD-10"]["state"] == "concluido" and bars["CAD-10"]["start"] < bars["CAD-10"]["end"]
-    # CAD-17 is open but never entered a working status, so it has no bar at all.
-    assert "CAD-17" not in bars
-    assert all(b["began"] <= b["end"] for b in bars.values())
-    diego = {b["key"]: b for b in detail(client, "demo-diego")["timeline"]["items"]}
-    assert diego["CAD-13"]["state"] == "bloqueado"
+    timeline = detail(client, "demo-ana")["timeline"]
+    # The sprint timeline's own shape, over the person's last weeks.
+    assert set(timeline["window"]) == {"start", "end", "today"}
+    assert timeline["window"]["start"] < timeline["window"]["end"]
+    rows = {r["key"]: r for r in _rows(timeline["nodes"])}
+    assert rows["CAD-10"]["state"] == "concluido" and rows["CAD-10"]["start"] < rows["CAD-10"]["end"]
+    assert rows["CAD-10"]["member"] and rows["CAD-10"]["issue"]["key"] == "CAD-10"
+    # CAD-17 is open but never entered a working status, so it is not on her timeline.
+    assert "CAD-17" not in rows
+    items = [r for r in rows.values() if not r["synthetic"] and r["issue"]["level"] <= 0]
+    assert all(r["member"] for r in items)
+    assert all(r["start"] is None or r["end"] is None or r["start"] <= r["end"] for r in rows.values())
+    # Her items sit under their epics, which only group them.
+    epics = [r for r in rows.values() if r["issue"] and r["issue"]["level"] > 0]
+    assert epics and not any(r["member"] for r in epics)
+    assert timeline["counts"]["itens"] + timeline["counts"]["subtarefas"] == len(items)
+    diego = {r["key"]: r for r in _rows(detail(client, "demo-diego")["timeline"]["nodes"])}
+    assert diego["CAD-13"]["state"] == "bloqueado" and diego["CAD-13"]["risk"] is not None
+    # Nobody else's sprint marks: a person's period has no sprint to be carried into or added to.
+    assert not any(r["added"] or r["carried"] for r in diego.values())
+
+
+def test_someone_on_two_boards_gets_one_group_per_board(client):
+    nodes = detail(client, "demo-diego")["timeline"]["nodes"]
+    assert [n["label"] for n in nodes] == ["Dados", "Plataforma"]  # alphabetical
+    for group in nodes:
+        assert group["synthetic"] and group["key"].startswith("board:") and group["children"]
+        begun = [c["start"] for c in group["children"] if c["start"]]
+        assert group["start"] == min(begun)
+        # A group ends only once everything under it has.
+        if any(c["state"] != "concluido" for c in group["children"]):
+            assert group["end"] is None
 
 
 def test_capacity_per_sprint_sets_commitment_against_hours(client):

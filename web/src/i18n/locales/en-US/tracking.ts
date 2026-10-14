@@ -487,7 +487,7 @@ export const tracking = {
     calculate: 'Calculate theoretical distribution',
     noPlan: 'No distribution calculated for this sprint.',
   },
-  /** `components/SprintTimeline.tsx` and `lib/sprintTimeline.ts`. Keys of `states` are the API's timeline states. */
+  /** `components/WorkTimeline.tsx` and `lib/timeline.ts`. Keys of `states` are the API's timeline states. */
   timeline: {
     states: { concluido: 'done', andamento: 'in progress', bloqueado: 'blocked', aberto: 'not started' },
     kindGroup: 'Group',
@@ -529,6 +529,7 @@ export const tracking = {
       `${plural(epics, 'epic', 'epics')} · ${plural(items, 'item', 'items')} · ${plural(subtasks, 'subtask', 'subtasks')}`,
     sprintEnd: 'end of sprint',
     todayOn: (date: string) => ` · today: ${date}`,
+    todayIs: (date: string) => `today: ${date}`,
     noneFiltered: 'No items with these filters.',
     none: 'No items in this sprint.',
     listByPerson: 'Sprint items by person',

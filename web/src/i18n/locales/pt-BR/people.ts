@@ -200,18 +200,10 @@ export const people: Messages['people'] = {
   },
 
   timeline: {
-    state: {
-      concluido: 'concluído',
-      andamento: 'em andamento',
-      bloqueado: 'bloqueado',
-      aberto: 'aberto',
-    },
+    summaryTitle: 'Últimas 8 semanas',
     empty: 'Nenhum item desta pessoa entrou em andamento nas últimas semanas.',
-    withSubtasks: 'Incluir subtarefas',
     listAria: 'Itens da pessoa ao longo do tempo',
-    bar: (key, state, from, to) => `${key}, ${state}, de ${from} a ${to}`,
-    today: 'hoje',
-    foot: 'Da primeira entrada em andamento até a conclusão. Últimas 8 semanas; uma ponta cortada à esquerda começou antes.',
+    help: 'Clique numa barra ou num nome para ver o item ao lado; as setas andam entre as linhas e Enter abre a que tem o foco. Passe o mouse no eixo para ler a data e quantos itens estavam em andamento nela. Cada barra vai de quando o item entrou em andamento até ser concluído, ou até hoje; uma barra cortada à esquerda começou antes destas semanas.',
   },
 
   week: {

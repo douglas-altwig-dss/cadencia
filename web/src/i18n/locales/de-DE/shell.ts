@@ -623,6 +623,8 @@ export const shell: Messages['shell'] = {
     'col:data': 'Wann dieses Board zuletzt erfolgreich abgerufen wurde. Eine Warnung erscheint, wenn der letzte Datenabruf fehlschlug oder mehr als 26 Stunden zurückliegt.',
 
     'person:load': `Offene Stunden ÷ verbleibende Kapazität.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES} Hat kein Vorgang eine Schätzung, ist die Zahl nur eine Vermutung und es erscheint „ohne Schätzung“.`,
+    'person:timeline':
+      'Die Vorgänge, die die Person hatte — bei Erledigung oder jetzt — und die in den letzten 8 Wochen irgendwann in Arbeit waren, Unteraufgaben eingeschlossen, unter ihren Epics (und eine Gruppe pro Board, wenn es mehrere sind). Erledigt, in Arbeit, blockiert und nicht begonnen ist der heutige Zustand jedes Vorgangs; blockiert heißt, dass eine Blockaderegel ausgelöst hat (Markierung, blockierender Status oder ein offener Link „wird blockiert durch“). Ein Vorgang kann zugleich überfällig und blockiert sein, daher ergeben die Risiko-Chips nicht die Summe.',
     'person:delivered':
       'Im aktuellen Sprint erledigte Vorgänge, von wie vielen zu Beginn zugesagt wurden. Zusage und Lieferung zählen für die Person, die den Vorgang zu Beginn hatte; später hinzugekommene, bereits erledigte Vorgänge zählen auch. Ohne aktiven Sprint zählt, was in der Woche erledigt wurde.',
     'person:blocks': BLOCK,

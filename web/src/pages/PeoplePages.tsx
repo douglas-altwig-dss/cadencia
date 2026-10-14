@@ -375,9 +375,7 @@ export function PersonPage() {
             </Stack>
           </Tabs.Panel>
           <Tabs.Panel value="timeline">
-            <Paper withBorder p="md">
-              <PersonTimeline timeline={data.timeline} />
-            </Paper>
+            <PersonTimeline timeline={data.timeline} />
           </Tabs.Panel>
           <Tabs.Panel value="capacity">
             <PersonCapacity accountId={accountId} sprints={data.capacity.sprints} />

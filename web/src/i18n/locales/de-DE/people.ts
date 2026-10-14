@@ -201,18 +201,10 @@ export const people: Messages['people'] = {
   },
 
   timeline: {
-    state: {
-      concluido: 'erledigt',
-      andamento: 'in Arbeit',
-      bloqueado: 'blockiert',
-      aberto: 'offen',
-    },
+    summaryTitle: 'Letzte 8 Wochen',
     empty: 'Keiner der Vorgänge dieser Person ist in den letzten Wochen in Arbeit gegangen.',
-    withSubtasks: 'Unteraufgaben einbeziehen',
     listAria: 'Vorgänge der Person im Zeitverlauf',
-    bar: (key, state, from, to) => `${key}, ${state}, von ${from} bis ${to}`,
-    today: 'heute',
-    foot: 'Vom ersten Wechsel in Arbeit bis zum Abschluss. Letzte 8 Wochen; ein links abgeschnittener Balken hat früher begonnen.',
+    help: 'Klicken Sie auf einen Balken oder einen Namen, um den Vorgang daneben zu sehen; die Pfeiltasten wechseln zwischen den Zeilen, Enter öffnet die fokussierte. Zeigen Sie auf die Achse, um das Datum zu lesen und wie viele Vorgänge an diesem Tag in Arbeit waren. Jeder Balken reicht vom Wechsel in Arbeit bis zur Erledigung oder bis heute; ein links abgeschnittener Balken hat vor diesen Wochen begonnen.',
   },
 
   week: {

@@ -667,6 +667,8 @@ export const shell = {
 
     // ---- a person's card and summary
     'person:load': `Open hours ÷ capacity left.\n\n${HOURS}\n\n${CAPACITY}\n\n${LOAD_STATES} If no item has an estimate, the number is only a guess and “no estimate” is shown.`,
+    'person:timeline':
+      'The items the person held — when done, or now — that were in progress at some point of the last 8 weeks, subtasks included, under their epics (and one group per board when there are several). Done, in progress, blocked and not started are each item’s state today; blocked means a block rule fired (flag, blocking status or an open “is blocked by” link). An item can be overdue and blocked at once, so the risk chips do not add up to the total.',
     'person:delivered':
       'Items done in the current sprint, out of how many were committed at the start. Commitment and delivery belong to whoever held the item at the start; items that entered later and are already done count too. With no active sprint, it counts what was done this week.',
     'person:blocks': BLOCK,
