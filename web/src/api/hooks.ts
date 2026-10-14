@@ -397,8 +397,16 @@ export const useSpace = (key?: string) =>
 export const useRun = (runId?: string) =>
   useQuery({ queryKey: ['run', runId], queryFn: () => api.get<ReportRun>(`/reports/runs/${runId}`), enabled: !!runId });
 
-export const useRuns = (templateId?: number) =>
-  useQuery({ queryKey: ['runs', templateId], queryFn: () => api.get<{ items: ReportRun[] }>(`/reports/runs${qs({ template_id: templateId })}`) });
+/**
+ * Generations, newest first: one template's, or every template's when `templateId` is undefined.
+ * Pass `enabled: false` while the template is still unknown, or the undefined reads as "all of them".
+ */
+export const useRuns = (templateId?: number, enabled = true) =>
+  useQuery({
+    queryKey: ['runs', templateId],
+    queryFn: () => api.get<{ items: ReportRun[] }>(`/reports/runs${qs({ template_id: templateId })}`),
+    enabled,
+  });
 
 // ---- writes
 

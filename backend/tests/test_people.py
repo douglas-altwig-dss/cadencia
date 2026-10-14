@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
+from collections import Counter
 from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, text
 
+from cadencia.analytics import person_detail
+from cadencia.analytics.data import load_board
 from cadencia.analytics.people_overview import BLOCK_DAYS, _OnBoard, has_activity, severity
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
 from cadencia.domain.capacity import Availability, sprint_capacity
 from cadencia.domain.models import BoardProfile, Person
-from cadencia.store.db import make_engine, upgrade
+from cadencia.store import repo
+from cadencia.store.db import make_engine, session_scope, upgrade
 from tests.support import NOW, PT_BR, collect_demo
 
 
@@ -231,6 +236,19 @@ def test_the_timeline_runs_from_in_progress_to_done_or_now(client):
     assert diego["CAD-13"]["state"] == "bloqueado" and diego["CAD-13"]["risk"] is not None
     # Nobody else's sprint marks: a person's period has no sprint to be carried into or added to.
     assert not any(r["added"] or r["carried"] for r in diego.values())
+
+
+def test_an_item_on_two_boards_is_listed_once(client, sessions, settings):
+    # The demo has no item shared by two boards, so one board is given a twin holding the same items.
+    with session_scope(sessions) as session:
+        data = load_board(session, 1, repo.profile_defaults(settings), settings.history_days)
+    twin = dataclasses.replace(data, board=dataclasses.replace(data.board, id=99, name="Atendimento"))
+    timeline = person_detail._timeline([data, twin], "demo-ana", NOW, NOW - timedelta(weeks=8), None)
+    members = Counter(r["key"] for r in _rows(timeline["nodes"]) if r["member"])
+    assert members and all(n == 1 for n in members.values())
+    # The board that comes first by name keeps them; one with nothing left is not a group at all.
+    assert [n["key"] for n in timeline["nodes"] if n["synthetic"]] == []
+    assert timeline["counts"]["itens"] + timeline["counts"]["subtarefas"] == len(members)
 
 
 def test_someone_on_two_boards_gets_one_group_per_board(client):

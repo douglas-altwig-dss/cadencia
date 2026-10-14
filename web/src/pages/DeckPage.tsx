@@ -1278,7 +1278,8 @@ export function RunPage() {
   const navigate = useNavigate();
   const run = useRun(runId);
   const detail = useTemplate(run.data?.template_id);
-  const runs = useRuns(run.data?.template_id);
+  // Only this template's generations, and only once the run says which template that is.
+  const runs = useRuns(run.data?.template_id, run.data !== undefined);
   if (run.isLoading) return <Loading rows={6} />;
   if (run.error) return <ErrorState error={run.error} />;
   if (!run.data) return null;
