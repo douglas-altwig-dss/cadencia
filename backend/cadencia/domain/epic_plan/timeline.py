@@ -17,6 +17,7 @@ from cadencia.domain.epic_plan.graph import natural_key
 from cadencia.domain.epic_plan.hours import hours_label
 from cadencia.domain.epic_plan.model import Epic, Phase, Role
 from cadencia.domain.epic_plan.schedule import Schedule, SchedulingProblem
+from cadencia.i18n.message import Msg
 
 DAYS_PER_WEEK = 5
 
@@ -31,18 +32,23 @@ class Duration:
         return self.planning_days + self.execution_days
 
     @property
-    def label(self) -> str:
-        return (
-            f"Planejamento {self.planning_days} d + Execução {self.execution_days} d = "
-            f"Total {self.total_days} dias úteis"
+    def label(self) -> Msg:
+        """``Planejamento 6 d + Execução 1 d = Total 7 dias úteis`` in pt-BR (also the deck's
+        ``plano.duracao``, which is built in the deck locale)."""
+        return Msg(
+            "epic_plan.duration",
+            planning=self.planning_days,
+            execution=self.execution_days,
+            total=self.total_days,
         )
 
     def as_dict(self) -> dict[str, Any]:
+        """``rotulo`` is ``$msg`` JSON: the view that embeds it ends with ``localize``."""
         return {
             "planejamento_dias": self.planning_days,
             "execucao_dias": self.execution_days,
             "total_dias": self.total_days,
-            "rotulo": self.label,
+            "rotulo": self.label.to_json(),
         }
 
 
@@ -146,7 +152,9 @@ def task_segments(epic: Epic, problem: SchedulingProblem, schedule: Schedule) ->
                     "inicio": round(start * step, 4),
                     "fim": round(end * step, 4),
                     "horas": hours,
-                    "rotulo": hours_label(round((end - start) * step, 4), problem.params.workday_hours),
+                    "rotulo": hours_label(
+                        round((end - start) * step, 4), problem.params.workday_hours
+                    ).to_json(),
                     "subtarefas": sorted({p[2] for p in part}, key=natural_key),
                 }
             )

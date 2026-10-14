@@ -24,6 +24,7 @@ from typing import Any
 from cadencia.domain.epic_plan.graph import natural_key, subtask_cycles, tails
 from cadencia.domain.epic_plan.model import Epic, Member, Parameters, Problem, Role
 from cadencia.errors import Invalid
+from cadencia.i18n.message import Msg
 
 EPSILON = 1e-6
 
@@ -147,7 +148,7 @@ def blocking_problems(epic: Epic, workers: Sequence[Worker], roles: Sequence[Rol
             Problem(
                 "erro",
                 "ciclo",
-                "Dependência circular entre subtarefas: " + " → ".join((*cycle, cycle[0])) + ".",
+                Msg("epic_plan.problem.cycle", path=" → ".join((*cycle, cycle[0]))),
                 cycle,
             )
         )
@@ -171,8 +172,11 @@ def blocking_problems(epic: Epic, workers: Sequence[Worker], roles: Sequence[Rol
             Problem(
                 "erro",
                 "papel_sem_membro",
-                f"Nenhum membro selecionado cobre o papel {names.get(role_id, role_id)}; "
-                f"subtarefas afetadas: {', '.join(subtasks)}.",
+                Msg(
+                    "epic_plan.problem.role_without_member",
+                    role=str(names.get(role_id, role_id)),
+                    keys=subtasks,
+                ),
                 tuple(subtasks),
             )
         )
@@ -181,8 +185,7 @@ def blocking_problems(epic: Epic, workers: Sequence[Worker], roles: Sequence[Rol
             Problem(
                 "erro",
                 "composta_sem_par",
-                "Subtarefas compostas precisam de duas pessoas diferentes, e só uma pessoa selecionada "
-                f"cobre os dois papéis: {', '.join(impossible)}.",
+                Msg("epic_plan.problem.composite_without_pair", keys=impossible),
                 tuple(impossible),
             )
         )
@@ -194,7 +197,7 @@ def build_problem(
 ) -> SchedulingProblem:
     problems = blocking_problems(epic, workers, roles)
     if problems:
-        raise Invalid(" ".join(p.message for p in problems))
+        raise Invalid(Msg("epic_plan.problems", items=[p.message for p in problems]))
     ordered = sorted(epic.subtasks, key=lambda s: natural_key(s.id))
     known = {s.id for s in ordered}
     return SchedulingProblem(
@@ -210,51 +213,58 @@ def build_problem(
 # ---------------------------------------------------------------------------------- validator
 
 
-def validate(problem: SchedulingProblem, schedule: Schedule) -> list[str]:
+def validate(problem: SchedulingProblem, schedule: Schedule) -> list[Msg]:
     """Every rule of the agenda, checked on a finished plan — whoever produced it."""
-    errors: list[str] = []
+    errors: list[Msg] = []
     workers = {w.id: w for w in problem.workers}
     by_subtask = schedule.by_subtask()
     for unknown in sorted(set(by_subtask) - set(problem.subtasks), key=natural_key):
-        errors.append(f"{unknown} não faz parte do épico.")
+        errors.append(Msg("epic_plan.violation.unknown_subtask", key=unknown))
     for sid in problem.subtasks:
         allocations = by_subtask.get(sid, [])
         needed = sorted(problem.roles[sid])
         if sorted(a.role_id for a in allocations) != needed:
-            errors.append(f"{sid} não está alocada exatamente uma vez para cada papel que exige.")
+            errors.append(Msg("epic_plan.violation.roles_once", key=sid))
             continue
         if len({a.worker_id for a in allocations}) != len(allocations):
-            errors.append(f"{sid} é composta e tem a mesma pessoa nas duas vagas.")
+            errors.append(Msg("epic_plan.violation.same_person", key=sid))
         if len({(a.start, a.end) for a in allocations}) != 1:
-            errors.append(f"{sid} é composta e as duas vagas não acontecem ao mesmo tempo.")
+            errors.append(Msg("epic_plan.violation.not_together", key=sid))
         for allocation in allocations:
             worker = workers.get(allocation.worker_id)
             if worker is None:
-                errors.append(f"{sid} foi alocada a {allocation.worker_id}, que não está selecionado.")
+                errors.append(Msg("epic_plan.violation.not_selected", key=sid, worker=allocation.worker_id))
             elif allocation.role_id not in worker.roles:
-                errors.append(f"{sid} foi alocada a {worker.name}, que não tem o papel exigido.")
+                errors.append(Msg("epic_plan.violation.lacks_role", key=sid, worker=worker.name))
             if allocation.start < 0 or allocation.end - allocation.start != problem.duration[sid]:
-                errors.append(f"{sid} não ocupa a sua duração em horas úteis contínuas.")
+                errors.append(Msg("epic_plan.violation.duration", key=sid))
     starts = {sid: min(a.start for a in al) for sid, al in by_subtask.items()}
     ends = {sid: max(a.end for a in al) for sid, al in by_subtask.items()}
     for sid in problem.subtasks:
         for pred in problem.preds[sid]:
             if sid in starts and pred in ends and starts[sid] < ends[pred]:
-                errors.append(f"{sid} começa antes de o pré-requisito {pred} terminar.")
+                errors.append(Msg("epic_plan.violation.prerequisite", key=sid, prerequisite=pred))
     per_day = problem.slots_per_day
     for worker_id, allocations in schedule.by_worker().items():
         name = workers[worker_id].name if worker_id in workers else worker_id
         busy = [a for a in allocations if a.end > a.start]
         for first, second in pairwise(busy):
             if second.start < first.end:
-                errors.append(f"{name} está em {first.subtask_id} e {second.subtask_id} ao mesmo tempo.")
+                errors.append(
+                    Msg(
+                        "epic_plan.violation.overlap",
+                        name=name,
+                        first=first.subtask_id,
+                        second=second.subtask_id,
+                    )
+                )
         load: dict[int, int] = defaultdict(int)
         for allocation in busy:
             for slot in range(allocation.start, allocation.end):
                 load[slot // per_day] += 1
         for day, slots in sorted(load.items()):
             if slots > per_day:
-                errors.append(f"{name} passa da jornada no dia {day + 1}.")
+                errors.append(Msg("epic_plan.violation.workday", name=name, day=day + 1))
     return errors
 
 
@@ -277,7 +287,7 @@ def list_schedule(problem: SchedulingProblem) -> Schedule:
     while pending:
         ready = [s for s in pending if all(p in finished for p in problem.preds[s])]
         if not ready:
-            raise Invalid("Dependência circular entre subtarefas: " + ", ".join(pending) + ".")
+            raise Invalid(Msg("epic_plan.problem.cycle", path=", ".join(pending)))
         sid = min(ready, key=lambda s: (-remaining[s], natural_key(s)))
         pending.remove(sid)
         release = max((finished[p] for p in problem.preds[sid]), default=0)

@@ -20,6 +20,7 @@ from cadencia.domain.epic_plan.schedule import (
     list_schedule,
     lower_bound,
 )
+from cadencia.i18n.message import Msg
 
 OPTIMAL = "otimo"
 FEASIBLE = "viavel"
@@ -28,7 +29,15 @@ HEURISTIC = "heuristico"
 
 
 class SolverUnavailable(RuntimeError):
-    """The solver library is not installed or could not start."""
+    """The solver library is not installed or could not start. ``msg`` is rendered where the
+    reader is (the API's 503); ``str(exc)`` speaks the ambient locale."""
+
+    def __init__(self, message: Msg | str) -> None:
+        super().__init__(message)
+        self.msg: Msg | str = message
+
+    def __str__(self) -> str:
+        return str(self.msg)
 
 
 @dataclass(frozen=True)
@@ -92,7 +101,7 @@ def solve_cpsat(problem: SchedulingProblem, seconds: float) -> SolveResult:
     try:
         from ortools.sat.python import cp_model
     except ImportError as exc:  # pragma: no cover - exercised only without OR-Tools
-        raise SolverUnavailable("OR-Tools (CP-SAT) não está instalado no backend.") from exc
+        raise SolverUnavailable(Msg("planner.unavailable", solver="CP-SAT")) from exc
     began = time.monotonic()
     hint = list_schedule(problem)
     horizon = max(hint.makespan, 1)
@@ -167,7 +176,7 @@ def solve_milp(problem: SchedulingProblem, seconds: float) -> SolveResult:
     try:
         from ortools.math_opt.python import mathopt
     except ImportError as exc:  # pragma: no cover - exercised only without OR-Tools
-        raise SolverUnavailable("OR-Tools (MathOpt/HiGHS) não está instalado no backend.") from exc
+        raise SolverUnavailable(Msg("planner.unavailable", solver="MathOpt/HiGHS")) from exc
     began = time.monotonic()
     hint = list_schedule(problem)
     horizon = max(hint.makespan, 1)

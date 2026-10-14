@@ -16,6 +16,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from cadencia.domain.epic_plan.model import Epic, Kind, Member, Parameters, Phase, Problem, Role
+from cadencia.i18n.message import Msg
 
 EPSILON = 1e-6
 
@@ -126,7 +127,7 @@ def round_up(hours: float, step: float) -> float:
 def consistency_problems(epic: Epic, params: Parameters) -> list[Problem]:
     """Code-review and card-creation hours checked against what the parameters say they cost."""
     problems: list[Problem] = []
-    missing_review: list[str] = []
+    missing_review: list[tuple[str, float]] = []
     for task in epic.tasks:
         subtasks = epic.subtasks_of(task.id)
         reviews = [s for s in subtasks if s.kind is Kind.CODE_REVIEW]
@@ -136,7 +137,7 @@ def consistency_problems(epic: Epic, params: Parameters) -> list[Problem]:
                     Problem(
                         "aviso",
                         "code_review_sem_codigo",
-                        f"{task.id} está marcada como sem código, mas tem subtarefa de code review.",
+                        Msg("epic_plan.problem.code_review_without_code", task=task.id),
                         tuple(s.id for s in reviews),
                     )
                 )
@@ -147,15 +148,20 @@ def consistency_problems(epic: Epic, params: Parameters) -> list[Problem]:
         expected = round_up(params.code_review_hours * len(executions), params.slot_hours)
         actual = _sum(s.hours for s in reviews)
         if not reviews:
-            missing_review.append(f"{task.id} ({fmt_hours(expected)}h)")
+            missing_review.append((task.id, expected))
         elif abs(actual - expected) > EPSILON:
             problems.append(
                 Problem(
                     "aviso",
                     "code_review_divergente",
-                    f"Code review de {task.id}: {fmt_hours(actual)}h estimadas, "
-                    f"{fmt_hours(expected)}h esperadas ({len(executions)} subtarefas × "
-                    f"{fmt_hours(params.code_review_hours)}h).",
+                    Msg(
+                        "epic_plan.problem.code_review_mismatch",
+                        task=task.id,
+                        actual=actual,
+                        expected=expected,
+                        count=len(executions),
+                        each=params.code_review_hours,
+                    ),
                     tuple(s.id for s in reviews),
                 )
             )
@@ -168,25 +174,23 @@ def consistency_problems(epic: Epic, params: Parameters) -> list[Problem]:
             Problem(
                 "aviso",
                 "cadastro_divergente",
-                f"Cadastro de cards: {fmt_hours(actual)}h estimadas, {fmt_hours(expected)}h esperadas "
-                f"({cards} cards × {fmt_hours(params.card_minutes)} min).",
+                Msg(
+                    "epic_plan.problem.card_setup_mismatch",
+                    actual=actual,
+                    expected=expected,
+                    cards=cards,
+                    minutes=params.card_minutes,
+                ),
                 tuple(s.id for s in setups),
             )
         )
     return problems
 
 
-def fmt_hours(hours: float) -> str:
-    """``3.5`` → ``3,5``; ``19.0`` → ``19``."""
-    text = f"{round(hours, 2):.2f}".rstrip("0").rstrip(".")
-    return text.replace(".", ",")
-
-
-def hours_label(hours: float, workday_hours: float) -> str:
-    """``19h · 3d 1h``: the hours, then whole workdays plus what is left of the last one."""
+def hours_label(hours: float, workday_hours: float) -> Msg:
+    """``19h · 3d 1h`` (pt-BR, en-US) / ``19h · 3T 1h`` (de-DE): the hours, then whole workdays
+    plus what is left of the last one. ``rest`` is 0 when nothing is left; the catalogue formats
+    the numbers per locale (``cadencia.i18n.fmt.hours``: ``7,5`` in pt-BR, as it always was)."""
     days = int(hours // workday_hours + EPSILON)
     rest = round(hours - days * workday_hours, 4)
-    base = f"{fmt_hours(hours)}h"
-    if days == 0:
-        return base
-    return f"{base} · {days}d" + (f" {fmt_hours(rest)}h" if rest > EPSILON else "")
+    return Msg("epic_plan.hours_label", hours=hours, days=days, rest=rest if days and rest > EPSILON else 0)

@@ -8,9 +8,19 @@ from enum import StrEnum
 from typing import Any
 
 from cadencia.errors import Invalid
+from cadencia.i18n.message import Msg
 
-SENIORITIES = {"junior": "Júnior", "pleno": "Pleno", "senior": "Sênior"}
-HOURS_SOURCES = {"original": "estimativa original", "estimate": "campo de estimativa"}
+#: Seniority code → the message key of its label (rendered where it is shown; R7).
+SENIORITIES = {
+    "junior": "epic_plan.seniority.junior",
+    "pleno": "epic_plan.seniority.pleno",
+    "senior": "epic_plan.seniority.senior",
+}
+#: Hours source → the message key of the Jira field's name.
+HOURS_SOURCES = {
+    "original": "epic_plan.hours_source.original",
+    "estimate": "epic_plan.hours_source.estimate",
+}
 
 
 class Phase(StrEnum):
@@ -93,14 +103,15 @@ class Problem:
 
     level: str  # "erro" | "aviso"
     code: str
-    message: str
+    message: Msg
     subtasks: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
+        """``mensagem`` is ``$msg`` JSON: the view that embeds it ends with ``localize``."""
         return {
             "nivel": self.level,
             "codigo": self.code,
-            "mensagem": self.message,
+            "mensagem": self.message.to_json(),
             "subtarefas": list(self.subtasks),
         }
 
@@ -177,14 +188,14 @@ class Parameters:
         for name, (_default, low, high) in _NUMERIC.items():
             value = getattr(self, name)
             if not low <= value <= high:
-                raise Invalid(f"Parâmetro {name} deve ficar entre {low:g} e {high:g}.")
+                raise Invalid(Msg("epic_plan.parameter.range", name=name, low=low, high=high))
         if abs(self.workday_hours / self.slot_hours - self.slots_per_day) > 1e-9:
-            raise Invalid("A jornada útil precisa ser múltipla da granularidade de agenda.")
+            raise Invalid(Msg("epic_plan.parameter.workday_granularity"))
         if self.hours_source not in HOURS_SOURCES:
-            raise Invalid(f"Fonte das horas inválida: {self.hours_source}.")
+            raise Invalid(Msg("epic_plan.parameter.hours_source", value=self.hours_source))
         for name in ("label_code_review", "label_jira_setup", "label_planning", "label_no_code"):
             if not str(getattr(self, name)).strip():
-                raise Invalid(f"Parâmetro {name} não pode ficar vazio.")
+                raise Invalid(Msg("epic_plan.parameter.empty", name=name))
         return self
 
     def as_dict(self) -> dict[str, Any]:

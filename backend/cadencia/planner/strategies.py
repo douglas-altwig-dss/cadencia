@@ -1,5 +1,8 @@
 """The planning algorithms the UI offers. The picker is drawn from this registry, so a new
-strategy is one ``register`` call here and no change to any view."""
+strategy is one ``register`` call here and no change to any view.
+
+Names and descriptions are messages (R7: no module-level text), rendered by the view that shows
+them; a plain ``str`` still works for a strategy registered without catalogue entries."""
 
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ from dataclasses import dataclass
 
 from cadencia.domain.epic_plan.schedule import SchedulingProblem, list_schedule
 from cadencia.errors import Invalid
+from cadencia.i18n.message import Msg
 from cadencia.planner.solvers import HEURISTIC, SolveResult, solve_cpsat, solve_milp
 
 Runner = Callable[[SchedulingProblem, float], SolveResult]
@@ -16,21 +20,26 @@ Runner = Callable[[SchedulingProblem, float], SolveResult]
 @dataclass(frozen=True)
 class Strategy:
     id: str
-    name: str
-    tooltip: str
+    name: Msg | str
+    tooltip: Msg | str
     run: Runner
     #: Uses the time limit and can prove optimality; the UI shows its status and gap.
     exact: bool = False
     default: bool = False
 
     def as_dict(self) -> dict[str, object]:
+        """``nome``/``descricao`` as ``$msg`` JSON (or the plain text given): ``localize`` it."""
         return {
             "id": self.id,
-            "nome": self.name,
-            "descricao": self.tooltip,
+            "nome": _json(self.name),
+            "descricao": _json(self.tooltip),
             "exato": self.exact,
             "padrao": self.default,
         }
+
+
+def _json(value: Msg | str) -> object:
+    return value.to_json() if isinstance(value, Msg) else value
 
 
 STRATEGIES: dict[str, Strategy] = {}
@@ -45,7 +54,7 @@ def strategy(strategy_id: str) -> Strategy:
     try:
         return STRATEGIES[strategy_id]
     except KeyError:
-        raise Invalid(f"Algoritmo desconhecido: {strategy_id}. Opções: {', '.join(STRATEGIES)}.") from None
+        raise Invalid(Msg("planner.unknown", algorithm=strategy_id, options=list(STRATEGIES))) from None
 
 
 def _greedy(problem: SchedulingProblem, _seconds: float) -> SolveResult:
@@ -55,10 +64,8 @@ def _greedy(problem: SchedulingProblem, _seconds: float) -> SolveResult:
 GREEDY = register(
     Strategy(
         "guloso",
-        "List Scheduling (heurística gulosa)",
-        "Rápida, responde em segundos. Aloca cada subtarefa ao especialista compatível que fica livre "
-        "primeiro, respeitando os pré-requisitos. Não garante a melhor solução, mas é ideal para "
-        "simulações rápidas.",
+        Msg("planner.strategy.guloso.name"),
+        Msg("planner.strategy.guloso.description"),
         _greedy,
         default=True,
     )
@@ -66,10 +73,8 @@ GREEDY = register(
 register(
     Strategy(
         "milp",
-        "MS-RCPSP exato (MILP)",
-        "Modela o escalonamento com múltiplas habilidades e recursos limitados como programação "
-        "linear inteira mista. Pode provar a solução ótima, mas o tempo cresce muito com o número de "
-        "subtarefas; por isso roda com limite de tempo.",
+        Msg("planner.strategy.milp.name"),
+        Msg("planner.strategy.milp.description"),
         solve_milp,
         exact=True,
     )
@@ -77,9 +82,8 @@ register(
 register(
     Strategy(
         "cpsat",
-        "Constraint Programming (CP-SAT)",
-        "Usa o solver de restrições do Google OR-Tools. Lida bem com precedências, não sobreposição e "
-        "disponibilidade e costuma achar soluções muito boas rapidamente. Opção recomendada.",
+        Msg("planner.strategy.cpsat.name"),
+        Msg("planner.strategy.cpsat.description"),
         solve_cpsat,
         exact=True,
     )

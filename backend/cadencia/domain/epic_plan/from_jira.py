@@ -14,7 +14,8 @@
   ``cadastro-jira``, ``planejamento``, ``sem-codigo`` by default).
 - **Prerequisites** are "is blocked by" links. A link to or from a *task* stands for all of that
   task's subtasks, so a team that links tasks rather than subtasks still gets a pipeline.
-- **Negócio / Técnico / Dependências** are sections of the task's description, found by heading.
+- **Negócio / Técnico / Dependências** are sections of the task's description, found by heading
+  (in Portuguese, English or German: the heading is what the team wrote in Jira).
 
 Nothing is guessed silently: every fallback that changes a number leaves a ``Problem`` behind.
 """
@@ -26,7 +27,7 @@ import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 
 from cadencia.domain.epic_plan.graph import natural_key
-from cadencia.domain.epic_plan.hours import EPSILON, fmt_hours, round_up
+from cadencia.domain.epic_plan.hours import EPSILON, round_up
 from cadencia.domain.epic_plan.model import (
     HOURS_SOURCES,
     Epic,
@@ -39,14 +40,25 @@ from cadencia.domain.epic_plan.model import (
     Task,
 )
 from cadencia.domain.models import HierarchyLevel, Issue
+from cadencia.i18n.message import Msg
 
-_SECTIONS = {
+#: Description headings, normalised (accents and umlauts stripped, casefolded), as teams write
+#: them in Jira — Portuguese, English and German. Input recognition only: the sections keep their
+#: own names on the wire whatever language the heading was in.
+_SECTIONS = {  # i18n: out of scope (Jira input matched, never shown)
     "negocio": "business",
     "business": "business",
+    "fachlich": "business",
+    "geschaftlich": "business",
     "tecnico": "technical",
     "technical": "technical",
+    "technisch": "technical",
     "dependencia": "dependencies",
     "dependencias": "dependencies",
+    "dependency": "dependencies",
+    "dependencies": "dependencies",
+    "abhangigkeit": "dependencies",
+    "abhangigkeiten": "dependencies",
     "observacao de dependencia": "dependencies",
     "observacoes de dependencia": "dependencies",
 }
@@ -100,11 +112,6 @@ def roles_matching(issue: Issue, roles: Sequence[Role]) -> list[Role]:
 
 def _has(issue: Issue, label: str) -> bool:
     return normalize(label) in _tags(issue)
-
-
-def _listing(items: Sequence[str], limit: int = 12) -> str:
-    shown = ", ".join(items[:limit])
-    return shown + (f" e mais {len(items) - limit}" if len(items) > limit else "")
 
 
 def epic_from_issues(
@@ -173,50 +180,51 @@ def epic_from_issues(
         if not children[issue.key]:
             empty_tasks.append(issue.key)
 
-    def resolve(issue: Issue) -> tuple[list[Role], str, str]:
+    def resolve(issue: Issue) -> tuple[list[Role], str, Msg | None]:
         """(roles, source, why-not) for one subtask."""
         chosen = [role_by_id[r] for r in manual.get(issue.key, ()) if r in role_by_id]
         if chosen:
-            return sorted(chosen, key=ordered_roles.index), "manual", ""
+            return sorted(chosen, key=ordered_roles.index), "manual", None
         matched = roles_matching(issue, ordered_roles)
         if matched:
-            return matched, "rotulo", ""
+            return matched, "rotulo", None
         own_task = task_roles.get(issue.parent_key or "", [])
-        why = "sem label de papel"
         if issue.assignee is not None:
+            name = issue.assignee.display_name
             covered = people.get(issue.assignee.account_id)
             if covered is None:
-                why = f"{issue.assignee.display_name} não está na equipe"
+                why = Msg("epic_plan.why.not_on_team", name=name)
             elif len(covered) == 1:
-                return [role_by_id[r] for r in covered if r in role_by_id], "responsavel", ""
+                return [role_by_id[r] for r in covered if r in role_by_id], "responsavel", None
             else:
                 narrowed = [r for r in own_task if r.id in covered]
                 if len(narrowed) == 1:
-                    return narrowed, "responsavel", ""
+                    return narrowed, "responsavel", None
                 why = (
-                    f"{issue.assignee.display_name} cobre {len(covered)} papéis"
+                    Msg("epic_plan.why.covers_roles", name=name, count=len(covered))
                     if covered
-                    else f"{issue.assignee.display_name} não tem papel"
+                    else Msg("epic_plan.why.no_role", name=name)
                 )
         else:
-            why = "sem responsável"
+            why = Msg("epic_plan.why.no_assignee")
         if len(own_task) == 1:
-            return own_task, "tarefa", ""
+            return own_task, "tarefa", None
         return [], "", why
 
     parent_blockers = {t.key: t.blocked_by for t in tasks_raw}
     subtasks: list[Subtask] = []
-    no_role: list[tuple[str, str]] = []
+    no_role: list[tuple[str, Msg]] = []
     too_many: list[str] = []
     no_hours: list[str] = []
-    rounded_up: list[str] = []
+    rounded_up: list[Msg] = []
+    rounded_keys: list[str] = []
     external: list[str] = []
     found = {"original": 0, "estimate": 0}
     for issue in subtasks_raw:
         own_task = issue.parent_key or ""
         matched, source, why = resolve(issue)
         if not matched:
-            no_role.append((issue.key, why))
+            no_role.append((issue.key, why or Msg("epic_plan.why.no_role_label")))
         elif len(matched) > 2:
             too_many.append(f"{issue.key} ({', '.join(r.name for r in matched)})")
         found["original"] += issue.original_estimate_hours is not None
@@ -227,7 +235,8 @@ def epic_from_issues(
             hours = 0.0
         rounded = round_up(hours, params.slot_hours)
         if abs(rounded - hours) > EPSILON:
-            rounded_up.append(f"{issue.key} ({fmt_hours(hours)}h → {fmt_hours(rounded)}h)")
+            rounded_up.append(Msg("epic_plan.rounded_item", key=issue.key, before=hours, after=rounded))
+            rounded_keys.append(issue.key)
         own_links, own_outside = expand(issue.blocked_by, own_task)
         task_links, task_outside = expand(parent_blockers.get(own_task, ()), own_task)
         external.extend(f"{issue.key} → {outside}" for outside in (*own_outside, *task_outside))
@@ -256,17 +265,15 @@ def epic_from_issues(
 
     # One problem per kind, naming every subtask: 24 separate lines hide what the fix is.
     if no_role:
-        reasons: dict[str, list[str]] = {}
+        reasons: dict[Msg, list[str]] = {}
         for sub_key, why in no_role:
             reasons.setdefault(why, []).append(sub_key)
-        detail = "; ".join(f"{why}: {_listing(keys, 8)}" for why, keys in reasons.items())
+        detail = [Msg("epic_plan.reason_group", why=why, keys=keys) for why, keys in reasons.items()]
         problems.append(
             Problem(
                 "erro",
                 "sem_papel",
-                f"{len(no_role)} subtarefa(s) sem papel ({detail}). "
-                "Atribua o papel em “Papéis das subtarefas”, cadastre o papel dos responsáveis na equipe "
-                "ou use labels de papel no Jira.",
+                Msg("epic_plan.problem.no_role", count=len(no_role), reasons=detail),
                 tuple(k for k, _ in no_role),
             )
         )
@@ -275,18 +282,22 @@ def epic_from_issues(
             Problem(
                 "erro",
                 "papeis_demais",
-                f"Uma subtarefa tem um ou dois papéis; estas correspondem a mais: {_listing(too_many, 6)}.",
+                Msg("epic_plan.problem.too_many_roles", items=too_many),
                 tuple(t.split(" ")[0] for t in too_many),
             )
         )
     if no_hours:
-        label = HOURS_SOURCES[params.hours_source]
         problems.append(
             Problem(
                 "aviso",
                 "sem_estimativa",
-                f"{len(no_hours)} de {len(subtasks_raw)} subtarefa(s) sem horas no campo “{label}” do Jira; "
-                f"contam como 0h: {_listing(no_hours)}.",
+                Msg(
+                    "epic_plan.problem.no_hours",
+                    count=len(no_hours),
+                    total=len(subtasks_raw),
+                    source=Msg(HOURS_SOURCES[params.hours_source]),
+                    keys=no_hours,
+                ),
                 tuple(no_hours),
             )
         )
@@ -295,9 +306,8 @@ def epic_from_issues(
             Problem(
                 "aviso",
                 "estimativa_arredondada",
-                f"Horas arredondadas para a granularidade de {fmt_hours(params.slot_hours)}h: "
-                f"{_listing(rounded_up, 6)}.",
-                tuple(r.split(" ")[0] for r in rounded_up),
+                Msg("epic_plan.problem.rounded", step=params.slot_hours, items=rounded_up),
+                tuple(rounded_keys),
             )
         )
     if external:
@@ -305,7 +315,7 @@ def epic_from_issues(
             Problem(
                 "aviso",
                 "dependencia_externa",
-                f"Dependências de itens fora do épico foram ignoradas: {_listing(external, 8)}.",
+                Msg("epic_plan.problem.external_dependency", items=external),
                 tuple(dict.fromkeys(e.split(" ")[0] for e in external)),
             )
         )
@@ -314,7 +324,7 @@ def epic_from_issues(
             Problem(
                 "aviso",
                 "tarefa_sem_subtarefas",
-                f"{len(empty_tasks)} tarefa(s) sem subtarefas não somam horas: {_listing(empty_tasks)}.",
+                Msg("epic_plan.problem.empty_tasks", count=len(empty_tasks), keys=empty_tasks),
             )
         )
     return Epic(

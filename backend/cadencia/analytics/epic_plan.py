@@ -4,6 +4,10 @@ The only place the plan meets the store. The numbers all come from ``domain.epic
 module chooses the inputs (which roles, which people, which epic) and shapes the output. JSON keys
 are Portuguese because the planning contract (``POST /api/planejamento``) was specified that way,
 and one feature speaking two languages on the wire would be worse than either.
+
+The domain hands back messages (problems, labels, validator findings); the views end with
+``localize`` so they reach the page in the request's language and the deck (``deck_summary``,
+built under the deck locale) in pt-BR.
 """
 
 from __future__ import annotations
@@ -42,6 +46,7 @@ from cadencia.domain.epic_plan.schedule import (
 from cadencia.domain.epic_plan.source import EpicSource
 from cadencia.domain.epic_plan.timeline import duration, task_segments, total_days, weekly_load, weeks
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, localize, tr
 from cadencia.planner.solvers import FEASIBLE, HEURISTIC, OPTIMAL
 from cadencia.planner.strategies import STRATEGIES, strategy
 from cadencia.store import repo
@@ -86,7 +91,7 @@ class JiraEpicSource:
     def load(self, key: str) -> Epic:
         epic_issue, issues = repo.epic_issues(self.session, key)
         if epic_issue is None and not issues:
-            raise NotFound(key, f"O épico {key} não foi coletado do Jira.")
+            raise NotFound(key, Msg("epic_plan.error.not_collected", key=key))
         return epic_from_issues(
             key,
             epic_issue,
@@ -160,7 +165,7 @@ def member_dict(member: Member) -> dict[str, Any]:
             {
                 "papel_id": r.role_id,
                 "senioridade": r.seniority,
-                "senioridade_rotulo": SENIORITIES.get(r.seniority, ""),
+                "senioridade_rotulo": tr(SENIORITIES[r.seniority]) if r.seniority in SENIORITIES else "",
             }
             for r in member.roles
         ],
@@ -210,11 +215,11 @@ def parameters_from(values: dict[str, Any] | None) -> dict[str, Any]:
         if key == "horas_semana":
             continue
         if key not in PARAMETER_NAMES:
-            raise Invalid(f"Parâmetro desconhecido: {key}.")
+            raise Invalid(Msg("epic_plan.error.unknown_parameter", name=key))
         if key == "fonte_horas":
             back = {v: k for k, v in HOURS_SOURCE_NAMES.items()}
             if value not in back:
-                raise Invalid(f"Fonte das horas inválida: {value}. Use {' ou '.join(back)}.")
+                raise Invalid(Msg("epic_plan.error.hours_source", value=str(value), options=list(back)))
             value = back[value]
         out[PARAMETER_NAMES[key]] = value
     return out
@@ -264,7 +269,7 @@ def tasks_view(
         subtasks = epic.subtasks_of(task.id)
         review = round(sum(s.hours for s in subtasks if s.kind is Kind.CODE_REVIEW), 4)
         work = round(sum(s.hours for s in subtasks if s.kind is not Kind.CODE_REVIEW), 4)
-        label = f"{h.fmt_hours(work)}h" + (f" + {h.fmt_hours(review)}h" if review else "")
+        label = Msg("epic_plan.task_hours", work=work, review=review)
         out.append(
             {
                 "id": task.id,
@@ -333,6 +338,7 @@ def schedule_view(
 
 
 def plan_view(session: Session, key: str, base_url: str | None = None) -> dict[str, Any]:
+    """The whole Plano tab, rendered in the ambient locale (the request's; pt-BR for the deck)."""
     params = parameters_of(session)
     roles = roles_of(session)
     members = members_of(session)
@@ -400,7 +406,7 @@ def plan_view(session: Session, key: str, base_url: str | None = None) -> dict[s
             plan["ganho_dias"] = baseline["duracao"]["total_dias"] - view["duracao"]["total_dias"]
         load = weekly_load(epic, problem, schedule)
 
-    return {
+    view = {
         "epico": {"key": epic.key, "titulo": epic.title, "url": issue_url(base_url, epic.key)},
         "parametros": parameters_dict(params),
         "papeis": [role_dict(r) for r in roles],
@@ -451,6 +457,7 @@ def plan_view(session: Session, key: str, base_url: str | None = None) -> dict[s
         "base": baseline,
         "plano": plan,
     }
+    return localize(view)
 
 
 def capacity_view(
@@ -516,14 +523,14 @@ def generate_plan(
     available = {m.id: m for m in available_members(members_of(session))}
     unknown = [i for i in member_ids if i not in available]
     if unknown:
-        raise Invalid(f"Membros inexistentes, inativos ou sem papel: {', '.join(unknown)}.")
+        raise Invalid(Msg("epic_plan.error.unknown_members", ids=unknown))
     if not epic.subtasks:
-        raise Invalid(f"O épico {epic_key} não tem subtarefas para planejar.")
+        raise Invalid(Msg("epic_plan.error.no_subtasks", key=epic_key))
     workers = member_workers(available[i] for i in dict.fromkeys(member_ids))
     problem = build_problem(epic, params, workers, roles)
     limit = float(time_limit if time_limit is not None else params.solver_seconds)
     if not 1 <= limit <= 600:
-        raise Invalid("O limite de tempo deve ficar entre 1 e 600 segundos.")
+        raise Invalid(Msg("epic_plan.error.time_limit", low=1, high=600))
     result = chosen.run(problem, limit)
     out: dict[str, Any] = {
         "algoritmo": chosen.id,
@@ -536,7 +543,7 @@ def generate_plan(
         "duracao": None,
     }
     if result.schedule is None:
-        return out
+        return localize(out)
     violations = validate(problem, result.schedule)
     out.update(
         makespan_dias=total_days(problem, result.schedule),
@@ -546,7 +553,7 @@ def generate_plan(
     )
     if violations:
         out["status"] = INVALID
-        return out
+        return localize(out)
     run = repo.save_plan_run(
         session,
         epic_key=epic_key,
@@ -561,7 +568,7 @@ def generate_plan(
         seconds=result.seconds,
     )
     out["id"] = run.id
-    return out
+    return localize(out)
 
 
 # ---------------------------------------------------------------------------------- deck (#1)
@@ -590,9 +597,14 @@ def deck_summary(session: Session, key: str, base_url: str | None = None) -> dic
         "plan_days": plan["duracao"]["total_dias"] if plan else None,
         "gain_days": plan.get("ganho_dias") if plan else None,
         "algorithm": plan["algoritmo_nome"] if plan else "",
-        "state": "pronto"
+        # The plan's state as the deck prints it.
+        "state": "pronto"  # deck text: pt-BR by design (docs/i18n.md)
         if plan
-        else ("bloqueado: " + blocks[0]["codigo"].replace("_", " ") if blocks else "sem subtarefas"),
+        else (
+            "bloqueado: " + blocks[0]["codigo"].replace("_", " ")  # deck text: pt-BR by design (docs/i18n.md)
+            if blocks
+            else "sem subtarefas"  # deck text: pt-BR by design (docs/i18n.md)
+        ),
         "duration_label": plan["duracao"]["rotulo"] if plan else "",
         "workday": view["parametros"]["jornada_h"],
         "role_hours": [

@@ -22,6 +22,7 @@ from cadencia.analytics.epic_plan import (
 from cadencia.api.deps import JSONDict, SessionDep, SettingsDep, base_url
 from cadencia.domain.epic_plan.model import Role
 from cadencia.errors import Invalid
+from cadencia.i18n import Msg, localize, render, tr
 from cadencia.planner.solvers import SolverUnavailable
 from cadencia.planner.strategies import STRATEGIES
 from cadencia.store import repo
@@ -86,14 +87,13 @@ def delete_role(role_id: int, session: SessionDep) -> None:
     if role is not None:
         members = repo.role_member_names(session, role_id)
         subtasks = role_usage(session, role_id, roles)
-        where = []
+        where: list[Msg] = []
         if members:
-            where.append(f"atribuído a {', '.join(members)}")
+            where.append(Msg("epic_plan.role_in_use.members", names=members))
         if subtasks:
-            shown = ", ".join(subtasks[:10]) + (f" e mais {len(subtasks) - 10}" if len(subtasks) > 10 else "")
-            where.append(f"usado pelas subtarefas {shown}")
+            where.append(Msg("epic_plan.role_in_use.subtasks", keys=subtasks))
         if where:
-            raise Invalid(f"O papel {role.name} está em uso: {'; '.join(where)}.")
+            raise Invalid(Msg("epic_plan.role_in_use.message", role=role.name, places=where))
     repo.delete_role(session, role_id)
 
 
@@ -147,7 +147,7 @@ def put_parameters(body: dict[str, Any], session: SessionDep) -> JSONDict:
 
 @router.get("/planejamento/algoritmos")
 def algorithms() -> JSONDict:
-    return {"items": [s.as_dict() for s in STRATEGIES.values()]}
+    return localize({"items": [s.as_dict() for s in STRATEGIES.values()]})
 
 
 class PlanRequest(BaseModel):
@@ -175,9 +175,9 @@ def plan(body: PlanRequest, session: SessionDep) -> JSONDict:
         raise HTTPException(
             status_code=503,
             detail={
-                "cause": "solver indisponível",
-                "message": str(exc),
-                "action": "Instale as dependências do backend (ortools) ou use o algoritmo guloso.",
+                "cause": tr("planner.unavailable_cause"),
+                "message": render(exc.msg),
+                "action": tr("planner.unavailable_action"),
             },
         ) from exc
 
@@ -197,7 +197,7 @@ def put_selection(key: str, body: SelectionBody, session: SessionDep) -> JSONDic
     known = {m.id for m in members_of(session)}
     unknown = [i for i in body.membros_ids if i not in known]
     if unknown:
-        raise Invalid(f"Membros desconhecidos: {', '.join(unknown)}.")
+        raise Invalid(Msg("epic_plan.error.unknown_selection", ids=unknown))
     repo.set_plan_selection(session, key, body.membros_ids)
     return {"selecao": body.membros_ids}
 

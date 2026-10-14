@@ -9,11 +9,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect, text
 
+from cadencia.analytics.epic_plan import deck_summary, plan_view
 from cadencia.api.app import create_app
 from cadencia.api.deps import clock
 from cadencia.demo import PEOPLE, DemoJira
 from cadencia.demo_seed import DEMO_TEAM
 from cadencia.domain.epic_plan.schedule import Allocation, Schedule
+from cadencia.i18n import DECK_LOCALE, Msg, using_locale
 from cadencia.planner import strategies
 from cadencia.planner.solvers import HEURISTIC, SolveResult, SolverUnavailable
 from cadencia.store import repo
@@ -365,3 +367,105 @@ def test_migration_0011_adds_the_subtask_roles(tmp_path):
         connection.execute(text("UPDATE alembic_version SET version_num = '0010'"))
     upgrade(url)
     assert "subtask_role" in inspect(engine).get_table_names()
+
+
+# ---------------------------------------------------------------------------------- languages
+
+
+def test_the_plan_page_speaks_english_and_german(client):
+    english = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "en-US"}))
+    german = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "de-DE"}))
+    portuguese = view(client)
+    # Same plan, same numbers: only the words change.
+    assert english["plano"]["alocacoes"] == german["plano"]["alocacoes"] == portuguese["plano"]["alocacoes"]
+    total = english["plano"]["duracao"]["total_dias"]
+    assert english["plano"]["duracao"]["rotulo"].startswith("Planning ")
+    assert english["plano"]["duracao"]["rotulo"].endswith(f"Total {total} working days")
+    assert german["plano"]["duracao"]["rotulo"].startswith("Planung ")
+    assert german["plano"]["duracao"]["rotulo"].endswith(f"Gesamt {total} Arbeitstage")
+    assert portuguese["plano"]["duracao"]["rotulo"].endswith(f"Total {total} dias úteis")
+    assert english["plano"]["algoritmo_nome"] == "List scheduling (greedy heuristic)"
+    assert german["plano"]["algoritmo_nome"] == "List Scheduling (Greedy-Heuristik)"
+    assert portuguese["plano"]["algoritmo_nome"] == "List Scheduling (heurística gulosa)"
+    # Hours labels: the day unit is "d" in English and Portuguese, "T" in German.
+    long = next(s for s in portuguese["subtarefas"] if "·" in s["rotulo_horas"])
+    by_id = {s["id"]: s for s in german["subtarefas"]}
+    assert "d" in long["rotulo_horas"].split("·")[1]
+    assert by_id[long["id"]]["rotulo_horas"] == long["rotulo_horas"].replace("d", "T")
+    segments = german["base"]["segmentos_tarefa"]
+    assert all(isinstance(s["rotulo"], str) and "d" not in s["rotulo"] for s in segments)
+    # Seniority labels come from the catalogue too.
+    seniority = {r["senioridade"]: r["senioridade_rotulo"] for m in english["membros"] for r in m["papeis"]}
+    assert {"Junior", "Mid-level", "Senior"} >= set(seniority.values())
+
+
+def test_plan_problems_and_errors_speak_the_request_language(client):
+    ok(client.put("/api/planejamento/parametros", json={"fonte_horas": "campo_estimativa"}))
+    english = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "en-US"}))
+    german = ok(client.get("/api/epics/ANL-1/plano", headers={"Accept-Language": "de-DE"}))
+    [en] = [p for p in english["problemas"] if p["codigo"] == "sem_estimativa"]
+    [de] = [p for p in german["problemas"] if p["codigo"] == "sem_estimativa"]
+    assert en["mensagem"].startswith("37 of 37 subtasks without hours in the Jira field “estimate field”")
+    assert de["mensagem"].startswith("37 von 37 Unteraufgaben ohne Stunden im Jira-Feld „Schätzungsfeld“")
+    assert en["mensagem"].endswith(" and 25 more.") and de["mensagem"].endswith(" und 25 weitere.")
+
+    unknown = client.post(
+        "/api/planejamento",
+        json={"epico": "ANL-1", "algoritmo": "magia", "membros_ids": []},
+        headers={"Accept-Language": "de-DE"},
+    )
+    assert unknown.status_code == 400
+    assert unknown.json()["detail"]["message"] == (
+        "Unbekannter Algorithmus: magia. Optionen: guloso, milp, cpsat."
+    )
+    missing = client.get("/api/epics/NADA-1/plano", headers={"Accept-Language": "en-US"})
+    assert missing.status_code == 404
+    assert missing.json()["detail"]["message"] == "The epic NADA-1 was not collected from Jira."
+    bad = client.put(
+        "/api/planejamento/parametros", json={"jornada_h": 6.2}, headers={"Accept-Language": "en-US"}
+    )
+    assert bad.json()["detail"]["message"] == "The workday must be a multiple of the scheduling granularity."
+    algorithms = ok(client.get("/api/planejamento/algoritmos", headers={"Accept-Language": "de-DE"}))
+    assert [a["nome"] for a in algorithms["items"]] == [
+        "List Scheduling (Greedy-Heuristik)",
+        "Exaktes MS-RCPSP (MILP)",
+        "Constraint Programming (CP-SAT)",
+    ]
+    assert all(isinstance(a["descricao"], str) and a["descricao"] for a in algorithms["items"])
+
+
+def test_the_solver_503_and_the_role_in_use_speak_the_request_language(client, monkeypatch):
+    def unavailable(_problem, _seconds):
+        raise SolverUnavailable(Msg("planner.unavailable", solver="CP-SAT"))
+
+    monkeypatch.setitem(
+        strategies.STRATEGIES, "cpsat", strategies.Strategy("cpsat", "x", "x", unavailable, exact=True)
+    )
+    selection = view(client)["selecao"]
+    response = client.post(
+        "/api/planejamento",
+        json={"epico": "ANL-1", "algoritmo": "cpsat", "membros_ids": selection},
+        headers={"Accept-Language": "en-US"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "cause": "solver unavailable",
+        "message": "OR-Tools (CP-SAT) is not installed on the backend.",
+        "action": "Install the backend dependencies (ortools) or use the greedy algorithm.",
+    }
+    refused = client.delete(f"/api/papeis/{role_id(client, 'Backend')}", headers={"Accept-Language": "de-DE"})
+    assert refused.status_code == 400
+    message = refused.json()["detail"]["message"]
+    assert message.startswith("Die Rolle Backend wird verwendet: zugewiesen an ")
+    assert "; verwendet von den Unteraufgaben ANL-" in message and message.endswith(".")
+
+
+def test_the_deck_summary_stays_portuguese_whatever_the_ambient_locale(client, sessions):
+    with session_scope(sessions) as session, using_locale("de-DE"):
+        german = plan_view(session, "ANL-1")
+        with using_locale(DECK_LOCALE):  # what JiraSource.deck_data wraps every deck build in
+            summary = deck_summary(session, "ANL-1")
+    assert german["plano"]["duracao"]["rotulo"].startswith("Planung ")
+    assert summary is not None
+    assert summary["duration_label"].startswith("Planejamento ") and "dias úteis" in summary["duration_label"]
+    assert summary["algorithm"] == "List Scheduling (heurística gulosa)" and summary["state"] == "pronto"

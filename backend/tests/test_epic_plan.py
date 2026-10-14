@@ -34,6 +34,7 @@ from cadencia.domain.epic_plan.schedule import (
 from cadencia.domain.epic_plan.timeline import duration, task_segments, total_days, weekly_load, weeks
 from cadencia.domain.models import Person
 from cadencia.errors import Invalid
+from cadencia.i18n import render
 from cadencia.jira.fields import FieldMap
 from cadencia.jira.mapping import adf_text, issue_from_payload
 from cadencia.planner.solvers import OPTIMAL, solve_cpsat, solve_milp
@@ -101,10 +102,23 @@ def test_capacity_counts_a_person_once_but_every_role_they_cover():
 
 
 def test_hours_labels_split_whole_workdays_from_the_rest():
-    assert h.hours_label(19, 6) == "19h · 3d 1h"
-    assert h.hours_label(12, 6) == "12h · 2d"
-    assert h.hours_label(4, 6) == "4h"
-    assert h.hours_label(7.5, 6) == "7,5h · 1d 1,5h"
+    assert str(h.hours_label(19, 6)) == "19h · 3d 1h"
+    assert str(h.hours_label(12, 6)) == "12h · 2d"
+    assert str(h.hours_label(4, 6)) == "4h"
+    assert str(h.hours_label(7.5, 6)) == "7,5h · 1d 1,5h"
+
+
+@pytest.mark.locale("en-US")
+def test_hours_labels_in_english_keep_d_and_a_decimal_point():
+    assert str(h.hours_label(19, 6)) == "19h · 3d 1h"
+    assert str(h.hours_label(7.5, 6)) == "7.5h · 1d 1.5h"
+
+
+@pytest.mark.locale("de-DE")
+def test_hours_labels_in_german_count_days_as_t():
+    assert str(h.hours_label(19, 6)) == "19h · 3T 1h"
+    assert str(h.hours_label(7.5, 6)) == "7,5h · 1T 1,5h"
+    assert str(h.hours_label(12, 6)) == "12h · 2T"
 
 
 def test_code_review_and_card_hours_are_checked_against_the_parameters():
@@ -117,7 +131,7 @@ def test_code_review_and_card_hours_are_checked_against_the_parameters():
     setup = Subtask("S06", "T1", "Cadastrar cards", 5, (1,), Kind.JIRA_SETUP)
     with_setup = replace(e, subtasks=(*e.subtasks, setup))
     [cards] = h.consistency_problems(with_setup, PARAMS)
-    assert cards.code == "cadastro_divergente" and "1,5h esperadas" in cards.message  # 8 cards × 10 min
+    assert cards.code == "cadastro_divergente" and "1,5h esperadas" in str(cards.message)  # 8 cards × 10 min
 
 
 def test_parameters_refuse_a_workday_that_is_not_a_multiple_of_the_granularity():
@@ -172,7 +186,7 @@ def test_jira_issues_become_tasks_and_subtasks_with_roles_kinds_and_prerequisite
     assert codes["sem_papel"].subtasks == ("A-14",) and codes["sem_papel"].level == "erro"
     assert codes["sem_estimativa"].subtasks == ("A-14",)
     assert codes["estimativa_arredondada"].subtasks == ("A-11",)
-    assert "X-9" in codes["dependencia_externa"].message
+    assert "X-9" in str(codes["dependencia_externa"].message)
 
 
 def test_description_sections_from_adf_headings_and_inline_labels():
@@ -201,6 +215,55 @@ def test_description_sections_from_adf_headings_and_inline_labels():
         "dependencies": "trilha paralela",
     }
     assert description_sections("Só um texto.") == {"business": "Só um texto."}
+
+
+def _heading(text: str) -> dict:
+    return {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": text}]}
+
+
+def _paragraph(text: str) -> dict:
+    return {"type": "paragraph", "content": [{"type": "text", "text": text}]}
+
+
+@pytest.mark.parametrize(
+    ("business", "technical", "dependencies"),
+    [
+        ("Business", "Technical", "Dependencies"),
+        ("Business", "Technical", "Dependency"),
+        ("Fachlich", "Technisch", "Abhängigkeiten"),
+        ("Geschäftlich", "Technisch", "Abhängigkeit"),
+    ],
+)
+def test_description_headings_in_english_and_german_are_recognised(business, technical, dependencies):
+    adf = {
+        "type": "doc",
+        "content": [
+            _heading(business),
+            _paragraph("Why it exists."),
+            _heading(technical),
+            _paragraph("A queue."),
+            _heading(dependencies),
+            _paragraph("After A-2."),
+        ],
+    }
+    assert description_sections(adf_text(adf)) == {
+        "business": "Why it exists.",
+        "technical": "A queue.",
+        "dependencies": "After A-2.",
+    }
+
+
+def test_inline_english_and_german_labels_open_sections():
+    assert description_sections("Business: value\nDependencies: parallel track") == {
+        "business": "value",
+        "dependencies": "parallel track",
+    }
+    assert description_sections("Fachlich: Wert\nTechnisch: Warteschlange\nAbhängigkeiten: nach A-2") == {
+        "business": "Wert",
+        "technical": "Warteschlange",
+        "dependencies": "nach A-2",
+    }
+    assert description_sections("**Geschäftlich:**\nWert") == {"business": "Wert"}
 
 
 def test_mapping_reads_original_estimate_and_description():
@@ -244,7 +307,7 @@ def test_a_role_nobody_covers_names_the_affected_subtasks():
         ("papel_sem_membro", ("S04",)),
         ("papel_sem_membro", ("S05",)),
     ]
-    assert "Dados" in problems[0].message and "Tech Leader" in problems[1].message
+    assert "Dados" in str(problems[0].message) and "Tech Leader" in str(problems[1].message)
 
 
 def test_a_composite_needs_two_different_people():
@@ -275,7 +338,7 @@ def test_the_validator_accepts_a_greedy_plan_and_refuses_each_broken_rule():
                 allocations[index] = replace(allocation, **changes["with"])
                 if changes.get("once"):
                     break
-        return validate(problem, Schedule(tuple(allocations)))
+        return [str(e) for e in validate(problem, Schedule(tuple(allocations)))]
 
     # S02 starts before S01 (8 slots) ends.
     assert any("pré-requisito S01" in e for e in broken(sid="S02", **{"with": {"start": 0, "end": 12}}))
@@ -289,11 +352,11 @@ def test_the_validator_accepts_a_greedy_plan_and_refuses_each_broken_rule():
     # Two subtasks at the same time for one person.
     s02 = next(a for a in plan.allocations if a.subtask_id == "S02")
     overlap = Schedule((*plan.allocations, Allocation("S99", s02.worker_id, 2, s02.start, s02.end)))
-    errors = validate(problem, overlap)
+    errors = [str(e) for e in validate(problem, overlap)]
     assert any("ao mesmo tempo" in e for e in errors) and any("S99" in e for e in errors)
     # A subtask left out.
     missing = Schedule(tuple(a for a in plan.allocations if a.subtask_id != "S03"))
-    assert any("S03" in e for e in validate(problem, missing))
+    assert any("S03" in str(e) for e in validate(problem, missing))
 
 
 def test_the_validator_catches_a_day_beyond_the_workday():
@@ -307,7 +370,7 @@ def test_the_validator_catches_a_day_beyond_the_workday():
     )
     # Overlapping allocations are what pushes a day over; both errors are reported.
     plan = Schedule((Allocation("S1", "bia", 2, 0, 6), Allocation("S2", "bia", 2, 2, 8)))
-    errors = validate(problem, plan)
+    errors = [str(e) for e in validate(problem, plan)]
     assert any("jornada" in e for e in errors) and any("ao mesmo tempo" in e for e in errors)
 
 
@@ -387,8 +450,14 @@ def test_weeks_count_from_the_first_execution_subtask():
     e = Epic("E", "E", tasks, subtasks)
     problem = build_problem(e, PARAMS, baseline_workers(ROLES), ROLES)
     plan = list_schedule(problem)
-    assert duration(e, problem, plan).as_dict()["rotulo"] == (
+    assert render(duration(e, problem, plan).as_dict()["rotulo"]) == (
         "Planejamento 6 d + Execução 1 d = Total 7 dias úteis"
+    )
+    assert render(duration(e, problem, plan).label, "en-US") == (
+        "Planning 6 d + Execution 1 d = Total 7 working days"
+    )
+    assert render(duration(e, problem, plan).label, "de-DE") == (
+        "Planung 6 T + Umsetzung 1 T = Gesamt 7 Arbeitstage"
     )
     labels = [(w["semana"], w["planejamento"], w["papeis"]) for w in weeks(e, problem, plan, ROLES)]
     assert labels == [(-1, True, ["Arquiteto"]), (1, False, ["Arquiteto", "Backend"])]
@@ -457,7 +526,11 @@ def test_roles_resolve_manual_then_labels_then_assignee_then_task():
     assert (subs["B-15"].roles, subs["B-15"].role_source) == ((2, 4), "manual")
     [missing] = [p for p in e.problems if p.code == "sem_papel"]
     assert missing.subtasks == ("B-13", "B-14")
-    assert "Bia cobre 2 papéis" in missing.message and "Zeca não está na equipe" in missing.message
+    assert "Bia cobre 2 papéis" in str(missing.message) and "Zeca não está na equipe" in str(missing.message)
+    english = render(missing.message, "en-US")
+    assert english.startswith("2 subtasks without a role")
+    assert "Bia covers 2 roles: B-13" in english and "Zeca is not on the team: B-14" in english
+    assert "Zeca ist nicht im Team: B-14" in render(missing.message, "de-DE")
 
 
 def test_hours_come_from_the_configured_source():
@@ -470,7 +543,8 @@ def test_hours_come_from_the_configured_source():
     assert [s.hours for s in by_original.subtasks] == [0, 2]
     assert by_original.hours_found == {"original": 1, "estimate": 2}
     [missing] = [p for p in by_original.problems if p.code == "sem_estimativa"]
-    assert missing.subtasks == ("C-10",) and "estimativa original" in missing.message
+    assert missing.subtasks == ("C-10",) and "estimativa original" in str(missing.message)
+    assert "“original estimate”" in render(missing.message, "en-US")
     by_field = epic_from_issues("C-1", None, issues, ROLES, Parameters(hours_source="estimate"))
     assert [s.hours for s in by_field.subtasks] == [8, 4]
     assert not [p for p in by_field.problems if p.code == "sem_estimativa"]
