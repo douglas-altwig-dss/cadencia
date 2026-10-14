@@ -138,13 +138,19 @@ def _timeline(
 ) -> dict[str, Any]:
     """The sprint timeline's own shape over the person's last weeks: the same tree of rows (their
     items under their epics), so the person page draws it with the same component. Someone on more
-    than one board gets one group per board."""
+    than one board gets one group per board.
+
+    An item two of those boards both hold is listed once, under the first of them by name — the
+    order the groups are shown in — so it is neither drawn nor counted twice. A board left with
+    nothing of its own is not a group."""
     per_board: list[tuple[BoardData, list[dict[str, Any]]]] = []
     counts = {"epicos": 0, "itens": 0, "subtarefas": 0}
-    for data in boards:
-        members = _worked_on(data, account_id, now, start)
+    claimed: set[str] = set()
+    for data in sorted(boards, key=lambda d: (d.board.name.casefold(), d.board.id)):
+        members = _worked_on(data, account_id, now, start) - claimed
         if not members:
             continue
+        claimed |= members
         rows, found = timeline_rows(data, _with_ancestors(data, members), members, now, None, base_url)
         per_board.append((data, rows))
         for kind, n in found.items():
@@ -152,7 +158,6 @@ def _timeline(
     if len(per_board) == 1:
         nodes = per_board[0][1]
     else:
-        per_board.sort(key=lambda pair: pair[0].board.name.casefold())
         nodes = [group_row(f"board:{data.board.id}", data.board.name, rows) for data, rows in per_board]
     return {
         "window": {"start": iso(start), "end": iso(now), "today": iso(now)},
