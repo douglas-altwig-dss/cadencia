@@ -42,7 +42,7 @@ export function FieldsTab() {
       { onSuccess: () => notifications.show({ title: m.savedTitle, message: m.savedMessage }) },
     );
   return (
-    <Stack gap="sm" maw={900}>
+    <Stack gap="sm">
       <Note>{m.note}</Note>
       {data.missing.length > 0 && (
         <Alert color="yellow" variant="light">

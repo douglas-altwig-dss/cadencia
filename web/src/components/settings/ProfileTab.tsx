@@ -76,7 +76,7 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
     .filter((p) => p.label.toLocaleLowerCase(currentLocale()).includes(affinityQuery.trim().toLocaleLowerCase(currentLocale())));
 
   return (
-    <Stack gap="md" maw={1000}>
+    <Stack gap="md">
       <Select
         label={m.board}
         data={(selected.data?.items ?? []).map((b) => ({ value: String(b.id), label: b.name }))}

@@ -24,7 +24,7 @@ export function SystemSection({ section, onDirtyChange }: { section: SystemSecti
   const text = m.groups[group];
 
   return (
-    <Stack gap="md" maw={960}>
+    <Stack gap="md">
       <ImportEnvBanner view={view} />
       {section === 'conexao' ? (
         <ConnectionSection view={view} onDirtyChange={onDirtyChange} />
