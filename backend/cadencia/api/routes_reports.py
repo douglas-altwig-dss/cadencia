@@ -23,6 +23,7 @@ from cadencia.api.deps import (
     stored_file,
 )
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, tr
 from cadencia.report.core.context import FIXED_PREFIX, catalog
 from cadencia.report.core.edits import DeckEdits, merge_edits
 from cadencia.report.core.fonts import face_file, font_plan
@@ -73,7 +74,8 @@ async def _read_capped(file: UploadFile, limit: int, cause: str) -> bytes:
     content = await file.read(limit + 1)
     if len(content) > limit:
         raise HTTPException(
-            413, detail={"cause": cause, "message": f"Limite de {limit // (1024 * 1024)} MB."}
+            413,
+            detail={"cause": cause, "message": tr("deck_api.too_large.message", mb=limit // (1024 * 1024))},
         )
     return content
 
@@ -81,7 +83,10 @@ async def _read_capped(file: UploadFile, limit: int, cause: str) -> bytes:
 def _template(session: SessionDep, template_id: int) -> s.TemplateRow:
     row = session.get(s.TemplateRow, template_id)
     if row is None:
-        raise not_found("modelo não encontrado", f"Modelo {template_id}.")
+        raise not_found(
+            tr("deck_api.template_not_found.cause"),
+            tr("deck_api.template_not_found.message", template_id=template_id),
+        )
     return row
 
 
@@ -235,9 +240,9 @@ def create_variable(body: VariableBody, session: SessionDep) -> JSONDict:
         raise HTTPException(
             400,
             detail={
-                "cause": "variável inválida",
+                "cause": tr("deck_api.variable_invalid.cause"),
                 "message": str(exc),
-                "action": "Use um nome em minúsculas, sem espaços (ex.: definicao_do_espaco).",
+                "action": tr("deck_api.variable_invalid.action"),
             },
         ) from None
     return _variable_dict(session, row)
@@ -260,16 +265,18 @@ def patch_variable(variable_id: int, body: VariablePatch, session: SessionDep) -
             clear_source=body.clear_source,
         )
     except Invalid as exc:
-        raise HTTPException(400, detail={"cause": "variável inválida", "message": str(exc)}) from None
+        raise HTTPException(
+            400, detail={"cause": tr("deck_api.variable_invalid.cause"), "message": str(exc)}
+        ) from None
     if row is None:
-        raise not_found("variável não encontrada", str(variable_id))
+        raise not_found(tr("deck_api.variable_not_found.cause"), str(variable_id))
     return _variable_dict(session, row)
 
 
 @router.delete("/variables/{variable_id}", status_code=204)
 def delete_variable(variable_id: int, session: SessionDep) -> None:
     if not repo.delete_variable(session, variable_id):
-        raise not_found("variável não encontrada", str(variable_id))
+        raise not_found(tr("deck_api.variable_not_found.cause"), str(variable_id))
 
 
 @router.put("/variables/{variable_id}/values")
@@ -284,7 +291,9 @@ def set_variable_value(variable_id: int, body: VariableValueBody, session: Sessi
             value=body.value,
         )
     except Invalid as exc:
-        raise HTTPException(400, detail={"cause": "valor inválido", "message": str(exc)}) from None
+        raise HTTPException(
+            400, detail={"cause": tr("deck_api.value_invalid.cause"), "message": str(exc)}
+        ) from None
     row = repo.get_variable(session, variable_id)
     return _variable_dict(session, row) if row else {}
 
@@ -292,7 +301,7 @@ def set_variable_value(variable_id: int, body: VariableValueBody, session: Sessi
 @router.delete("/variables/{variable_id}/values", status_code=204)
 def clear_variable_value(variable_id: int, session: SessionDep, scope: str, scope_key: str = "") -> None:
     if not repo.clear_variable_value(session, variable_id, scope, scope_key):
-        raise not_found("valor não encontrado", f"{scope}:{scope_key}")
+        raise not_found(tr("deck_api.value_not_found.cause"), f"{scope}:{scope_key}")
 
 
 @router.get("/templates")
@@ -327,8 +336,16 @@ async def upload_template(
 ) -> JSONDict:
     filename = file.filename or "modelo.pptx"
     if not filename.lower().endswith(".pptx"):
-        raise HTTPException(400, detail={"cause": "formato inválido", "message": "Envie um arquivo .pptx."})
-    content = await _read_capped(file, settings.template_max_mb * 1024 * 1024, "modelo grande demais")
+        raise HTTPException(
+            400,
+            detail={
+                "cause": tr("deck_api.format_invalid.cause"),
+                "message": tr("deck_api.format_invalid.message"),
+            },
+        )
+    content = await _read_capped(
+        file, settings.template_max_mb * 1024 * 1024, tr("deck_api.template_too_large.cause")
+    )
     row = store_template(session, settings, filename, content, name)
     return {"id": row.id, "name": row.name, "sha256": row.sha256}
 
@@ -426,7 +443,10 @@ def slide_preview_route(
             now=now,
         )
     except NotFound:
-        raise not_found("slide não encontrado", f"Slide {slide_id} do modelo {template_id}.") from None
+        raise not_found(
+            tr("deck_api.slide_not_found.cause"),
+            tr("deck_api.slide_not_found.message", slide_id=slide_id, template_id=template_id),
+        ) from None
 
 
 @router.post("/templates/{template_id}/refresh")
@@ -435,7 +455,7 @@ def refresh_template(template_id: int, session: SessionDep) -> JSONDict:
     row = _template(session, template_id)
     path = Path(row.path)
     if not path.exists():
-        raise not_found("arquivo do modelo não encontrado", row.filename)
+        raise not_found(tr("deck_api.template_file_not_found.cause"), row.filename)
     before = row.manifest.get("version")
     manifest = extract_manifest(path)
     manifest["template"]["filename"] = row.filename
@@ -451,7 +471,7 @@ def save_mapping(template_id: int, body: DeckMapping, session: SessionDep, reque
         raise HTTPException(
             400,
             detail={
-                "cause": "áreas inexistentes no modelo",
+                "cause": tr("deck_api.unknown_areas.cause"),
                 "message": ", ".join(unknown[:10]),
                 "targets": unknown,
             },
@@ -477,7 +497,7 @@ def clone_mapping(
     from_row = _template(session, body.from_template_id)
     from_mapping_row = repo.get_mapping(session, body.from_template_id)
     if from_mapping_row is None:
-        raise Invalid("O modelo de origem não tem mapeamento salvo.")
+        raise Invalid(Msg("deck_api.clone_without_mapping"))
     cloned, plan = apply_mapping_clone(from_row.manifest, from_mapping_row.mapping, to_row.manifest)
     result: JSONDict = {"matched": len(plan["matched"]), "unmatched": plan["unmatched"]}
     if not body.aplicar:
@@ -486,7 +506,7 @@ def clone_mapping(
     unknown = sorted(set(mapping.targets()) - target_ids(to_row.manifest))
     if unknown:
         raise HTTPException(
-            400, detail={"cause": "área não encontrada após o remapeamento", "targets": unknown}
+            400, detail={"cause": tr("deck_api.area_lost_after_remap.cause"), "targets": unknown}
         )
     repo.save_mapping(session, template_id, to_row.sha256, mapping.model_dump())
     repo.record_version(session, template_id, "mapping", mapping.model_dump(), author=author_of(request))
@@ -515,7 +535,7 @@ def fonts(session: SessionDep, template_id: int | None = None) -> JSONDict:
 def font_file(face: str, variant: str) -> FileResponse:
     path = face_file(face, variant)
     if path is None:
-        raise not_found("fonte não disponível", f"{face} {variant}")
+        raise not_found(tr("deck_api.font_unavailable.cause"), f"{face} {variant}")
     media = "font/otf" if path.suffix.lower() == ".otf" else "font/ttf"
     return FileResponse(path, media_type=media, headers={"Cache-Control": "max-age=604800"})
 
@@ -556,7 +576,7 @@ def template_readiness_route(
     try:
         return template_readiness(session, settings, template_id, now)
     except NotFound:
-        raise not_found("modelo não encontrado", str(template_id)) from None
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id)) from None
 
 
 @router.get("/templates/{template_id}/scene")
@@ -564,11 +584,11 @@ def template_scene_route(template_id: int, session: SessionDep) -> JSONDict:
     """RF-61: the template as a scene, so one renderer draws the template and the run alike."""
     row = session.get(s.TemplateRow, template_id)
     if row is None:
-        raise not_found("modelo não encontrado", str(template_id))
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id))
     try:
         return template_scene(session, row)
     except NotFound:
-        raise not_found("o arquivo do modelo não está mais no disco", str(template_id)) from None
+        raise not_found(tr("deck_api.template_file_gone.cause"), str(template_id)) from None
 
 
 @router.get("/templates/{template_id}/images/{shape_key}")
@@ -576,10 +596,10 @@ def template_shape_image(template_id: int, shape_key: str, session: SessionDep) 
     """A picture embedded in the template, for the canvas drawing it."""
     row = session.get(s.TemplateRow, template_id)
     if row is None:
-        raise not_found("modelo não encontrado", str(template_id))
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id))
     blob = template_picture(row, shape_key)
     if blob is None:
-        raise not_found("imagem não encontrada no modelo", shape_key)
+        raise not_found(tr("deck_api.template_image_not_found.cause"), shape_key)
     content, content_type = blob
     return Response(content=content, media_type=content_type, headers={"Cache-Control": "max-age=3600"})
 
@@ -589,11 +609,11 @@ def run_scene_route(run_id: str, session: SessionDep) -> JSONDict:
     """The generated deck as an editable scene: every shape with the geometry the file holds."""
     row = session.get(s.ReportRunRow, run_id)
     if row is None:
-        raise not_found("geração não encontrada", run_id)
+        raise not_found(tr("deck_api.run_not_found.cause"), run_id)
     try:
         return run_scene(session, row)
     except NotFound:
-        raise not_found("arquivo da geração não encontrado", run_id) from None
+        raise not_found(tr("deck_api.run_file_not_found.cause"), run_id) from None
 
 
 class ReassociateBody(BaseModel):
@@ -605,7 +625,7 @@ def reassociate_run_route(run_id: str, body: ReassociateBody, session: SessionDe
     """#12: relink an orphaned run (its template deleted) to a re-uploaded one."""
     row = session.get(s.ReportRunRow, run_id)
     if row is None:
-        raise not_found("geração não encontrada", run_id)
+        raise not_found(tr("deck_api.run_not_found.cause"), run_id)
     reassociate_run(session, row, body.template_id)
     return run_scene(session, row)
 
@@ -640,8 +660,8 @@ def put_edits(template_id: int, body: EditsBody, session: SessionDep, now: Now, 
         raise HTTPException(
             409,
             detail={
-                "cause": "as edições mudaram enquanto você editava",
-                "action": "Recarregue o editor para pegar a versão atual antes de salvar.",
+                "cause": tr("deck_api.edits_conflict.cause"),
+                "action": tr("deck_api.edits_conflict.action"),
                 "revision": current,
             },
         )
@@ -661,7 +681,7 @@ def clear_edits(template_id: int, session: SessionDep, now: Now) -> None:
 async def upload_asset(
     session: SessionDep, settings: SettingsDep, file: Annotated[UploadFile, File()]
 ) -> JSONDict:
-    content = await _read_capped(file, ASSET_MAX_BYTES, "imagem grande demais")
+    content = await _read_capped(file, ASSET_MAX_BYTES, tr("deck_api.image_too_large.cause"))
     row = store_asset(session, settings, file.filename or "imagem.png", content)
     return {
         "id": row.id,
@@ -677,7 +697,7 @@ async def upload_asset(
 def get_asset(asset_id: str, session: SessionDep) -> FileResponse:
     row = session.get(s.AssetRow, asset_id)
     if row is None or not Path(row.path).exists():
-        raise not_found("imagem não encontrada", asset_id)
+        raise not_found(tr("deck_api.image_not_found.cause"), asset_id)
     if row.content_type in IMAGE_TYPES:
         return FileResponse(row.path, media_type=row.content_type)
     # Stored before uploads were checked: hand it over as a download, never as a page of this app.
@@ -697,10 +717,10 @@ def run_shape_image(run_id: str, shape_key: str, session: SessionDep) -> Respons
     """The bitmap of a picture already on a generated slide, so the canvas can draw it."""
     row = session.get(s.ReportRunRow, run_id)
     if row is None or not row.path or not Path(row.path).exists():
-        raise not_found("geração não encontrada", run_id)
+        raise not_found(tr("deck_api.run_not_found.cause"), run_id)
     blob = picture_blob(row.path, shape_key)
     if blob is None:
-        raise not_found("imagem não encontrada no slide", shape_key)
+        raise not_found(tr("deck_api.slide_image_not_found.cause"), shape_key)
     content, content_type = blob
     return Response(content=content, media_type=content_type, headers={"Cache-Control": "max-age=3600"})
 
@@ -755,7 +775,9 @@ def runs(session: SessionDep, template_id: int | None = None, kind: str = "entre
 def download(run_id: str, session: SessionDep, force: bool = False) -> FileResponse:
     row = session.get(s.ReportRunRow, run_id)
     if row is None or not row.path or not Path(row.path).exists():
-        raise not_found("apresentação não encontrada", f"Geração {run_id}.")
+        raise not_found(
+            tr("deck_api.deck_not_found.cause"), tr("deck_api.deck_not_found.message", run_id=run_id)
+        )
     blocker = download_blocker(session, row)
     if blocker and not force:
         raise HTTPException(409, detail=blocker)
@@ -787,7 +809,10 @@ def _version_dict(row: s.DeckVersionRow) -> JSONDict:
 def _version(session: SessionDep, version_id: int) -> s.DeckVersionRow:
     row = session.get(s.DeckVersionRow, version_id)
     if row is None:
-        raise not_found("versão não encontrada", f"Versão {version_id}.")
+        raise not_found(
+            tr("deck_api.version_not_found.cause"),
+            tr("deck_api.version_not_found.message", version_id=version_id),
+        )
     return row
 
 
@@ -812,7 +837,13 @@ def create_version(
     """Keep the current state under a name, where autosave's rolling copies will never prune it."""
     _template(session, template_id)
     if not body.label.strip():
-        raise HTTPException(400, detail={"cause": "nome ausente", "message": "Dê um nome à versão."})
+        raise HTTPException(
+            400,
+            detail={
+                "cause": tr("deck_api.version_name_missing.cause"),
+                "message": tr("deck_api.version_name_missing.message"),
+            },
+        )
     row = repo.record_version(
         session,
         template_id,
@@ -923,7 +954,7 @@ def resolve_comment(comment_id: int, body: CommentPatch, session: SessionDep) ->
 @router.delete("/comments/{comment_id}", status_code=204)
 def delete_comment(comment_id: int, session: SessionDep) -> None:
     if not repo.delete_comment(session, comment_id):
-        raise not_found("comentário não encontrado", str(comment_id))
+        raise not_found(tr("deck_api.comment_not_found.cause"), str(comment_id))
 
 
 # ------------------------------------------------------------ find & replace in variables (RF-88)

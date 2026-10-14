@@ -13,6 +13,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg, tr
 from cadencia.report.core.a11y import audit
 from cadencia.report.core.context import spec_for
 from cadencia.report.core.edits import DeckEdits, ShapeEdit, SlideEdits
@@ -53,11 +54,11 @@ def create_block(
     wherever it is dropped; only inserted shapes travel (a template's own shape has no meaning
     in another template)."""
     if not name.strip():
-        raise Invalid("O bloco precisa de um nome.")
+        raise Invalid(Msg("library.block.name_required"))
     edits = {key: ShapeEdit.model_validate(value) for key, value in shapes.items()}
     edits = {key: e for key, e in edits.items() if e.op == "insert" and e.frame is not None}
     if not edits:
-        raise Invalid("Um bloco guarda formas inseridas no editor; selecione ao menos uma.")
+        raise Invalid(Msg("library.block.no_shapes"))
     left = min(e.frame.x or 0 for e in edits.values())  # type: ignore[union-attr]
     top = min(e.frame.y or 0 for e in edits.values())  # type: ignore[union-attr]
     right = max((e.frame.x or 0) + (e.frame.cx or 0) for e in edits.values())  # type: ignore[union-attr]
@@ -93,7 +94,7 @@ def use_block(session: Session, block_id: int) -> s.DeckBlockRow:
     """Record that a block was just dropped onto a slide (#29)."""
     row = session.get(s.DeckBlockRow, block_id)
     if row is None:
-        raise NotFound(block_id, "Bloco não encontrado.")
+        raise NotFound(block_id, Msg("library.block.not_found"))
     row.usage_count += 1
     row.last_used_at = datetime.now(UTC)
     session.flush()
@@ -102,7 +103,7 @@ def use_block(session: Session, block_id: int) -> s.DeckBlockRow:
 
 def delete_block(session: Session, block_id: int) -> None:
     if session.get(s.DeckBlockRow, block_id) is None:
-        raise NotFound(block_id, "Bloco não encontrado.")
+        raise NotFound(block_id, Msg("library.block.not_found"))
     session.execute(delete(s.DeckBlockRow).where(s.DeckBlockRow.id == block_id))
 
 
@@ -142,7 +143,7 @@ def update_asset(
 ) -> s.AssetRow:
     row = session.get(s.AssetRow, asset_id)
     if row is None:
-        raise NotFound(asset_id, "Imagem não encontrada.")
+        raise NotFound(asset_id, Msg("library.image.not_found"))
     if label is not None:
         row.label = label.strip()[:160]
     if tags is not None:
@@ -228,14 +229,14 @@ def restore_slide(
     """Put one slide back as ``version`` had it; every other slide stays as it is now."""
     version = session.get(s.DeckVersionRow, version_id)
     if version is None or version.template_id != template_id or version.kind != "edits":
-        raise NotFound(version_id, "Versão não encontrada.")
+        raise NotFound(version_id, Msg("library.version.not_found"))
     current = load_edits(session, template_id)
     repo.record_version(
         session,
         template_id,
         "edits",
         current.model_dump(),
-        label=f"antes de restaurar o slide {key}",
+        label=tr("library.version.before_restoring_slide", key=key),
         auto=False,
         author=author,
         now=now,
@@ -284,26 +285,11 @@ def template_diagnostics(session: Session, template: s.TemplateRow) -> dict[str,
         round(Path(template.path).stat().st_size / 1_048_576, 2) if Path(template.path).exists() else None
     )
     checks = [
-        (
-            "fontes",
-            "aviso",
-            f"{len(fonts)} fonte(s) sem equivalente métrico: o texto pode quebrar diferente no editor.",
-            fonts,
-        ),
-        (
-            "marcadores_orfaos",
-            "erro",
-            f"{len(orphans)} marcador(es) {{…}} que nenhum campo ou variável responde.",
-            orphans,
-        ),
-        (
-            "areas_sem_vinculo",
-            "info",
-            f"{len(unbound)} área(s) de texto, tabela ou gráfico sem vínculo.",
-            unbound,
-        ),
-        ("slides_sem_nome", "info", f"{len(unnamed)} slide(s) sem nome nem título.", unnamed),
-        ("imagens_sem_alt", "aviso", f"{len(silent)} imagem(ns) do modelo sem texto alternativo.", silent),
+        ("fontes", "aviso", tr("library.diagnostics.fonts", count=len(fonts)), fonts),
+        ("marcadores_orfaos", "erro", tr("library.diagnostics.orphan_markers", count=len(orphans)), orphans),
+        ("areas_sem_vinculo", "info", tr("library.diagnostics.unbound_areas", count=len(unbound)), unbound),
+        ("slides_sem_nome", "info", tr("library.diagnostics.unnamed_slides", count=len(unnamed)), unnamed),
+        ("imagens_sem_alt", "aviso", tr("library.diagnostics.silent_images", count=len(silent)), silent),
     ]
     return {
         "template_id": template.id,
@@ -365,13 +351,16 @@ def template_usage(session: Session, template_id: int, last: int = 20) -> dict[s
     for origin, count in dropped.most_common():
         if runs and count >= max(2, 0.8 * len(runs)):
             suggestions.append(
-                f"“{names.get(origin, origin)}” saiu vazio em {count} de {len(runs)} gerações: vale remover?"
+                tr(
+                    "library.usage.often_empty",
+                    name=str(names.get(origin, origin)),
+                    count=count,
+                    runs=len(runs),
+                )
             )
     for origin, times in presented_time.items():
         if len(times) >= 2 and sum(times) / len(times) < 3:
-            suggestions.append(
-                f"“{names.get(origin, origin)}” fica menos de 3 s na tela ao apresentar: é pulado."
-            )
+            suggestions.append(tr("library.usage.skipped", name=str(names.get(origin, origin))))
     return {
         "runs": len(runs),
         "ok": sum(1 for r in runs if r.status == "ok"),

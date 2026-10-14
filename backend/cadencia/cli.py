@@ -12,11 +12,13 @@ from pathlib import Path
 from typing import Any
 
 from cadencia.config import get_settings
-from cadencia.i18n import configure_default_locale
+from cadencia.i18n import configure_default_locale, localize, tr
 
 
 def _print(value: Any) -> None:
-    json.dump(value, sys.stdout, ensure_ascii=False, indent=2, default=str)
+    """JSON on stdout. Any message the services left as ``Msg`` renders in ``CADENCIA_LOCALE``;
+    the keys never change."""
+    json.dump(localize(value), sys.stdout, ensure_ascii=False, indent=2, default=str)
     sys.stdout.write("\n")
 
 
@@ -101,7 +103,7 @@ def cmd_spaces(args: argparse.Namespace) -> None:
         items = [
             {
                 "key": key,
-                "name": spaces[key].label if key and key in spaces else "Sem espaço",
+                "name": spaces[key].label if key and key in spaces else tr("cli.no_space"),
                 "boards": [
                     {"id": b.id, "name": b.name, "type": b.type, "selected": b.selected}
                     for b in sorted(boards, key=lambda b: b.name.casefold())
@@ -204,7 +206,7 @@ def cmd_summary(args: argparse.Namespace) -> None:
     with session_scope(_sessions()) as session:
         sprint = repo.get_sprint(session, args.sprint)
         if sprint is None:
-            raise SystemExit(f"sprint {args.sprint} não coletada")
+            raise SystemExit(tr("cli.error.sprint_not_collected", sprint=args.sprint))
         data = load_board(session, sprint.board_id, repo.profile_defaults(settings), settings.history_days)
         overview = sprint_overview(
             data,
@@ -255,7 +257,7 @@ def cmd_mapping(args: argparse.Namespace) -> None:
     with session_scope(_sessions()) as session:
         template = session.get(s.TemplateRow, args.template)
         if template is None:
-            raise SystemExit(f"modelo {args.template} não encontrado")
+            raise SystemExit(tr("cli.error.template_not_found", template=args.template))
         if args.action == "show":
             row = repo.get_mapping(session, template.id)
             _print(row.mapping if row else None)
@@ -305,10 +307,7 @@ def cmd_demo(args: argparse.Namespace) -> None:
     with session_scope(sessions) as session:
         _rows, total = repo.list_boards(session, limit=1)
     if total and not args.force:
-        raise SystemExit(
-            "o banco já tem boards; use --force para misturar dados de demonstração a ele "
-            "ou aponte CADENCIA_DATABASE_URL para outro banco"
-        )
+        raise SystemExit(tr("cli.error.demo_not_empty"))
     _print(asyncio.run(seed_demo(get_settings(), sessions)))
 
 
@@ -389,103 +388,99 @@ def cmd_scheduler(_args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="cadencia", description="Cadência — acompanhamento de entregas no Jira"
-    )
+    parser = argparse.ArgumentParser(prog="cadencia", description=tr("cli.description"))
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("db-upgrade", help="aplica as migrações do banco").set_defaults(func=cmd_db_upgrade)
-    sub.add_parser("test-connection", help="testa a credencial do Jira").set_defaults(
+    sub.add_parser("db-upgrade", help=tr("cli.help.db_upgrade")).set_defaults(func=cmd_db_upgrade)
+    sub.add_parser("test-connection", help=tr("cli.help.test_connection")).set_defaults(
         func=cmd_test_connection
     )
-    sub.add_parser("discover", help="M0: boards, campos customizados e status da instância").set_defaults(
-        func=cmd_discover
-    )
+    sub.add_parser("discover", help=tr("cli.help.discover")).set_defaults(func=cmd_discover)
 
-    p = sub.add_parser("boards", help="lista boards descobertos e marca os acompanhados")
-    p.add_argument("--q", help="filtro por nome do board ou do espaço")
-    p.add_argument("--select", type=int, nargs="*", help="ids a acompanhar (substitui a seleção)")
+    p = sub.add_parser("boards", help=tr("cli.help.boards"))
+    p.add_argument("--q", help=tr("cli.help.boards.q"))
+    p.add_argument("--select", type=int, nargs="*", help=tr("cli.help.boards.select"))
     p.set_defaults(func=cmd_boards)
 
-    p = sub.add_parser("spaces", help="lista os espaços (times) com os boards de cada um")
-    p.add_argument("--selected", action="store_true", help="apenas boards acompanhados")
+    p = sub.add_parser("spaces", help=tr("cli.help.spaces"))
+    p.add_argument("--selected", action="store_true", help=tr("cli.help.spaces.selected"))
     p.set_defaults(func=cmd_spaces)
 
-    p = sub.add_parser("check-deck", help="valida um .pptx como pacote OOXML; sai com erro se inválido")
-    p.add_argument("file", nargs="+", help="arquivos .pptx a validar")
+    p = sub.add_parser("check-deck", help=tr("cli.help.check_deck"))
+    p.add_argument("file", nargs="+", help=tr("cli.help.check_deck.file"))
     p.set_defaults(func=cmd_check_deck)
 
     p = sub.add_parser(
         "check-variables",
-        help="lista variáveis usadas em modelos sem registro ou sem valor; sai com erro se houver",
+        help=tr("cli.help.check_variables"),
     )
-    p.add_argument("--template", type=int, help="restringe a um modelo")
+    p.add_argument("--template", type=int, help=tr("cli.help.template_filter"))
     p.set_defaults(func=cmd_check_variables)
 
     p = sub.add_parser(
         "migrate-bindings",
-        help="mostra o que converter vínculos antigos (field:) em variáveis faria; não grava nada",
+        help=tr("cli.help.migrate_bindings"),
     )
-    p.add_argument("--template", type=int, help="restringe a um modelo")
-    p.add_argument("--apply", action="store_true", help="grava: registra as variáveis e repõe os vínculos")
+    p.add_argument("--template", type=int, help=tr("cli.help.template_filter"))
+    p.add_argument("--apply", action="store_true", help=tr("cli.help.migrate_bindings.apply"))
     p.set_defaults(func=cmd_migrate_bindings)
 
     p = sub.add_parser(
         "migrate-palette",
-        help="mostra modelos cuja paleta é só uma cópia da compartilhada; --apply faz herdar",
+        help=tr("cli.help.migrate_palette"),
     )
-    p.add_argument("--apply", action="store_true", help="grava: remove as cópias redundantes")
+    p.add_argument("--apply", action="store_true", help=tr("cli.help.migrate_palette.apply"))
     p.set_defaults(func=cmd_migrate_palette)
 
-    p = sub.add_parser("collect", help="coleta os boards selecionados")
-    p.add_argument("--full", action="store_true", help="reconciliação completa")
-    p.add_argument("--board", type=int, action="append", help="restringe a um board (repetível)")
+    p = sub.add_parser("collect", help=tr("cli.help.collect"))
+    p.add_argument("--full", action="store_true", help=tr("cli.help.collect.full"))
+    p.add_argument("--board", type=int, action="append", help=tr("cli.help.collect.board"))
     p.set_defaults(func=cmd_collect)
 
-    p = sub.add_parser("checkpoint", help="grava/reexecuta snapshots de checkpoints")
+    p = sub.add_parser("checkpoint", help=tr("cli.help.checkpoint"))
     p.add_argument("--board", type=int, required=True)
-    p.add_argument("--at", help="instante ISO de um checkpoint específico")
-    p.add_argument("--force", action="store_true", help="regrava snapshots existentes")
+    p.add_argument("--at", help=tr("cli.help.checkpoint.at"))
+    p.add_argument("--force", action="store_true", help=tr("cli.help.checkpoint.force"))
     p.set_defaults(func=cmd_checkpoint)
 
-    p = sub.add_parser("summary", help="M1: resumo de uma sprint em JSON")
+    p = sub.add_parser("summary", help=tr("cli.help.summary"))
     p.add_argument("--sprint", type=int, required=True)
     p.set_defaults(func=cmd_summary)
 
-    p = sub.add_parser("manifest", help="M0: manifesto de áreas substituíveis de um .pptx")
+    p = sub.add_parser("manifest", help=tr("cli.help.manifest"))
     p.add_argument("path")
     p.add_argument("--out")
     p.set_defaults(func=cmd_manifest)
 
-    p = sub.add_parser("template-add", help="registra um modelo .pptx")
+    p = sub.add_parser("template-add", help=tr("cli.help.template_add"))
     p.add_argument("path")
     p.add_argument("--name")
     p.set_defaults(func=cmd_template_add)
 
-    p = sub.add_parser("mapping", help="mapeamento de um modelo")
+    p = sub.add_parser("mapping", help=tr("cli.help.mapping"))
     p.add_argument("action", choices=["show", "suggest", "set"])
     p.add_argument("template", type=int)
-    p.add_argument("file", nargs="?", help="JSON do mapeamento (para set)")
+    p.add_argument("file", nargs="?", help=tr("cli.help.mapping.file"))
     p.set_defaults(func=cmd_mapping)
 
-    p = sub.add_parser("deck", help="gera a apresentação")
+    p = sub.add_parser("deck", help=tr("cli.help.deck"))
     p.add_argument("--template", type=int, required=True)
-    p.add_argument("--reference", help="instante de referência (padrão: último checkpoint)")
+    p.add_argument("--reference", help=tr("cli.help.deck.reference"))
     p.add_argument("--board", type=int, action="append")
     p.add_argument("--anonymize", action="store_true")
-    p.add_argument("--no-render", action="store_true", help="não renderiza prévias com LibreOffice")
+    p.add_argument("--no-render", action="store_true", help=tr("cli.help.deck.no_render"))
     p.set_defaults(func=cmd_deck)
 
-    p = sub.add_parser("serve", help="sobe a API")
+    p = sub.add_parser("serve", help=tr("cli.help.serve"))
     p.add_argument("--host", default="0.0.0.0")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--reload", action="store_true")
     p.set_defaults(func=cmd_serve)
 
-    sub.add_parser("scheduler", help="serviço coletor agendado").set_defaults(func=cmd_scheduler)
+    sub.add_parser("scheduler", help=tr("cli.help.scheduler")).set_defaults(func=cmd_scheduler)
 
-    p = sub.add_parser("demo", help="preenche o banco com a instância fictícia de demonstração")
-    p.add_argument("--force", action="store_true", help="aceita um banco que já tem boards")
+    p = sub.add_parser("demo", help=tr("cli.help.demo"))
+    p.add_argument("--force", action="store_true", help=tr("cli.help.demo.force"))
     p.set_defaults(func=cmd_demo)
     return parser
 

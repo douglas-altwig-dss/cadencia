@@ -15,6 +15,7 @@ from cadencia.analytics.data import BoardData, load_board
 from cadencia.config import Settings
 from cadencia.domain.models import Sprint
 from cadencia.errors import NotFound
+from cadencia.i18n import tr
 from cadencia.store import repo
 from cadencia.store.db import session_scope
 
@@ -72,10 +73,10 @@ def stored_file(root: Path, *parts: str) -> Path:
     """
     for part in parts:
         if not _PLAIN_NAME.match(part):
-            raise HTTPException(400, detail={"cause": "nome inválido", "message": part})
+            raise HTTPException(400, detail={"cause": tr("http.invalid_name.cause"), "message": part})
     path = root.joinpath(*parts)
     if not path.resolve().is_relative_to(root.resolve()) or not path.is_file():
-        raise not_found("arquivo não encontrado", parts[-1])
+        raise not_found(tr("http.file_not_found.cause"), parts[-1])
     return path
 
 
@@ -84,14 +85,16 @@ def board_data(session: Session, settings: Settings, board_id: int) -> BoardData
         return load_board(session, board_id, repo.profile_defaults(settings), settings.history_days)
     except NotFound:
         raise not_found(
-            "board não encontrado", f"O board {board_id} não existe ou ainda não foi descoberto."
+            tr("http.board_not_found.cause"), tr("http.board_not_found.message", board_id=board_id)
         ) from None
 
 
 def sprint_or_404(session: Session, sprint_id: int) -> Sprint:
     sprint = repo.get_sprint(session, sprint_id)
     if sprint is None:
-        raise not_found("sprint não encontrada", f"A sprint {sprint_id} não foi coletada.")
+        raise not_found(
+            tr("http.sprint_not_found.cause"), tr("http.sprint_not_found.message", sprint_id=sprint_id)
+        )
     return sprint
 
 
@@ -104,7 +107,7 @@ def board_for_issue(session: Session, key: str, board_id: int | None) -> int:
 
     found = session.scalar(select(s.IssueBoardRow.board_id).where(s.IssueBoardRow.issue_key == key).limit(1))
     if found is None:
-        raise not_found("item não encontrado", f"O item {key} não foi coletado em nenhum board.")
+        raise not_found(tr("http.issue_not_found.cause"), tr("http.issue_not_found.message", key=key))
     return int(found)
 
 
@@ -126,7 +129,11 @@ def parse_instant(value: str | None, default: datetime) -> datetime:
             parsed = datetime.combine(date.fromisoformat(value), time(23, 59, 59))
         except ValueError:
             raise HTTPException(
-                400, detail={"cause": "data inválida", "message": f"{value!r} não é uma data ISO."}
+                400,
+                detail={
+                    "cause": tr("http.invalid_date.cause"),
+                    "message": tr("http.invalid_date.message", value=repr(value)),
+                },
             ) from None
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
@@ -137,7 +144,7 @@ def csv_ints(value: str | None) -> list[int]:
     try:
         return [int(v) for v in value.split(",") if v.strip()]
     except ValueError:
-        raise HTTPException(400, detail={"cause": "parâmetro inválido", "message": value}) from None
+        raise HTTPException(400, detail={"cause": tr("http.invalid_param.cause"), "message": value}) from None
 
 
 def csv_strs(value: str | None) -> list[str]:

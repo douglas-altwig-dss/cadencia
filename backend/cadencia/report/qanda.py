@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from cadencia.errors import Invalid, NotFound
+from cadencia.i18n import Msg
 from cadencia.store import schema as s
 
 
@@ -29,7 +30,7 @@ def question_dict(row: s.ReportQuestionRow) -> dict[str, Any]:
 def ask_question(session: Session, run_id: str, text: str, author: str | None) -> s.ReportQuestionRow:
     text = text.strip()
     if not text:
-        raise Invalid("A pergunta está vazia.")
+        raise Invalid(Msg("deck_api.question_empty"))
     row = s.ReportQuestionRow(run_id=run_id, text=text[:2000], author=author, asked_at=datetime.now(UTC))
     session.add(row)
     session.flush()
@@ -50,7 +51,7 @@ def list_questions(session: Session, run_id: str) -> list[s.ReportQuestionRow]:
 def set_answered(session: Session, question_id: int, answered: bool) -> s.ReportQuestionRow:
     row = session.get(s.ReportQuestionRow, question_id)
     if row is None:
-        raise NotFound(question_id, "Pergunta não encontrada.")
+        raise NotFound(question_id, Msg("deck_api.question_not_found"))
     row.answered_at = datetime.now(UTC) if answered else None
     session.flush()
     return row
@@ -58,5 +59,5 @@ def set_answered(session: Session, question_id: int, answered: bool) -> s.Report
 
 def delete_question(session: Session, question_id: int) -> None:
     if session.get(s.ReportQuestionRow, question_id) is None:
-        raise NotFound(question_id, "Pergunta não encontrada.")
+        raise NotFound(question_id, Msg("deck_api.question_not_found"))
     session.execute(delete(s.ReportQuestionRow).where(s.ReportQuestionRow.id == question_id))

@@ -15,6 +15,7 @@ from typing import Any
 
 from cadencia.config import Settings
 from cadencia.errors import Invalid
+from cadencia.i18n import Msg, render
 from cadencia.report.core.context import BoardDeck
 
 #: The numbers a narrative may cite: label for the model -> where it lives in the board's deck.
@@ -41,7 +42,7 @@ FACTS: tuple[tuple[str, str], ...] = (
     ("riscos_resolvidos", "num.mudancas_resolvidos"),
 )
 
-SYSTEM = (
+SYSTEM = (  # deck text: pt-BR by design (docs/i18n.md) — the draft becomes the deck variable
     "Você escreve o parágrafo de abertura do slide de um time numa reunião semanal de "
     "acompanhamento de entregas. Escreva em português do Brasil, em 2 a 4 frases, tom factual e "
     "direto, sem markdown, sem listas e sem saudação. Use apenas os números fornecidos; quando um "
@@ -51,7 +52,17 @@ SYSTEM = (
 
 
 class NarrativeUnavailable(RuntimeError):
-    """The feature is off, the SDK is missing, or the API could not be reached."""
+    """The feature is off, the SDK is missing, or the API could not be reached.
+
+    Carries a ``Msg``; ``str(exc)`` renders it in the ambient locale (the request's, in the API).
+    """
+
+    def __init__(self, message: Msg) -> None:
+        super().__init__(message)
+        self.msg = message
+
+    def __str__(self) -> str:
+        return render(self.msg)
 
 
 def narrative_facts(board: BoardDeck) -> dict[str, Any]:
@@ -68,11 +79,11 @@ def narrative_facts(board: BoardDeck) -> dict[str, Any]:
 def draft_narrative(settings: Settings, facts: Mapping[str, Any], *, client: Any = None) -> str:
     """One paragraph from ``facts``. ``client`` is injectable for tests."""
     if not settings.ai_enabled:
-        raise NarrativeUnavailable("A sugestão por IA está desligada (CADENCIA_AI_ENABLED).")
+        raise NarrativeUnavailable(Msg("narrative.disabled"))
     try:
         import anthropic
     except ImportError as exc:  # pragma: no cover - the package is a dependency
-        raise NarrativeUnavailable("O pacote anthropic não está instalado no backend.") from exc
+        raise NarrativeUnavailable(Msg("narrative.package_missing")) from exc
     if client is None:
         key = settings.anthropic_api_key.get_secret_value()
         client = anthropic.Anthropic(api_key=key or None, timeout=settings.ai_timeout_seconds, max_retries=2)
@@ -89,22 +100,22 @@ def draft_narrative(settings: Settings, facts: Mapping[str, Any], *, client: Any
             messages=[
                 {
                     "role": "user",
-                    "content": "Números do time nesta semana (JSON):\n"
+                    "content": "Números do time nesta semana (JSON):\n"  # deck text: pt-BR by design
                     + json.dumps(dict(facts), ensure_ascii=False, sort_keys=True),
                 }
             ],
         )
     except anthropic.AuthenticationError as exc:
-        raise NarrativeUnavailable("A chave da API da Anthropic foi recusada.") from exc
+        raise NarrativeUnavailable(Msg("narrative.key_refused")) from exc
     except anthropic.RateLimitError as exc:
-        raise NarrativeUnavailable("Limite de uso da API atingido; tente de novo em instantes.") from exc
+        raise NarrativeUnavailable(Msg("narrative.rate_limited")) from exc
     except anthropic.APIStatusError as exc:
-        raise NarrativeUnavailable(f"A API respondeu com erro {exc.status_code}.") from exc
+        raise NarrativeUnavailable(Msg("narrative.status_error", status=exc.status_code)) from exc
     except anthropic.APIConnectionError as exc:
-        raise NarrativeUnavailable("Não foi possível falar com a API da Anthropic.") from exc
+        raise NarrativeUnavailable(Msg("narrative.unreachable")) from exc
     if response.stop_reason == "refusal":
-        raise Invalid("A IA recusou escrever este texto; escreva-o à mão.")
+        raise Invalid(Msg("narrative.refused"))
     text = " ".join(b.text.strip() for b in response.content if b.type == "text" and b.text.strip())
     if not text:
-        raise NarrativeUnavailable("A IA não devolveu texto.")
+        raise NarrativeUnavailable(Msg("narrative.empty"))
     return text

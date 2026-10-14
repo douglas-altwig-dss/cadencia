@@ -8,6 +8,7 @@ from cadencia.api.deps import JSONDict, Now, SessionDep
 from cadencia.focus_log import service
 from cadencia.focus_log.model import Documento
 from cadencia.focus_log.service import RevisionConflict
+from cadencia.i18n import tr
 
 router = APIRouter(prefix="/focus-log", tags=["timeline de foco"])
 
@@ -31,8 +32,8 @@ def save_log(body: SaveBody, session: SessionDep, now: Now) -> JSONDict:
         raise HTTPException(
             409,
             detail={
-                "cause": "a timeline mudou enquanto você editava",
-                "action": "Recarregue a página para pegar a versão atual antes de salvar.",
+                "cause": tr("focus_log.conflict.cause"),
+                "action": tr("focus_log.conflict.action"),
                 "revision": conflict.current,
             },
         ) from conflict

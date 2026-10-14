@@ -8,6 +8,8 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from cadencia.i18n import tr
+
 Tipo = Literal["tarefa", "troca"]
 Estilo = Literal["borda-gradiente", "borda-tracejada", "borda-dupla", "borda-solida"]
 Cor = Annotated[str, Field(pattern=r"^#[0-9A-Fa-f]{6}$")]
@@ -25,10 +27,12 @@ def normaliza(texto: str) -> str:
 
 
 def _sem_repetidos(valores: list[str], o_que: str) -> None:
+    """``o_que`` is a ``focus_log.subject.*`` key. Rendered when raised: validation runs inside the
+    request, so the message speaks its language."""
     vistos: set[str] = set()
     for valor in valores:
         if valor in vistos:
-            raise ValueError(f"Há {o_que} repetido: {valor}.")
+            raise ValueError(tr("focus_log.duplicate", what=tr(o_que), value=valor))
         vistos.add(valor)
 
 
@@ -77,9 +81,9 @@ class Registro(_Modelo):
     @model_validator(mode="after")
     def _completo(self) -> Self:
         if self.tipo == "tarefa" and not self.registro:
-            raise ValueError("Uma atividade precisa de descrição.")
+            raise ValueError(tr("focus_log.task_needs_text"))
         if self.tipo == "troca" and not (self.de_tema and self.para_tema):
-            raise ValueError("Uma troca de foco diz de qual tema sai e para qual tema vai.")
+            raise ValueError(tr("focus_log.switch_needs_themes"))
         return self
 
 
@@ -91,9 +95,9 @@ class Documento(_Modelo):
 
     @model_validator(mode="after")
     def _sem_repetidos(self) -> Self:
-        _sem_repetidos([p.id for p in self.pessoas], "membro (id)")
-        _sem_repetidos([normaliza(p.nome) for p in self.pessoas], "membro")
-        _sem_repetidos([normaliza(t.nome) for t in self.temas], "tema")
-        _sem_repetidos([normaliza(s.nome) for s in self.sinais], "sinal")
-        _sem_repetidos([r.uid for r in self.registros], "registro (uid)")
+        _sem_repetidos([p.id for p in self.pessoas], "focus_log.subject.member_id")
+        _sem_repetidos([normaliza(p.nome) for p in self.pessoas], "focus_log.subject.member")
+        _sem_repetidos([normaliza(t.nome) for t in self.temas], "focus_log.subject.theme")
+        _sem_repetidos([normaliza(s.nome) for s in self.sinais], "focus_log.subject.signal")
+        _sem_repetidos([r.uid for r in self.registros], "focus_log.subject.entry_uid")
         return self

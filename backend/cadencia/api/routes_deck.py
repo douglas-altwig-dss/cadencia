@@ -22,6 +22,7 @@ from cadencia.api.deps import (
     stored_file,
 )
 from cadencia.errors import NotFound
+from cadencia.i18n import tr
 from cadencia.report.core.fonts import face_file, font_plan
 from cadencia.report.core.scene import picture_blob
 from cadencia.report.library import (
@@ -70,7 +71,7 @@ PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentatio
 def _run(session: SessionDep, run_id: str) -> s.ReportRunRow:
     row = session.get(s.ReportRunRow, run_id)
     if row is None:
-        raise not_found("geração não encontrada", run_id)
+        raise not_found(tr("deck_api.run_not_found.cause"), run_id)
     return row
 
 
@@ -96,14 +97,14 @@ def download_file(
         try:
             path = run_pdf(settings, row)
         except NotFound:
-            raise not_found("apresentação não encontrada", run_id) from None
+            raise not_found(tr("deck_api.deck_not_found.cause"), run_id) from None
         return FileResponse(path, media_type="application/pdf", filename=f"{stem}.pdf")
     if not row.path:
-        raise not_found("apresentação não encontrada", run_id)
+        raise not_found(tr("deck_api.deck_not_found.cause"), run_id)
     try:
         return FileResponse(row.path, media_type=PPTX, filename=f"{stem}.pptx")
     except RuntimeError:  # pragma: no cover - file vanished between the check and the send
-        raise not_found("apresentação não encontrada", run_id) from None
+        raise not_found(tr("deck_api.deck_not_found.cause"), run_id) from None
 
 
 # ------------------------------------------------------------ preview one board (#9), partial run (#10)
@@ -149,7 +150,13 @@ def partial_run(
     a quick check of one fix without redoing thirty slides. It is a deck of its own, linked back."""
     parent = _run(session, run_id)
     if not body.slide_ids and not body.board_ids and not body.agora:
-        raise HTTPException(400, detail={"cause": "nada a regerar", "message": "Escolha slides ou boards."})
+        raise HTTPException(
+            400,
+            detail={
+                "cause": tr("deck_api.nothing_to_regenerate.cause"),
+                "message": tr("deck_api.nothing_to_regenerate.message"),
+            },
+        )
     board_ids = body.board_ids or parent.board_ids
     reference = now if body.agora else parent.reference_at
     run = generate_report(
@@ -177,7 +184,7 @@ def compare(before_id: str, after_id: str, session: SessionDep) -> JSONDict:
     try:
         return compare_runs(before, after, names)
     except NotFound as exc:
-        raise not_found("arquivo da geração não encontrado", str(exc)) from None
+        raise not_found(tr("deck_api.run_file_not_found.cause"), str(exc)) from None
 
 
 # ------------------------------------------------------------ accessibility (#15)
@@ -188,14 +195,14 @@ def run_a11y(run_id: str, session: SessionDep) -> JSONDict:
     try:
         return run_accessibility(session, _run(session, run_id))
     except NotFound:
-        raise not_found("arquivo da geração não encontrado", run_id) from None
+        raise not_found(tr("deck_api.run_file_not_found.cause"), run_id) from None
 
 
 @router.get("/templates/{template_id}/accessibility")
 def template_a11y(template_id: int, session: SessionDep) -> JSONDict:
     template = session.get(s.TemplateRow, template_id)
     if template is None:
-        raise not_found("modelo não encontrado", str(template_id))
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id))
     return template_accessibility(session, template)
 
 
@@ -246,7 +253,7 @@ def add_share(
 def revoke_share(token: str, session: SessionDep) -> None:
     row = session.get(s.DeckShareRow, token)
     if row is None:
-        raise not_found("link não encontrado", "link")
+        raise not_found(tr("deck_api.share_not_found.cause"), "link")
     row.revoked_at = row.revoked_at or datetime.now(UTC)
 
 
@@ -306,7 +313,7 @@ class PresenceBody(BaseModel):
 
 
 def _presence_author(request: Request, fallback: str | None) -> str:
-    return author_of(request, fallback) or "Alguém sem nome"
+    return author_of(request, fallback) or tr("deck_api.anonymous")
 
 
 @router.post("/templates/{template_id}/presence")
@@ -350,7 +357,7 @@ def restore_one_slide(
 def diagnostics(template_id: int, session: SessionDep) -> JSONDict:
     template = session.get(s.TemplateRow, template_id)
     if template is None:
-        raise not_found("modelo não encontrado", str(template_id))
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id))
     return template_diagnostics(session, template)
 
 
@@ -423,14 +430,14 @@ def narrative(
     """A draft paragraph for one board, from the numbers this template's deck would show. Nothing is
     saved: the person reviews it and stores it as a variable value if they want it in the deck."""
     if session.get(s.TemplateRow, template_id) is None:
-        raise not_found("modelo não encontrado", str(template_id))
+        raise not_found(tr("deck_api.template_not_found.cause"), str(template_id))
     reference = default_reference(session, settings, [body.board_id], now)
     deck = deck_source(session, settings).deck_data(
         [body.board_id], reference=reference, now=now, registry=variable_registry(session, template_id)
     )
     board = deck.board_by_id(body.board_id)
     if board is None:
-        raise not_found("board sem dados", str(body.board_id))
+        raise not_found(tr("deck_api.board_without_data.cause"), str(body.board_id))
     facts = narrative_facts(board)
     try:
         text = draft_narrative(settings, facts)
@@ -438,9 +445,9 @@ def narrative(
         raise HTTPException(
             503,
             detail={
-                "cause": "sugestão por IA indisponível",
+                "cause": tr("deck_api.ai_unavailable.cause"),
                 "message": str(exc),
-                "action": "Escreva o texto à mão, ou peça a quem administra para ligar CADENCIA_AI_ENABLED.",
+                "action": tr("deck_api.ai_unavailable.action"),
             },
         ) from exc
     return {"texto": text, "fatos": facts, "modelo": settings.ai_model}
@@ -456,7 +463,7 @@ def public_deck(token: str, session: SessionDep) -> JSONDict:
         run = shared_run(session, token)
         scene = run_scene(session, run)
     except NotFound:
-        raise not_found("link inexistente, expirado ou revogado", "link") from None
+        raise not_found(tr("deck_api.share_unavailable.cause"), "link") from None
     share = session.get(s.DeckShareRow, token)
     if share is not None:
         share.views += 1
@@ -492,10 +499,10 @@ def public_image(token: str, shape_key: str, session: SessionDep) -> Response:
     try:
         run = shared_run(session, token)
     except NotFound:
-        raise not_found("link inexistente, expirado ou revogado", "link") from None
+        raise not_found(tr("deck_api.share_unavailable.cause"), "link") from None
     blob = picture_blob(run.path or "", shape_key) if run.path else None
     if blob is None:
-        raise not_found("imagem não encontrada", shape_key)
+        raise not_found(tr("deck_api.image_not_found.cause"), shape_key)
     content, content_type = blob
     return Response(
         content=content, media_type=content_type, headers={"Cache-Control": "private, max-age=3600"}
@@ -508,7 +515,7 @@ def public_file(token: str, name: str, session: SessionDep, settings: SettingsDe
     try:
         run = shared_run(session, token)
     except NotFound:
-        raise not_found("link inexistente, expirado ou revogado", "link") from None
+        raise not_found(tr("deck_api.share_unavailable.cause"), "link") from None
     return FileResponse(
         stored_file(settings.decks_dir, run.id, name), headers={"Cache-Control": "private, max-age=3600"}
     )
@@ -519,6 +526,6 @@ def public_font(face: str, variant: str) -> FileResponse:
     """The metric-compatible faces — font files, no data — so a shared deck wraps like the editor."""
     path = face_file(face, variant)
     if path is None:
-        raise not_found("fonte não disponível", f"{face} {variant}")
+        raise not_found(tr("deck_api.font_unavailable.cause"), f"{face} {variant}")
     media = "font/otf" if path.suffix.lower() == ".otf" else "font/ttf"
     return FileResponse(path, media_type=media, headers={"Cache-Control": "max-age=604800"})
