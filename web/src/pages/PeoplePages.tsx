@@ -360,7 +360,7 @@ export function PersonPage() {
       </Drawer>
       <Stack gap="lg">
         {data.indicators && <PersonSummary indicators={data.indicators} />}
-        <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
+        <Tabs key={accountId} value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
           <Tabs.List mb="md" style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
             {TABS.map((id) => (
               <Tabs.Tab key={id} value={id}>

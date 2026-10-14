@@ -198,7 +198,9 @@ export function SprintPage() {
         actions={selector}
       />
       <Freshness freshness={data.freshness} />
-      <Tabs value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
+      {/* Keyed by the sprint: switching to another one remounts the tabs, so no tab keeps the
+          previous one's state (picked checkpoints, a what-if result, an open detail). */}
+      <Tabs key={sprintId} value={tab} onChange={(value) => set({ tab: value })} keepMounted={false}>
         <Tabs.List mb="md">
           <Tabs.Tab value="overview">{m.tabOverview}</Tabs.Tab>
           <Tabs.Tab value="work-tree">{m.tabTree}</Tabs.Tab>
