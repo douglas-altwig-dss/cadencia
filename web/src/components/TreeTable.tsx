@@ -48,7 +48,7 @@ export function TreeTable({ nodes, boardId, sprintId }: { nodes: TreeNode[]; boa
                   <Group gap={6} wrap="nowrap">
                     <Anchor
                       component={Link}
-                      to={carry(`/boards/${boardId}/epics/${node.key}`, { sprint: sprintId ? String(sprintId) : undefined })}
+                      to={carry(`/epics/${node.key}`, { board: String(boardId), sprint: sprintId ? String(sprintId) : undefined })}
                       fw={600}
                       className="mono"
                     >

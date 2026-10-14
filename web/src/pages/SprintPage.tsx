@@ -18,7 +18,7 @@ import { useT } from '../i18n';
 import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
 import { fmtDate, fmtPct } from '../lib/format';
-import { PlanningTab } from './PlanningTab';
+import { AllocationTab } from './AllocationTab';
 
 /** Numbers first, then the forecast, then the weeks that explain them. */
 function OverviewTab({ data, forecast, onCommitment }: { data: SprintOverview; forecast: ReactNode; onCommitment: () => void }) {
@@ -155,7 +155,7 @@ export function SprintPage() {
   const forecast = useSprintForecast(sprintId);
   const t = useT();
   const m = t.tracking.sprint;
-  const SPRINT_TABS = ['overview', 'work-tree', 'timeline', 'risks', 'changes', 'commitment', 'planning'] as const;
+  const SPRINT_TABS = ['overview', 'work-tree', 'timeline', 'risks', 'changes', 'commitment', 'allocation'] as const;
   const requestedTab = get('tab');
   const tab = (SPRINT_TABS as readonly string[]).includes(requestedTab ?? '') ? requestedTab! : 'overview';
 
@@ -177,8 +177,7 @@ export function SprintPage() {
   if (overview.error) return <ErrorState error={overview.error} />;
   const data = overview.data;
   if (!data) return null;
-  // The board's own page opens its current sprint, so from that sprint the board crumb is just text.
-  const onCurrentSprint = sprints.data?.current_sprint_id === sprintId;
+  const space = sprints.data?.board.space;
 
   return (
     <>
@@ -192,7 +191,8 @@ export function SprintPage() {
         }
         crumbs={[
           { label: t.tracking.crumbs.home, to: '/' },
-          { label: data.board.name, to: onCurrentSprint ? undefined : `/boards/${boardId}` },
+          ...(space ? [{ label: space.name, to: `/spaces/${encodeURIComponent(space.key)}` }] : []),
+          { label: data.board.name, to: `/boards/${boardId}` },
           { label: data.sprint.name },
         ]}
         actions={selector}
@@ -206,7 +206,7 @@ export function SprintPage() {
           <Tabs.Tab value="risks">{m.tabOpen}</Tabs.Tab>
           <Tabs.Tab value="changes">{m.tabChanges}</Tabs.Tab>
           <Tabs.Tab value="commitment">{m.tabCommitment}</Tabs.Tab>
-          <Tabs.Tab value="planning">{m.tabPlanning}</Tabs.Tab>
+          <Tabs.Tab value="allocation">{m.tabAllocation}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="overview">
           <OverviewTab data={data} forecast={<ForecastCard query={forecast} />} onCommitment={() => set({ tab: 'commitment' })} />
@@ -221,13 +221,13 @@ export function SprintPage() {
           <RiskTable sprintId={sprintId} />
         </Tabs.Panel>
         <Tabs.Panel value="changes">
-          <ChangesPanel boardId={boardId} />
+          <ChangesPanel scope={{ sprintId }} />
         </Tabs.Panel>
         <Tabs.Panel value="commitment">
           <CommitmentTab data={data} />
         </Tabs.Panel>
-        <Tabs.Panel value="planning">
-          <PlanningTab sprintId={sprintId} />
+        <Tabs.Panel value="allocation">
+          <AllocationTab sprintId={sprintId} />
         </Tabs.Panel>
       </Tabs>
     </>

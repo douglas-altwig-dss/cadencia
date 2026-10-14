@@ -167,7 +167,7 @@ function SimulationPanel({ sprintId, people }: { sprintId: number; people: { val
 }
 
 /** RF-25 … RF-29: theoretical capacity, greedy distribution and comparison with reality. */
-export function PlanningTab({ sprintId }: { sprintId: number }) {
+export function AllocationTab({ sprintId }: { sprintId: number }) {
   const capacity = useCapacity(sprintId);
   const allocation = useAllocation(sprintId);
   const create = useCreateAllocation(sprintId);

@@ -48,6 +48,7 @@ import {
   IconWand,
 } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 
 import {
   useBoards,
@@ -56,6 +57,7 @@ import {
   useGenerate,
   useReassociateRun,
   useRefreshTemplate,
+  useRun,
   useRunScene,
   useRuns,
   useTemplateReadiness,
@@ -162,11 +164,14 @@ function RunResult({
   onFix,
   context,
   onRun,
+  standalone = false,
 }: {
   run: ReportRun;
   onFix?: (fix: Fix) => void;
   context: RunContext;
   onRun?: (run: ReportRun) => void;
+  /** On the generation's own page: no link to itself. */
+  standalone?: boolean;
 }) {
   const t = useT();
   const r = t.deck.page;
@@ -197,6 +202,11 @@ function RunResult({
           {run.audience ? ` · ${r.audienceOf(run.audience)}` : ''}
           {run.seconds != null ? ` · ${fmtNum(run.seconds)} s` : ''}
         </Text>
+        {!standalone && (
+          <Anchor component={Link} to={`/presentation/runs/${run.id}`} size="sm">
+            {r.openPage}
+          </Anchor>
+        )}
       </Group>
       {scene.data?.template_deleted && (
         <Alert color="yellow" variant="light" title={r.templateDeletedTitle}>
@@ -360,6 +370,7 @@ function GenerateTab({
 }) {
   const t = useT();
   const g = t.deck.generate;
+  const r = t.deck.page;
   const boards = useBoards('', 1, 200, true);
   const generate = useGenerate();
   const runs = useRuns(templateId);
@@ -508,6 +519,9 @@ function GenerateTab({
                   <Table.Td className="mono">{run.template_sha256.slice(0, 10)}</Table.Td>
                   <Table.Td>
                     <Group gap={8} wrap="nowrap">
+                      <Anchor component={Link} to={`/presentation/runs/${run.id}`} size="sm">
+                        {r.openPage}
+                      </Anchor>
                       <Anchor href={runFileUrl(run, 'pptx', needsForce(run, !!draft.require_approval))} size="sm">
                         .pptx
                       </Anchor>
@@ -542,6 +556,7 @@ function GenerateTab({
  */
 function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack: () => void }) {
   const t = useT();
+  const navigate = useNavigate();
   const w = t.deck.workspace;
   const detail = useTemplate(templateId);
   const catalog = useCatalog();
@@ -967,13 +982,13 @@ function TemplateWorkspace({ templateId, onBack }: { templateId: number; onBack:
           <TemplatesDrawer
             current={templateId}
             onSelect={(id) => {
-              set({ template: id == null ? null : String(id), slide: null, run: null });
               setDrawer(null);
+              navigate(id == null ? '/presentation' : `/presentation/templates/${id}`);
             }}
             onUploaded={(id) => {
               // #23: a new template opens on its wizard.
-              set({ template: String(id), slide: null, run: null, wizard: '1' });
               setDrawer(null);
+              navigate(`/presentation/templates/${id}?wizard=1`);
             }}
           />
         )}
@@ -1084,79 +1099,302 @@ function DeckRules({
   );
 }
 
+/** The way between the Presentation pages: templates, generations and variables. */
+function PresentationLinks() {
+  const p = useT().deck.home;
+  return (
+    <Group gap="xs">
+      <Button component={Link} to="/presentation/runs" variant="default" size="xs" leftSection={<IconPresentation size={14} />}>
+        {p.generations}
+      </Button>
+      <Button component={Link} to="/presentation/variables" variant="default" size="xs" leftSection={<IconBraces size={14} />}>
+        {p.variables}
+      </Button>
+    </Group>
+  );
+}
+
 /**
  * RF-37 … RF-44 / RF-104: the user's PowerPoint template is the visual contract; the deck is
- * filled in place. Opening one starts from a gallery — the way both slide products do it — rather
- * than a `<Select>` that already assumed which template the person wanted; picking a card is the
- * same "open this template" the dropdown used to do.
+ * filled in place. Presentation starts from a gallery — the way both slide products do it — and each
+ * template opens at its own address (`/presentation/templates/<id>`), so a template in progress is a
+ * link. Generations and the shared variables have pages of their own beside it.
  */
 export function DeckPage() {
   const t = useT();
   const p = t.deck.home;
   const templates = useTemplates();
-  const { get, set } = useFilters();
+  const navigate = useNavigate();
   const items = useMemo(() => templates.data?.items ?? [], [templates.data]);
-  // RF-34: the model, the tab and the slide live in the URL, so a mapping in progress is a link.
-  const chosen = get('template');
-  const selected = items.some((item) => String(item.id) === chosen) ? chosen : null;
   const [managing, setManaging] = useState(false);
   const upload = useUploadTemplate();
-
-  if (selected) {
-    return (
-      <TemplateWorkspace
-        key={selected}
-        templateId={Number(selected)}
-        onBack={() => set({ template: null, slide: null, run: null })}
-      />
-    );
-  }
+  const open = (id: number, wizard = false) => navigate(`/presentation/templates/${id}${wizard ? '?wizard=1' : ''}`);
 
   return (
     <>
-      <PageHeader
-        title={p.title}
-        subtitle={p.subtitle}
-      />
+      <PageHeader title={p.title} subtitle={p.subtitle} actions={<PresentationLinks />} />
       {templates.isLoading && <Loading />}
       {templates.error && <ErrorState error={templates.error} />}
       {templates.data && !items.length && (
         <Stack gap="md" align="flex-start">
           <Empty title={p.emptyTitle}>{p.emptyBody}</Empty>
           <Box w={240}>
-            <UploadCard
-              uploading={upload.isPending}
-              error={upload.error}
-              onFile={(file) => upload.mutate({ file }, { onSuccess: (row) => set({ template: String(row.id), slide: null, wizard: '1' }) })}
-            />
+            <UploadCard uploading={upload.isPending} error={upload.error} onFile={(file) => upload.mutate({ file }, { onSuccess: (row) => open(row.id, true) })} />
           </Box>
         </Stack>
       )}
       {items.length > 0 && (
         <TemplateGallery
           items={items}
-          onSelect={(id) => set({ template: String(id), slide: null })}
+          onSelect={(id) => open(id)}
           onManage={() => setManaging(true)}
           uploading={upload.isPending}
           uploadError={upload.error}
-          onUploadFile={(file) =>
-            upload.mutate({ file }, { onSuccess: (row) => set({ template: String(row.id), slide: null, wizard: '1' }) })
-          }
+          onUploadFile={(file) => upload.mutate({ file }, { onSuccess: (row) => open(row.id, true) })}
         />
       )}
       <Drawer opened={managing} onClose={() => setManaging(false)} position="right" size="lg" title={t.deck.workspace.templates}>
         <TemplatesDrawer
           current={-1}
           onSelect={(id) => {
-            if (id != null) set({ template: String(id), slide: null });
             setManaging(false);
+            if (id != null) open(id);
           }}
           onUploaded={(id) => {
-            set({ template: String(id), slide: null, wizard: '1' });
             setManaging(false);
+            open(id, true);
           }}
         />
       </Drawer>
+    </>
+  );
+}
+
+/** One template in the editor: `/presentation/templates/<id>`, with `?run=`, `?slide=`, `?shape=` and `?wizard=1`. */
+export function TemplatePage() {
+  const templateId = Number(useParams().templateId);
+  const navigate = useNavigate();
+  return <TemplateWorkspace key={templateId} templateId={templateId} onBack={() => navigate('/presentation')} />;
+}
+
+/** Every generation, newest first, whatever its template; `?template=` narrows the list to one. */
+export function RunsPage() {
+  const t = useT();
+  const m = t.deck.runsPage;
+  const g = t.deck.generate;
+  const { get, set } = useFilters();
+  const templates = useTemplates();
+  const chosen = get('template');
+  const templateId = chosen && /^\d+$/.test(chosen) ? Number(chosen) : undefined;
+  const runs = useRuns(templateId);
+  const names = new Map((templates.data?.items ?? []).map((item) => [item.id, item.name]));
+  const items = runs.data?.items ?? [];
+  return (
+    <>
+      <PageHeader
+        title={m.title}
+        subtitle={m.subtitle}
+        crumbs={[{ label: t.deck.home.title, to: '/presentation' }, { label: m.title }]}
+        actions={<PresentationLinks />}
+      />
+      <Stack gap="md">
+        <Select
+          label={m.template}
+          placeholder={m.allTemplates}
+          data={(templates.data?.items ?? []).map((item) => ({ value: String(item.id), label: item.name }))}
+          value={templateId !== undefined ? String(templateId) : null}
+          onChange={(value) => set({ template: value })}
+          clearable
+          w={320}
+        />
+        {runs.isLoading && <Loading />}
+        {runs.error && <ErrorState error={runs.error} />}
+        {runs.data && !items.length && <Empty title={m.emptyTitle}>{m.emptyBody}</Empty>}
+        {items.length > 0 && (
+          <Table.ScrollContainer minWidth={760}>
+            <Table>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{g.colCreated}</Table.Th>
+                  <Table.Th>{m.template}</Table.Th>
+                  <Table.Th>{g.colReference}</Table.Th>
+                  <Table.Th>{g.colValidation}</Table.Th>
+                  <Table.Th>{g.colReview}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {items.map((run) => (
+                  <Table.Tr key={run.id}>
+                    <Table.Td>
+                      <Anchor component={Link} to={`/presentation/runs/${run.id}`} size="sm">
+                        {fmtDateTime(run.created_at)}
+                      </Anchor>
+                      {run.audience ? (
+                        <Badge size="xs" variant="outline" ml={6}>
+                          {run.audience}
+                        </Badge>
+                      ) : null}
+                    </Table.Td>
+                    <Table.Td>
+                      {names.has(run.template_id) ? (
+                        <Anchor component={Link} to={`/presentation/templates/${run.template_id}`} size="sm">
+                          {names.get(run.template_id)}
+                        </Anchor>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          {m.templateDeleted}
+                        </Text>
+                      )}
+                    </Table.Td>
+                    <Table.Td>{fmtDate(run.reference_at, true)}</Table.Td>
+                    <Table.Td>
+                      <Badge color={run.status === 'ok' ? 'teal' : 'red'} variant="light">
+                        {run.status === 'ok' ? 'ok' : t.deck.preview.errors(run.validation.errors.length)}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <ReviewBadge run={run} />
+                    </Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        )}
+      </Stack>
+    </>
+  );
+}
+
+/**
+ * One generation at its own address: downloads, review and approval, sharing, comparison, partial
+ * regeneration, accessibility and presenting — what a reviewer needs, without opening the editor.
+ * A problem's fix-it link opens the editor (or the variables) on the slide it points at.
+ */
+export function RunPage() {
+  const runId = useParams().runId!;
+  const t = useT();
+  const m = t.deck.runsPage;
+  const navigate = useNavigate();
+  const run = useRun(runId);
+  const detail = useTemplate(run.data?.template_id);
+  const runs = useRuns(run.data?.template_id);
+  if (run.isLoading) return <Loading rows={6} />;
+  if (run.error) return <ErrorState error={run.error} />;
+  if (!run.data) return null;
+  const current = run.data;
+  const templateName = detail.data?.name;
+  const crumbs = [
+    { label: t.deck.home.title, to: '/presentation' },
+    { label: m.title, to: '/presentation/runs' },
+    { label: fmtDateTime(current.created_at) },
+  ];
+  const header = (
+    <PageHeader
+      title={m.runTitle(fmtDateTime(current.created_at))}
+      subtitle={templateName ? m.runOf(templateName) : m.templateDeleted}
+      crumbs={crumbs}
+      actions={
+        templateName ? (
+          <Button component={Link} to={`/presentation/templates/${current.template_id}?run=${current.id}`} variant="default" size="xs">
+            {m.openInEditor}
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+  if (detail.isLoading) return <>{header}<Loading rows={4} /></>;
+  if (!detail.data) {
+    // The template is gone; the file is not. Reassociating needs the editor's context, so this page
+    // offers the deck itself and says why the rest is missing.
+    return (
+      <>
+        {header}
+        <Stack gap="sm">
+          <Alert color="yellow" variant="light" title={t.deck.page.templateDeletedTitle}>
+            {t.deck.page.templateDeletedBody}
+          </Alert>
+          <RunDownloads run={current} requireApproval={false} />
+        </Stack>
+      </>
+    );
+  }
+  const data = detail.data;
+  const draft = data.mapping ?? fromSuggestion(data.suggestion);
+  return (
+    <>
+      {header}
+      <RunResult
+        run={current}
+        standalone
+        context={{ data, draft, runs: runs.data?.items ?? [] }}
+        onRun={(next) => navigate(`/presentation/runs/${next.id}`)}
+        onFix={(fix) => {
+          if (fix.variable) {
+            navigate(`/presentation/variables?template=${current.template_id}`);
+            return;
+          }
+          const params = new URLSearchParams();
+          if (fix.run) params.set('run', fix.run);
+          if (fix.slide) params.set('slide', fix.slide);
+          if (fix.shape) params.set('shape', fix.shape);
+          navigate(`/presentation/templates/${current.template_id}?${params.toString()}`);
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * The deck variables outside the editor (RF-52): the same manager the editor's drawer opens, for one
+ * template at a time (`?template=`), since a variable can belong to a template or be shared by all.
+ */
+export function VariablesPage() {
+  const t = useT();
+  const m = t.deck.variablesPage;
+  const { get, set } = useFilters();
+  const templates = useTemplates();
+  const items = templates.data?.items ?? [];
+  const chosen = get('template');
+  const templateId = chosen && /^\d+$/.test(chosen) ? Number(chosen) : items[0]?.id;
+  const detail = useTemplate(templateId);
+  return (
+    <>
+      <PageHeader
+        title={m.title}
+        subtitle={m.subtitle}
+        crumbs={[{ label: t.deck.home.title, to: '/presentation' }, { label: m.title }]}
+        actions={<PresentationLinks />}
+      />
+      {templates.isLoading && <Loading />}
+      {templates.error && <ErrorState error={templates.error} />}
+      {templates.data && !items.length && <Empty title={t.deck.home.emptyTitle}>{m.noTemplates}</Empty>}
+      {items.length > 0 && (
+        <Stack gap="md">
+          <Select
+            label={m.template}
+            description={m.templateHint}
+            data={items.map((item) => ({ value: String(item.id), label: item.name }))}
+            value={templateId !== undefined ? String(templateId) : null}
+            onChange={(value) => value && set({ template: value })}
+            allowDeselect={false}
+            w={320}
+          />
+          {detail.isLoading && <Loading />}
+          {detail.error && <ErrorState error={detail.error} />}
+          {detail.data && (
+            <Paper withBorder p="md">
+              <VariablesDrawer
+                key={detail.data.id}
+                templateId={detail.data.id}
+                templateName={detail.data.name}
+                boards={detail.data.boards}
+                slides={detail.data.manifest.slides}
+              />
+            </Paper>
+          )}
+        </Stack>
+      )}
     </>
   );
 }

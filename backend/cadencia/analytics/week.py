@@ -181,7 +181,7 @@ def search(session: Session, query: str, limit: int = 8) -> list[dict[str, Any]]
                 "id": str(row.id),
                 "label": row.name,
                 "detail": row.filename,
-                "path": f"/presentation?template={row.id}",
+                "path": f"/presentation/templates/{row.id}",
             }
         )
     return out

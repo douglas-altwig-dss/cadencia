@@ -106,6 +106,27 @@ def test_tree_epic_and_item_drill_down(client):
     assert detail["issue"]["url"] == "https://demo.atlassian.net/browse/CAD-22"
     assert isinstance(detail["description"], str)
     assert isinstance(epic["description"], str)
+    # The epic page lives at /epics/<key>: the view names its board so the page can link back to it.
+    assert epic["board"] == {"id": 1, "name": "Plataforma"}
+
+
+def test_a_space_lists_its_boards_and_its_risks_across_them(client):
+    space = ok(client.get("/api/spaces/CAD"))
+    assert space["space"] == {"key": "CAD", "name": "Produto Digital"}
+    assert [b["name"] for b in space["boards"]] == ["Plataforma", "Suporte"]
+
+    risks = ok(client.get("/api/spaces/CAD/risks"))
+    keys = [i["key"] for i in risks["items"]]
+    assert len(keys) == len(set(keys)) and "CAD-14" in keys
+    assert {i["board"]["name"] for i in risks["items"]} <= {"Plataforma", "Suporte"}
+    severities = [i["risk"]["severity"] for i in risks["items"]]
+    assert severities == sorted(severities, reverse=True)
+    assert risks["freshness"] is not None
+    only = ok(client.get("/api/spaces/CAD/risks", params={"situation": "atrasado"}))
+    assert only["items"] and {i["risk"]["situation"] for i in only["items"]} == {"atrasado"}
+
+    assert client.get("/api/spaces/NOPE").status_code == 404
+    assert client.get("/api/spaces/NOPE/risks").status_code == 404
 
 
 def test_a_kanban_board_gets_the_same_shape_of_tree_a_sprint_does(client):
@@ -255,6 +276,10 @@ def test_report_template_mapping_generation_and_download(client, tmp_path):
     assert run["validation"]["slides"] >= 8
     download = client.get(f"/api/reports/runs/{run['id']}/download")
     assert download.status_code == 200 and download.content[:2] == b"PK"
+    # A generation has its own page, so it can be read alone.
+    alone = ok(client.get(f"/api/reports/runs/{run['id']}"))
+    assert alone["id"] == run["id"] and alone["template_id"] == uploaded["id"]
+    assert client.get("/api/reports/runs/nope").status_code == 404
     bad = client.put(
         f"/api/reports/templates/{uploaded['id']}/mapping",
         json={"slides": {"1": {"bindings": [{"target": "s1/sh999", "mode": "text", "field": "board.nome"}]}}},

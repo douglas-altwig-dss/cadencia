@@ -40,18 +40,18 @@ import { AudienceView } from './pages/AudienceView';
 import { fmtDateTime, fromNow, setDisplayTimeZone } from './lib/format';
 import { BoardPage } from './pages/BoardPage';
 import { BoardsPage } from './pages/BoardsPage';
-import { ConfigWizardPage } from './pages/ConfigWizardPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { DeckPage } from './pages/DeckPage';
+import { DeckPage, RunPage, RunsPage, TemplatePage, VariablesPage } from './pages/DeckPage';
 import { EpicPage } from './pages/EpicPage';
 import { IssuePage } from './pages/IssuePage';
-import { PeoplePage, PersonPage } from './pages/PeoplePages';
+import { MePage, PeoplePage, PersonPage } from './pages/PeoplePages';
 import { SettingsPage } from './pages/SettingsPage';
+import { SetupPage } from './pages/SetupPage';
 import { SharedDeckPage } from './pages/SharedDeckPage';
+import { SpacePage, SpacesPage } from './pages/SpacesPages';
 import { SprintPage } from './pages/SprintPage';
 import { StatusPage } from './pages/StatusPage';
 import { TimelineFocusPage } from './pages/TimelineFocusPage';
-import { WizardPage } from './pages/WizardPage';
 
 const NAV_WIDTH = 220;
 /** Just wide enough for the icon plus its focus ring. */
@@ -135,9 +135,8 @@ export function App() {
   useScrollHints();
   // Old Portuguese URLs (bookmarks, saved views, e-mails, share links) land on the English ones,
   // before any branch is chosen so the public and audience windows are covered too.
-  const legacy = normalizeLegacyUrl(location.pathname, location.search);
-  // A page that became a section brings its own anchor; otherwise the URL's hash travels.
-  if (legacy) return <Navigate to={legacy.includes('#') ? legacy : legacy + location.hash} replace />;
+  const legacy = normalizeLegacyUrl(location.pathname, location.search, location.hash);
+  if (legacy) return <Navigate to={legacy} replace />;
   // RF-100: the projector window is the slide and nothing else — no menu, no header.
   if (location.pathname.startsWith('/present/audience')) return <AudienceView />;
   // #14: a read-only share link — no shell, no sign-in, one deck.
@@ -304,24 +303,28 @@ function Shell() {
           )}
         </AppShell.Navbar>
         <AppShell.Main id="conteudo">
-          <div className={location.pathname.startsWith('/presentation') ? 'page is-wide' : 'page'}>
+          <div className={location.pathname.startsWith('/presentation/templates/') ? 'page is-wide' : 'page'}>
             <Routes>
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/getting-started" element={<WizardPage />} />
-              {/* Now a tab of People — kept as a redirect so an old bookmark or link still lands. */}
-              <Route path="/my-week" element={<Navigate to="/people?tab=my-week" replace />} />
+              <Route path="/setup" element={<SetupPage />} />
+              <Route path="/me" element={<MePage />} />
+              <Route path="/spaces" element={<SpacesPage />} />
+              <Route path="/spaces/:spaceKey" element={<SpacePage />} />
               <Route path="/boards" element={<BoardsPage />} />
               <Route path="/boards/:boardId" element={<BoardPage />} />
               <Route path="/boards/:boardId/sprints/:sprintId" element={<SprintPage />} />
-              <Route path="/boards/:boardId/epics/:epicKey" element={<EpicPage />} />
+              <Route path="/epics/:epicKey" element={<EpicPage />} />
               <Route path="/issues/:key" element={<IssuePage />} />
               <Route path="/people" element={<PeoplePage />} />
+              <Route path="/people/focus" element={<TimelineFocusPage />} />
               <Route path="/people/:accountId" element={<PersonPage />} />
               <Route path="/presentation" element={<DeckPage />} />
-              <Route path="/focus-timeline" element={<TimelineFocusPage />} />
+              <Route path="/presentation/templates/:templateId" element={<TemplatePage />} />
+              <Route path="/presentation/runs" element={<RunsPage />} />
+              <Route path="/presentation/runs/:runId" element={<RunPage />} />
+              <Route path="/presentation/variables" element={<VariablesPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/settings/wizard" element={<ConfigWizardPage />} />
               <Route path="*" element={<Empty title={t.shell.app.notFoundTitle}>{t.shell.app.notFoundBody}</Empty>} />
             </Routes>
           </div>

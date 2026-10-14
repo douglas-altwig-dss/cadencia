@@ -772,6 +772,17 @@ def runs(session: SessionDep, template_id: int | None = None, kind: str = "entre
     return {"items": [run_dict(r) for r in session.scalars(stmt)]}
 
 
+@router.get("/runs/{run_id}")
+def run(run_id: str, session: SessionDep) -> JSONDict:
+    """One generation, of any kind: what its own page (`/presentation/runs/<id>`) opens."""
+    row = session.get(s.ReportRunRow, run_id)
+    if row is None:
+        raise not_found(
+            tr("deck_api.deck_not_found.cause"), tr("deck_api.deck_not_found.message", run_id=run_id)
+        )
+    return run_dict(row)
+
+
 @router.get("/runs/{run_id}/download")
 def download(run_id: str, session: SessionDep, force: bool = False) -> FileResponse:
     row = session.get(s.ReportRunRow, run_id)

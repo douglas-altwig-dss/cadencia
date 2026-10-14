@@ -8,12 +8,12 @@ import { BoardCard } from './BoardCard';
 const COLS = { base: 1, sm: 2, lg: 3, xl: 4 };
 
 /** One grid of every board, by space then board name (boards with no space last); each card names its space. */
-export function BoardsGrid({ rows, onFlow }: { rows: DashboardRow[]; onFlow: (boardId: number) => void }) {
+export function BoardsGrid({ rows }: { rows: DashboardRow[] }) {
   const m = useT().tracking.boards;
   return (
     <SimpleGrid cols={COLS} spacing="md" verticalSpacing="md" component="section" aria-label={m.listAria}>
       {sortBySpace(rows).map((row) => (
-        <BoardCard key={row.board.id} row={row} onFlow={onFlow} />
+        <BoardCard key={row.board.id} row={row} />
       ))}
     </SimpleGrid>
   );

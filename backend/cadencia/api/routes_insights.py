@@ -6,7 +6,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from cadencia.analytics.changes import board_changes, digest
+from cadencia.analytics.changes import board_changes, digest, sprint_changes
 from cadencia.analytics.forecast import board_forecast, epic_forecast, sprint_forecast
 from cadencia.analytics.health import board_health
 from cadencia.analytics.serialize import iso
@@ -62,6 +62,21 @@ def changes(
     """What changed from one checkpoint to another, or from the last one to now (RF-74)."""
     data = board_data(session, settings, board_id)
     return board_changes(session, data, now, since=since, until=until, base_url=base_url(settings))
+
+
+@router.get("/sprints/{sprint_id}/changes")
+def changes_in_sprint(
+    sprint_id: int,
+    session: SessionDep,
+    settings: SettingsDep,
+    now: Now,
+    since: int | None = None,
+    until: int | None = None,
+) -> JSONDict:
+    """The same comparison over one sprint's own checkpoints; a past sprint walks first to last."""
+    sprint = sprint_or_404(session, sprint_id)
+    data = board_data(session, settings, sprint.board_id)
+    return sprint_changes(session, data, sprint, now, since=since, until=until, base_url=base_url(settings))
 
 
 @router.get("/digest")

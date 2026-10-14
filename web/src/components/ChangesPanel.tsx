@@ -1,7 +1,7 @@
 import { Accordion, Badge, Group, Paper, Select, SimpleGrid, Stack, Table, Text } from '@mantine/core';
 import { useState } from 'react';
 
-import { useChanges } from '../api/featureHooks';
+import { type ChangesScope, useChanges } from '../api/featureHooks';
 import type { ChangeEntry, ChangeTotals, Situation } from '../api/types';
 import { useT } from '../i18n';
 import { fmtDateTime } from '../lib/format';
@@ -84,13 +84,14 @@ function EntryTable({ items, kind }: { items: ChangeEntry[]; kind: string }) {
 /**
  * RF-74: the question every weekly meeting starts with — what changed since last week — answered
  * from the frozen checkpoints instead of two decks side by side. The default compares the last
- * checkpoint with right now; any two checkpoints can be compared.
+ * checkpoint with right now; any two checkpoints can be compared. Scoped to a sprint, only that sprint's
+ * checkpoints are offered, and a sprint that is not running has no "now" to compare with.
  */
-export function ChangesPanel({ boardId }: { boardId: number }) {
+export function ChangesPanel({ scope }: { scope: ChangesScope }) {
   const t = useT();
   const [since, setSince] = useState<number | null>(null);
   const [until, setUntil] = useState<number | null>(null);
-  const changes = useChanges(boardId, since, until);
+  const changes = useChanges(scope, since, until);
   if (changes.isLoading) return <Loading rows={5} />;
   if (changes.error) return <ErrorState error={changes.error} />;
   const data = changes.data;
@@ -117,8 +118,8 @@ export function ChangesPanel({ boardId }: { boardId: number }) {
         />
         <Select
           label={t.shell.changes.until}
-          data={[{ value: '', label: t.shell.changes.now }, ...options]}
-          value={until != null ? String(until) : ''}
+          data={data.live ? [{ value: '', label: t.shell.changes.now }, ...options] : options}
+          value={until != null ? String(until) : data.until.id != null ? String(data.until.id) : ''}
           onChange={(value) => setUntil(value ? Number(value) : null)}
           w={220}
           allowDeselect={false}

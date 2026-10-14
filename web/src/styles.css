@@ -1500,8 +1500,3 @@ body.is-resizing * {
   border-color: color-mix(in srgb, var(--mantine-primary-color-filled) 45%, var(--border-soft));
 }
 
-.boards-flow {
-  scroll-margin-top: 76px;
-  border-top: 1px solid var(--border-soft);
-  padding-top: var(--mantine-spacing-xl);
-}

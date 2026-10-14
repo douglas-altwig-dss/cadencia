@@ -37,6 +37,7 @@ MESSAGES: dict[str, Entry] = {
     # Names standing in for a missing person or space.
     "no_owner": "Unassigned",
     "no_space": "No space",
+    "space_not_found": "Space {key} does not exist.",
     # Forecast notes.
     "forecast.no_pace": "No item was done in the sample period: there is no pace to project.",
     "forecast.beyond": lambda days: (

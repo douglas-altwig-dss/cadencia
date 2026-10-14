@@ -9,7 +9,6 @@ import { NotificationsSettings } from '../components/NotificationsSettings';
 import { PlanParametersSettings } from '../components/PlanParametersSettings';
 import { BoardsTab } from '../components/settings/BoardsTab';
 import { FieldsTab } from '../components/settings/FieldsTab';
-import { ProfileTab, discardDialog } from '../components/settings/ProfileTab';
 import { SettingsNav } from '../components/settings/SettingsNav';
 import { SystemSection } from '../components/settings/SystemSection';
 import { isSection, isSystemSection, type SectionId } from '../components/settings/sections';
@@ -37,7 +36,7 @@ export function SettingsPage() {
   // Leaving a section with unsaved edits asks first.
   const goTo = async (value: SectionId) => {
     if (value === tab) return;
-    const dialog = tab === 'profile' ? discardDialog(m) : { title: c.page.discardTitle, body: c.page.discardBody, confirmLabel: c.page.discardLabel };
+    const dialog = { title: c.page.discardTitle, body: c.page.discardBody, confirmLabel: c.page.discardLabel };
     if (dirty && !(await confirm(dialog))) return;
     set({ tab: value });
   };
@@ -55,7 +54,7 @@ export function SettingsPage() {
           {jiraConfigured ? c.page.jiraConnected : c.page.jiraNotConfigured}
         </Badge>
       )}
-      <Button component={Link} to="/settings/wizard" variant="default" leftSection={<IconWand size={16} />}>
+      <Button component={Link} to="/setup?phase=configure" variant="default" leftSection={<IconWand size={16} />}>
         {c.page.wizard}
       </Button>
     </>
@@ -65,7 +64,6 @@ export function SettingsPage() {
   if (isSystemSection(tab)) content = <SystemSection key={tab} section={tab} onDirtyChange={setDirty} />;
   else if (tab === 'boards') content = <BoardsTab />;
   else if (tab === 'fields') content = <FieldsTab />;
-  else if (tab === 'profile') content = <ProfileTab onDirtyChange={setDirty} />;
   else if (tab === 'notifications') content = <NotificationsSettings />;
   else content = <PlanParametersSettings />;
 

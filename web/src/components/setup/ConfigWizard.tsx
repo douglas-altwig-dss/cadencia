@@ -1,20 +1,20 @@
 import { Anchor, Badge, Box, Button, Checkbox, Collapse, Group, Paper, Progress, SimpleGrid, Stack, Stepper, Text, Title, UnstyledButton } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconArrowLeft, IconCheck, IconChevronDown, IconChevronRight, IconExternalLink, IconPlugConnected } from '@tabler/icons-react';
+import { IconCheck, IconChevronDown, IconChevronRight, IconExternalLink, IconPlugConnected } from '@tabler/icons-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 
-import { useConfig, useImportEnv, useSaveConfig, useTestJiraDraft } from '../api/hooks';
-import type { ConfigField as Field, ConfigView } from '../api/types';
-import { announce } from '../components/Announcer';
-import { ErrorState, Loading, Note, PageHeader, useConfirm } from '../components/common';
-import { ConfigField, fieldText } from '../components/config/ConfigField';
-import { JiraTestResult } from '../components/config/JiraTestResult';
-import { useConfigDraft, type ConfigDraft } from '../components/config/useConfigDraft';
-import { LOCALE_NAMES, isLocale, useT, type Messages } from '../i18n';
-import { fieldErrorOf, hourLabel, jiraTestBody } from '../lib/config';
-import { WIZARD_STEPS, fieldsOfStep, isRecommended, stepOfField, wizardLayout, type WizardStepId } from '../lib/configWizard';
-import { fmtNum, weekdays } from '../lib/format';
+import { useConfig, useImportEnv, useSaveConfig, useTestJiraDraft } from '../../api/hooks';
+import type { ConfigField as Field, ConfigView } from '../../api/types';
+import { announce } from '../Announcer';
+import { ErrorState, Loading, Note } from '../common';
+import { ConfigField, fieldText } from '../config/ConfigField';
+import { JiraTestResult } from '../config/JiraTestResult';
+import { useConfigDraft, type ConfigDraft } from '../config/useConfigDraft';
+import { LOCALE_NAMES, isLocale, useT, type Messages } from '../../i18n';
+import { fieldErrorOf, hourLabel, jiraTestBody } from '../../lib/config';
+import { WIZARD_STEPS, fieldsOfStep, isRecommended, stepOfField, wizardLayout, type WizardStepId } from '../../lib/configWizard';
+import { fmtNum, weekdays } from '../../lib/format';
 
 const API_TOKEN_HELP = 'https://id.atlassian.com/manage-profile/security/api-tokens';
 
@@ -22,24 +22,23 @@ const API_TOKEN_HELP = 'https://id.atlassian.com/manage-profile/security/api-tok
 const OPTIONAL: ReadonlySet<WizardStepId> = new Set(['notifications', 'ai']);
 
 /**
- * The configuration wizard: the runtime settings of `GET /config` asked in order — connection,
- * calendar, collection, then the optional e-mail and AI — over one draft, reviewed and saved with a
- * single `PUT /config` at the end. Nothing is written before the last step.
+ * The configuration phase of `/setup`: the runtime settings of `GET /config` asked in order —
+ * connection, calendar, collection, then the optional e-mail and AI — over one draft, reviewed and
+ * saved with a single `PUT /config` at the end. Nothing is written before the last step; `onDone`
+ * moves the setup on to its first run.
  */
-export function ConfigWizardPage() {
+export function ConfigWizard({ onDone }: { onDone: () => void }) {
   const config = useConfig();
   if (config.isLoading) return <Loading />;
   if (config.error || !config.data) return <ErrorState error={config.error} />;
-  return <ConfigWizard view={config.data} />;
+  return <ConfigSteps view={config.data} onDone={onDone} />;
 }
 
-function ConfigWizard({ view }: { view: ConfigView }) {
+function ConfigSteps({ view, onDone }: { view: ConfigView; onDone: () => void }) {
   const t = useT();
   const m = t.config;
   const w = m.wizard;
-  const navigate = useNavigate();
   const phone = useMediaQuery('(max-width: 48em)') ?? false;
-  const { confirm, dialog } = useConfirm();
 
   const layout = useMemo(() => wizardLayout(view), [view]);
   const all = useMemo(() => view.groups.flatMap((group) => group.fields), [view]);
@@ -75,11 +74,6 @@ function ConfigWizard({ view }: { view: ConfigView }) {
   useEffect(() => {
     if (advancedTrouble) setAdvancedOpen(true);
   }, [advancedTrouble]);
-
-  const leave = async () => {
-    if (draft.isDirty && !finished && !(await confirm({ title: m.page.discardTitle, body: w.discardBody, confirmLabel: m.page.discardLabel }))) return;
-    navigate('/settings');
-  };
 
   const skip = (index: number) => {
     for (const field of fieldsAt(index)) draft.forget(field.key);
@@ -177,15 +171,9 @@ function ConfigWizard({ view }: { view: ConfigView }) {
 
   return (
     <>
-      <PageHeader
-        title={w.title}
-        subtitle={w.subtitle}
-        actions={
-          <Button variant="default" leftSection={<IconArrowLeft size={16} />} onClick={leave}>
-            {w.back}
-          </Button>
-        }
-      />
+      <Text size="sm" c="dimmed" mb="sm">
+        {w.subtitle}
+      </Text>
       <Paper withBorder p={phone ? 'md' : 'lg'}>
         {phone && !finished && (
           // On a phone six step markers take a screen of their own; one line and a bar say the same.
@@ -382,9 +370,7 @@ function ConfigWizard({ view }: { view: ConfigView }) {
             <Stack gap="md" mt="lg" align="flex-start">
               {header(w.done.title, w.done.body)}
               <Group gap="sm" wrap="wrap">
-                <Button component={Link} to="/getting-started">
-                  {w.done.start}
-                </Button>
+                <Button onClick={onDone}>{w.done.start}</Button>
                 <Button component={Link} to="/settings" variant="default">
                   {w.done.settings}
                 </Button>
@@ -393,7 +379,6 @@ function ConfigWizard({ view }: { view: ConfigView }) {
           </Stepper.Completed>
         </Stepper>
       </Paper>
-      {dialog}
     </>
   );
 }

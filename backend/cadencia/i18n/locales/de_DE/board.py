@@ -33,6 +33,7 @@ MESSAGES: dict[str, Entry] = {
     "cfd.done": "Fertig",
     "no_owner": "Nicht zugewiesen",
     "no_space": "Kein Bereich",
+    "space_not_found": "Der Bereich {key} existiert nicht.",
     "forecast.no_pace": (
         "Im Stichprobenzeitraum wurde kein Vorgang erledigt: Es gibt kein Tempo für eine Prognose."
     ),

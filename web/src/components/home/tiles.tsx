@@ -1,5 +1,5 @@
-import { Anchor, Badge, Group, Paper, Progress, ScrollArea, Skeleton, Stack, Text } from '@mantine/core';
-import { IconAlertTriangle, IconCalendarOff, IconCheck, IconHistory, IconLayoutKanban, IconPlus } from '@tabler/icons-react';
+import { Anchor, Badge, Group, Paper, ScrollArea, Skeleton, Stack, Table, Text } from '@mantine/core';
+import { IconAlertTriangle, IconCheck, IconHistory, IconLayoutKanban, IconPlus } from '@tabler/icons-react';
 import type { ComponentType, ReactNode } from 'react';
 import { Link } from 'react-router';
 
@@ -12,6 +12,7 @@ import { useFilters } from '../../lib/filters';
 import { fmtPct, fromNow } from '../../lib/format';
 import { tileHelp } from '../../lib/indicatorHelp';
 import type { TileState } from '../../lib/mosaic';
+import { spacesOf } from '../../lib/spaces';
 import { ErrorState, KpiCard, Tipped } from '../common';
 import { LoadGauge, SeverityBadge, StateBadge } from '../people/indicators';
 import { BoardsTile, type BoardsConfig } from './BoardsTile';
@@ -122,95 +123,74 @@ const ScopeTile = withDashboard('sprint:scope', 'scope', (s, m) => (
   </KpiCard>
 ));
 
-/** Time elapsed against work done, per board with a running sprint. */
-function ElapsedTile() {
+/**
+ * One row per team (space): its tracked boards, what is at risk, what it delivered this week and its
+ * sprint progress, each linking to the space's own page. The per-board view is the Boards page.
+ */
+function SpacesTile() {
   const { data, isLoading, error } = useDashboard();
   const { carry } = useFilters();
-  const m = useT().tracking.home;
-  if (isLoading) return <Waiting label={m.titles.elapsed} help={tileHelp('sprint:elapsed')} />;
+  const t = useT();
+  const m = t.tracking.home;
+  const sm = t.tracking.spaces;
+  if (isLoading) return <Skeleton h={220} />;
   if (error) return <ErrorState error={error} />;
-  const now = data ? new Date(data.generated_at).getTime() : Date.now();
-  const running = (data?.rows ?? []).filter((r) => !r.error && r.sprint?.state === 'active' && r.sprint.start && r.sprint.end);
+  const spaces = spacesOf((data?.rows ?? []).filter((r) => !r.error));
   return (
     <Paper withBorder p="md" h="100%">
       <Stack gap="sm">
-        <Text className="kpi-label">
-          <Tipped help={tileHelp('sprint:elapsed')}>{m.titles.elapsed}</Tipped>
-        </Text>
-        {running.length === 0 && <TileEmpty icon={<IconCalendarOff size={22} aria-hidden />}>{m.noActiveSprint}</TileEmpty>}
-        {running.map((row) => {
-          const start = new Date(row.sprint!.start!).getTime();
-          const end = new Date(row.sprint!.end!).getTime();
-          const elapsed = Math.round(Math.min(Math.max((now - start) / (end - start), 0), 1) * 100);
-          const done = Math.round((row.progress?.count_ratio ?? 0) * 100);
-          const behind = done < elapsed - 20;
-          return (
-            <Stack key={row.board.id} gap={4}>
-              <Group justify="space-between" wrap="nowrap">
-                <Anchor component={Link} to={carry(`/boards/${row.board.id}`)} size="sm" fw={600} lineClamp={1}>
-                  {row.board.name}
-                </Anchor>
-                {behind && (
-                  <Badge color="yellow" variant="light" size="xs" leftSection={<IconAlertTriangle size={10} />}>
-                    {m.behind}
-                  </Badge>
-                )}
-              </Group>
-              <Progress value={elapsed} size="xs" color="gray" aria-label={m.elapsedAria(elapsed)} />
-              <Progress value={done} size="xs" aria-label={m.doneAria(done)} />
-              <Text size="xs" c="dimmed">
-                {m.elapsedLine(row.sprint!.name, elapsed, done)}
-              </Text>
-            </Stack>
-          );
-        })}
-      </Stack>
-    </Paper>
-  );
-}
-
-/** A kanban board has no sprint to be "in progress": its own weekly vazão and open risk, per board. */
-function KanbanTile() {
-  const { data, isLoading, error } = useDashboard();
-  const { carry } = useFilters();
-  const m = useT().tracking.home;
-  if (isLoading) return <Waiting label={m.titles.kanban} help={tileHelp('kanban:boards')} />;
-  if (error) return <ErrorState error={error} />;
-  const rows = (data?.rows ?? []).filter((r) => !r.error && r.board.type === 'kanban');
-  return (
-    <Paper withBorder p="md" h="100%">
-      <Stack gap="sm">
-        <Text className="kpi-label">
-          <Tipped help={tileHelp('kanban:boards')}>{m.titles.kanban}</Tipped>
-        </Text>
-        {rows.length === 0 && <TileEmpty icon={<IconLayoutKanban size={22} aria-hidden />}>{m.noKanban}</TileEmpty>}
-        {rows.map((row) => {
-          const atRisk = Object.entries(row.risk_counts ?? {}).reduce((s, [k, n]) => (k === 'em_dia' ? s : s + (n ?? 0)), 0);
-          const delivered = row.trend.map((t) => t.delivered);
-          const last = row.trend.at(-1) ?? null;
-          const prior = row.trend.length > 1 ? row.trend.at(-2)! : null;
-          return (
-            <Stack key={row.board.id} gap={4}>
-              <Group justify="space-between" wrap="nowrap">
-                <Anchor component={Link} to={carry(`/boards/${row.board.id}`)} size="sm" fw={600} lineClamp={1}>
-                  {row.board.name}
-                </Anchor>
-                {atRisk > 0 && (
-                  <Badge color="yellow" variant="light" size="xs" leftSection={<IconAlertTriangle size={10} />}>
-                    {m.atRisk(atRisk)}
-                  </Badge>
-                )}
-              </Group>
-              <Group justify="space-between" wrap="nowrap">
-                <Sparkline values={delivered} label={m.deliveredPerWeek(delivered.join(', '))} />
-                <Text size="xs" c="dimmed">
-                  {m.thisWeek(last?.delivered ?? 0)}
-                </Text>
-              </Group>
-              <Delta value={last && prior ? last.delivered - prior.delivered : null} better="up" />
-            </Stack>
-          );
-        })}
+        <Group justify="space-between" wrap="nowrap">
+          <Text className="kpi-label">
+            <Tipped help={tileHelp('spaces')}>{m.titles.spaces}</Tipped>
+          </Text>
+          <Anchor component={Link} to={carry('/boards')} size="xs">
+            {m.allBoards}
+          </Anchor>
+        </Group>
+        {spaces.length === 0 && <TileEmpty icon={<IconLayoutKanban size={22} aria-hidden />}>{sm.emptyBody}</TileEmpty>}
+        {spaces.length > 0 && (
+          <Table.ScrollContainer minWidth={480}>
+            <Table verticalSpacing={4}>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>{m.colSpace}</Table.Th>
+                  <Table.Th className="num">{m.boards}</Table.Th>
+                  <Table.Th className="num">{sm.atRisk}</Table.Th>
+                  <Table.Th className="num">{sm.delivered}</Table.Th>
+                  <Table.Th className="num">{sm.progress}</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {spaces.map((space) => (
+                  <Table.Tr key={space.key}>
+                    <Table.Td>
+                      <Anchor component={Link} to={carry(`/spaces/${encodeURIComponent(space.key)}`)} size="sm" fw={600}>
+                        {space.name}
+                      </Anchor>
+                    </Table.Td>
+                    <Table.Td className="num">{space.rows.length}</Table.Td>
+                    <Table.Td className="num">
+                      {space.atRisk > 0 ? (
+                        <Badge color="yellow" variant="light" size="sm" leftSection={<IconAlertTriangle size={10} aria-hidden />}>
+                          {space.atRisk}
+                        </Badge>
+                      ) : (
+                        0
+                      )}
+                    </Table.Td>
+                    <Table.Td className="num">
+                      <Group gap={6} justify="flex-end" wrap="nowrap">
+                        {space.delivered.current}
+                        <Delta value={space.delivered.current - space.delivered.previous} better="up" />
+                      </Group>
+                    </Table.Td>
+                    <Table.Td className="num">{space.progress === null ? '—' : fmtPct(space.progress)}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </Table.ScrollContainer>
+        )}
       </Stack>
     </Paper>
   );
@@ -420,8 +400,6 @@ export const TILE_VIEWS: Record<string, ComponentType<TileProps>> = {
   'kpi:progress': ProgressTile,
   'kpi:adherence': AdherenceTile,
   'sprint:scope': ScopeTile,
-  'sprint:elapsed': ElapsedTile,
-  'kanban:boards': KanbanTile,
   'team:load': LoadTile,
   'team:overloaded': OverloadedTile,
   'team:blocks': BlocksTile,
@@ -429,6 +407,7 @@ export const TILE_VIEWS: Record<string, ComponentType<TileProps>> = {
   'pulse:recent': RecentTile,
   'pulse:feed': FeedTile,
   'pulse:due': DueTile,
+  spaces: SpacesTile,
   boards: BoardsView,
   'saude:pontos': HealthTile,
 };

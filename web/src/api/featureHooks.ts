@@ -43,18 +43,28 @@ export const useBoardForecast = (boardId?: number) =>
 
 // ---- RF-74 / RF-73 changes and digest
 
-export const useChanges = (boardId?: number, since?: number | null, until?: number | null) =>
-  useQuery({
-    queryKey: ['changes', boardId, since ?? null, until ?? null],
-    queryFn: () => api.get<ChangesView>(`/boards/${boardId}/changes${qs({ since, until })}`),
-    enabled: boardId !== undefined,
+/** What a changes view compares: a whole board, or one sprint's own checkpoints. */
+export type ChangesScope = { boardId: number } | { sprintId: number };
+
+export const useChanges = (scope: ChangesScope, since?: number | null, until?: number | null) => {
+  const path = 'sprintId' in scope ? `/sprints/${scope.sprintId}/changes` : `/boards/${scope.boardId}/changes`;
+  return useQuery({
+    queryKey: ['changes', path, since ?? null, until ?? null],
+    queryFn: () => api.get<ChangesView>(`${path}${qs({ since, until })}`),
   });
+};
 
 export const useDigest = () => useQuery({ queryKey: ['digest'], queryFn: () => api.get<DigestView>('/digest') });
 
 // ---- RF-78 health, RF-80 search, RF-85 week
 
-export const useHealthCheck = () => useQuery({ queryKey: ['health-check'], queryFn: () => api.get<HealthView>('/health-check') });
+/** Jira hygiene per board: every tracked board, or only the ones given (a board's or a space's tab). */
+export const useHealthCheck = (boardIds?: number[]) =>
+  useQuery({
+    queryKey: ['health-check', boardIds?.join(',') ?? null],
+    queryFn: () => api.get<HealthView>(`/health-check${qs({ board_id: boardIds?.join(',') })}`),
+    enabled: boardIds === undefined || boardIds.length > 0,
+  });
 
 export const useSearch = (q: string) =>
   useQuery({

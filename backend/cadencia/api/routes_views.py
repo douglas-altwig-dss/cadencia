@@ -24,6 +24,7 @@ from cadencia.api.deps import (
     csv_strs,
     parse_instant,
     selected_or,
+    space_or_404,
     sprint_or_404,
 )
 from cadencia.domain.calendar import sprint_timeline
@@ -58,7 +59,15 @@ def board_sprints(board_id: int, session: SessionDep, settings: SettingsDep, now
             }
         )
     return {
-        "board": {"id": data.board.id, "name": data.board.name, "type": data.board.type},
+        "board": {
+            "id": data.board.id,
+            "name": data.board.name,
+            "type": data.board.type,
+            # The team the board belongs to: the crumb between Home and the board.
+            "space": {"key": data.board.space_key, "name": data.board.space_name or data.board.space_key}
+            if data.board.space_key
+            else None,
+        },
         "current_sprint_id": current.id if current else None,
         "sprints": items,
         "freshness": data.freshness(now),
@@ -155,6 +164,55 @@ def board_risks(
         "items": items,
         "freshness": data.freshness(now),
     }
+
+
+@router.get("/spaces/{key}/risks")
+def space_risks(
+    key: str,
+    session: SessionDep,
+    settings: SettingsDep,
+    now: Now,
+    situation: str | None = None,
+    person: str | None = None,
+    type: str | None = None,
+) -> JSONDict:
+    """The open items at risk across a space's tracked boards, each naming its board. An item on
+    two of the team's boards is listed once, under the first board that has it."""
+    space, rows = space_or_404(session, key, tracked=True)
+    items: list[JSONDict] = []
+    seen: set[str] = set()
+    freshness: list[JSONDict] = []
+    for row in rows:
+        data = board_data(session, settings, row.id)
+        freshness.append(data.freshness(now))
+        for item in sprint_views.risk_list(
+            data,
+            now,
+            situations=csv_strs(situation) or None,
+            person=person,
+            type_name=type,
+            base_url=base_url(settings),
+        ):
+            if item["key"] in seen:
+                continue
+            seen.add(item["key"])
+            items.append({**item, "board": {"id": data.board.id, "name": data.board.name}})
+    items.sort(key=lambda r: (-r["risk"]["severity"], r["key"]))
+    return {"space": space, "items": items, "freshness": _stalest(freshness)}
+
+
+def _stalest(entries: list[JSONDict]) -> JSONDict | None:
+    """The freshness that most needs saying: a failed board first, then a stale one, then the oldest."""
+    if not entries:
+        return None
+    return min(
+        entries,
+        key=lambda f: (
+            not f["last_error"],
+            not f["stale"],
+            f["last_success_at"].timestamp() if f["last_success_at"] else float("-inf"),
+        ),
+    )
 
 
 @router.get("/issues/{key}")

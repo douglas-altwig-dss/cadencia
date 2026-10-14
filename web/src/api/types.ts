@@ -186,7 +186,7 @@ export interface BoardOverview {
 }
 
 export interface BoardSprints {
-  board: { id: number; name: string; type: string };
+  board: { id: number; name: string; type: string; space: { key: string; name: string } | null };
   current_sprint_id: number | null;
   sprints: (Sprint & { windows: WindowInfo[]; warnings: string[]; current: boolean })[];
   freshness: Freshness;
@@ -251,15 +251,26 @@ export interface SprintTimelineView {
 
 export interface RiskItem extends IssueBrief {
   risk: Risk;
+  /** On a space's list, which of its boards the item is on. */
+  board?: { id: number; name: string };
 }
 
 export interface RiskList {
   items: RiskItem[];
-  freshness: Freshness;
+  /** A space's list answers with its stalest board's freshness, or none when it tracks no board. */
+  freshness: Freshness | null;
+}
+
+/** `GET /spaces/{key}`: a space (team) and its boards. */
+export interface SpaceDetail {
+  space: { key: string; name: string };
+  boards: BoardListItem[];
 }
 
 export interface EpicView {
   epic: IssueBrief;
+  /** The board the epic was read from: the page's way back to it. */
+  board: { id: number; name: string };
   /** Plain text, headings kept as `#` lines. Empty when the Jira item has no description. */
   description: string;
   tree: TreeNode | null;
@@ -1814,6 +1825,8 @@ export interface ChangesView {
   board: { id: number; name: string };
   since: { id: number; at: string } | null;
   until: { id: number | null; at: string };
+  /** Whether "now" is a valid end: false for a sprint that is not running. */
+  live: boolean;
   checkpoints: { id: number; at: string; sprint_id: number | null }[];
   entered: ChangeEntry[];
   left: ChangeEntry[];

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from cadencia.analytics.data import BoardData
 from cadencia.analytics.serialize import iso, issue_url
 from cadencia.collector.snapshots import snapshot_rows
+from cadencia.domain.models import Sprint
 from cadencia.domain.risk import SEVERITY, Situation
 from cadencia.errors import Invalid, NotFound
 from cadencia.i18n import Msg, render, stored_text, tr
@@ -77,6 +78,11 @@ def state_at_checkpoint(session: Session, checkpoint_id: int) -> State:
 
 def state_now(data: BoardData, now: datetime) -> State:
     sprint = data.current_sprint(now)
+    running = sprint if sprint is not None and sprint.state != "closed" else None
+    return _state(snapshot_rows(data, now, running))
+
+
+def _state(rows: Sequence[Mapping[str, Any]]) -> State:
     return {
         r["issue_key"]: _entry(
             r["issue_key"],
@@ -87,7 +93,7 @@ def state_now(data: BoardData, now: datetime) -> State:
             r["situation"],
             r["evidence"],
         )
-        for r in snapshot_rows(data, now, sprint if sprint is not None and sprint.state != "closed" else None)
+        for r in rows
     }
 
 
@@ -171,21 +177,83 @@ def board_changes(
 ) -> dict[str, Any]:
     """Compare two checkpoints of the board, or one checkpoint with now (``until=None``)."""
     marks = checkpoints_with_snapshots(session, data.board.id, now)
+    start, end = _bounds(marks, since, until)
+    after = state_at_checkpoint(session, end.id) if end else state_now(data, now)
+    return _comparison(session, data, marks, start, end, after, now, live=True, base_url=base_url)
+
+
+def sprint_changes(
+    session: Session,
+    data: BoardData,
+    sprint: Sprint,
+    now: datetime,
+    *,
+    since: int | None = None,
+    until: int | None = None,
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    """The board comparison narrowed to one sprint: only the checkpoints frozen inside it.
+
+    A sprint that is still running compares its last checkpoint with now, like the board does, and
+    measures the live side over the sprint's own members. A sprint that is over (or not yet begun)
+    has no "now" worth comparing: by default it walks from its first checkpoint to its last, so a
+    past sprint's tab says what happened *during* it rather than what the board is doing today.
+    """
+    marks = [c for c in checkpoints_with_snapshots(session, data.board.id, now) if c.sprint_id == sprint.id]
+    live = sprint.state == "active"
+    if not live and until is None and marks:
+        until = marks[-1].id
+        if since is None:
+            since = marks[0].id if len(marks) > 1 else None
+    start, end = _bounds(marks, since, until)
+    if end is not None:
+        after = state_at_checkpoint(session, end.id)
+    elif live:
+        after = _state(snapshot_rows(data, now, sprint))
+    else:
+        after = {}
+    return _comparison(session, data, marks, start, end, after, now, live=live, base_url=base_url)
+
+
+def _bounds(
+    marks: Sequence[s.CheckpointRow], since: int | None, until: int | None
+) -> tuple[s.CheckpointRow | None, s.CheckpointRow | None]:
     by_id = {c.id: c for c in marks}
     for wanted in (since, until):
         if wanted is not None and wanted not in by_id:
             raise NotFound(wanted, Msg("changes.checkpoint.not_found", checkpoint=wanted))
-    start = by_id[since] if since is not None else (marks[-1] if marks else None)
     end = by_id[until] if until is not None else None
+    if since is not None:
+        start = by_id[since]
+    else:
+        # The latest checkpoint before the end, so "until a checkpoint" alone still has a start.
+        earlier = [c for c in marks if end is None or c.at < end.at]
+        start = earlier[-1] if earlier else None
     if start is not None and end is not None and end.at <= start.at:
         raise Invalid(Msg("changes.checkpoint.order"))
-    after = state_at_checkpoint(session, end.id) if end else state_now(data, now)
+    return start, end
+
+
+def _comparison(
+    session: Session,
+    data: BoardData,
+    marks: Sequence[s.CheckpointRow],
+    start: s.CheckpointRow | None,
+    end: s.CheckpointRow | None,
+    after: State,
+    now: datetime,
+    *,
+    live: bool,
+    base_url: str | None,
+) -> dict[str, Any]:
     before = state_at_checkpoint(session, start.id) if start else {}
     result = _enrich(compare(before, after), data, base_url)
     return {
         "board": {"id": data.board.id, "name": data.board.name},
         "since": {"id": start.id, "at": iso(start.at)} if start else None,
         "until": {"id": end.id, "at": iso(end.at)} if end else {"id": None, "at": iso(now)},
+        # Whether "now" is a valid end: false for a sprint that is not running.
+        "live": live,
         "checkpoints": [{"id": c.id, "at": iso(c.at), "sprint_id": c.sprint_id} for c in marks],
         **result,
     }

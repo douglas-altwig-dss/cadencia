@@ -1,15 +1,17 @@
-import { Button, Checkbox, Group, Pagination, Stack, Table, Text, TextInput } from '@mantine/core';
+import { Anchor, Button, Checkbox, Group, Pagination, Stack, Table, Text, TextInput } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconSearch } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 
 import { useBoards, useSaveSelection } from '../../api/hooks';
 import { useT } from '../../i18n';
 import { fromNow } from '../../lib/format';
 import { ErrorState, Loading } from '../common';
 
-/** Which boards are tracked, grouped by the space they belong to. */
+/** Which boards are tracked, grouped by the space they belong to. A tracked board's name opens its
+ * own Settings tab, where its profile (columns, checkpoint, capacity) is edited. */
 export function BoardsTab() {
   const [query, setQuery] = useState('');
   const [debounced] = useDebouncedValue(query, 300);
@@ -108,7 +110,15 @@ export function BoardsTab() {
                           aria-label={m.trackAria(b.name, group.space.name)}
                         />
                       </Table.Td>
-                      <Table.Td>{b.name}</Table.Td>
+                      <Table.Td>
+                        {b.selected ? (
+                          <Anchor component={Link} to={`/boards/${b.id}?tab=settings`} size="sm" aria-label={m.boardSettingsAria(b.name)}>
+                            {b.name}
+                          </Anchor>
+                        ) : (
+                          b.name
+                        )}
+                      </Table.Td>
                       <Table.Td>{b.type}</Table.Td>
                       <Table.Td>{b.selected ? fromNow(b.last_success_at) : '—'}</Table.Td>
                     </Table.Tr>

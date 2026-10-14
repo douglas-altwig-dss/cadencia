@@ -38,6 +38,7 @@ import type {
   PlanView,
   ReportRun,
   RiskList,
+  SpaceDetail,
   Scatter,
   SprintOverview,
   SprintTimelineView,
@@ -112,16 +113,21 @@ export const useBoardTree = (boardId?: number) =>
     enabled: boardId !== undefined,
   });
 
-export const useRisks = (scope: { sprintId?: number; boardId?: number }, filters: { situation?: string; person?: string; type?: string }) =>
+export const useRisks = (
+  scope: { sprintId?: number; boardId?: number; spaceKey?: string },
+  filters: { situation?: string; person?: string; type?: string },
+) =>
   useQuery({
     queryKey: ['risks', scope, filters],
     queryFn: () =>
       api.get<RiskList>(
         scope.sprintId !== undefined
           ? `/sprints/${scope.sprintId}/risks${qs(filters)}`
-          : `/boards/${scope.boardId}/risks${qs(filters)}`,
+          : scope.spaceKey !== undefined
+            ? `/spaces/${encodeURIComponent(scope.spaceKey)}/risks${qs(filters)}`
+            : `/boards/${scope.boardId}/risks${qs(filters)}`,
       ),
-    enabled: scope.sprintId !== undefined || scope.boardId !== undefined,
+    enabled: scope.sprintId !== undefined || scope.boardId !== undefined || scope.spaceKey !== undefined,
   });
 
 export const useIssue = (key?: string) =>
@@ -134,8 +140,9 @@ export const useEpic = (key?: string, boardId?: number) =>
     enabled: !!key,
   });
 
-export const useFlow = (filters: FlowFilters) =>
+export const useFlow = (filters: FlowFilters, enabled = true) =>
   useQuery({
+    enabled,
     queryKey: ['flow', filters],
     queryFn: () =>
       api.get<FlowView>(`/flow${qs({ board_id: filters.board, person: filters.person, type: filters.type, start: filters.start, end: filters.end })}`),
@@ -168,8 +175,12 @@ export const useCvd = (boardId?: number) =>
 export const usePeople = () => useQuery({ queryKey: ['people'], queryFn: () => api.get<PeopleView>('/people') });
 
 /** Workload, deliveries, blocks and past deliveries for everyone: the cards and the Home tiles share it. */
-export const usePeopleOverview = () =>
-  useQuery({ queryKey: ['people-overview'], queryFn: () => api.get<PeopleOverview>('/people/overview'), staleTime: 60_000 });
+export const usePeopleOverview = (boardIds?: number[]) =>
+  useQuery({
+    queryKey: ['people-overview', boardIds?.join(',') ?? null],
+    queryFn: () => api.get<PeopleOverview>(`/people/overview${qs({ board_id: boardIds?.join(',') })}`),
+    staleTime: 60_000,
+  });
 
 
 export const usePerson = (accountId?: string, weeks = 12) =>
@@ -373,6 +384,18 @@ export const useDeckEdits = (templateId?: number) =>
     queryFn: () => api.get<EditsView>(`/reports/templates/${templateId}/edits`),
     enabled: templateId !== undefined,
   });
+
+/** A space (team) and every board under it, tracked or not. */
+export const useSpace = (key?: string) =>
+  useQuery({
+    queryKey: ['space', key],
+    queryFn: () => api.get<SpaceDetail>(`/spaces/${encodeURIComponent(key!)}`),
+    enabled: !!key,
+  });
+
+/** One generation, whatever its template: what `/presentation/runs/:runId` opens. */
+export const useRun = (runId?: string) =>
+  useQuery({ queryKey: ['run', runId], queryFn: () => api.get<ReportRun>(`/reports/runs/${runId}`), enabled: !!runId });
 
 export const useRuns = (templateId?: number) =>
   useQuery({ queryKey: ['runs', templateId], queryFn: () => api.get<{ items: ReportRun[] }>(`/reports/runs${qs({ template_id: templateId })}`) });

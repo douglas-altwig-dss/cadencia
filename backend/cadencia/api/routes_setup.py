@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from cadencia import __version__
 from cadencia.analytics.serialize import iso
-from cadencia.api.deps import JSONDict, SessionDep, SessionsDep, SettingsDep, not_found
+from cadencia.api.deps import JSONDict, SessionDep, SessionsDep, SettingsDep, not_found, space_or_404
 from cadencia.collector.service import (
     COLLECT_LEASE,
     LEASE_TTL,
@@ -147,6 +147,13 @@ def spaces(session: SessionDep, selected: bool | None = None) -> JSONDict:
             groups.append({"space": {"key": row.key, "name": row.name}, "boards": []})
     groups.sort(key=lambda g: (g["space"]["key"] is None, str(g["space"]["name"]).casefold()))
     return {"items": groups, "total": len(groups)}
+
+
+@router.get("/spaces/{key}")
+def space(key: str, session: SessionDep) -> JSONDict:
+    """One space (team) and every board under it, tracked or not (the Space page's header)."""
+    found, boards = space_or_404(session, key)
+    return {"space": found, "boards": [_board_dict(b) for b in boards]}
 
 
 class Selection(BaseModel):

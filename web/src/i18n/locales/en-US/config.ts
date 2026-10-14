@@ -30,7 +30,6 @@ export const config = {
     general: 'General',
     boards: 'Boards',
     fields: 'Fields',
-    profile: 'Board profile',
     notifications: 'Notifications',
     'epic-plan': 'Epic plan',
   },
@@ -282,9 +281,7 @@ export const config = {
   },
   /** `pages/ConfigWizardPage.tsx`: the runtime settings asked step by step and saved at the end. */
   wizard: {
-    title: 'Configuration wizard',
     subtitle: 'Connect to Jira and set the defaults in a few steps. Nothing is saved until the last one.',
-    back: 'Back to settings',
     previous: 'Back',
     next: 'Next',
     skip: 'Skip',
@@ -335,7 +332,7 @@ export const config = {
     done: {
       title: 'Configuration saved',
       body: 'It applies from now on, with no restart. Next, discover the boards in Jira and run the first collection.',
-      start: 'Discover boards & start',
+      start: 'Continue: discover boards',
       settings: 'Open settings',
     },
   },

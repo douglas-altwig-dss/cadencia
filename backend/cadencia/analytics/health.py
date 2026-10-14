@@ -145,7 +145,7 @@ def board_health(data: BoardData, field_map: FieldMap, now: datetime) -> dict[st
                     "fora_do_time",
                     "info",
                     strangers,
-                    f"/settings?tab=boards&board={data.board.id}",
+                    f"/boards/{data.board.id}?tab=settings",
                 )
             )
 

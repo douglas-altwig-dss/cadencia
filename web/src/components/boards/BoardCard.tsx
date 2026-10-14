@@ -64,10 +64,10 @@ function SprintProgress({ row }: { row: DashboardRow }) {
 
 /**
  * One board at a glance: where its sprint is (or what it delivered this week, for a board without
- * one), how it has been delivering, what is at risk. The title opens the board; the footer brings
- * the flow metrics below to this board alone.
+ * one), how it has been delivering, what is at risk. The title opens the board; the footer opens the
+ * board's own flow metrics.
  */
-export function BoardCard({ row, onFlow }: { row: DashboardRow; onFlow: (boardId: number) => void }) {
+export function BoardCard({ row }: { row: DashboardRow }) {
   const t = useT();
   const m = t.tracking.boards;
   const { carry } = useFilters();
@@ -160,7 +160,8 @@ export function BoardCard({ row, onFlow }: { row: DashboardRow; onFlow: (boardId
             variant="subtle"
             size="compact-sm"
             leftSection={<IconChartDots size={16} aria-hidden />}
-            onClick={() => onFlow(row.board.id)}
+            component={Link}
+            to={carry(`/boards/${row.board.id}`, { tab: 'flow' })}
             aria-label={m.flowMetricsAria(row.board.name)}
           >
             {m.flowMetrics}

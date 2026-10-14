@@ -113,6 +113,29 @@ def test_what_changed_since_the_last_checkpoint(client):
     assert client.get("/api/boards/1/changes", params={"since": 99999}).status_code == 404
 
 
+def test_a_sprints_changes_use_only_its_own_checkpoints(client):
+    board = ok(client.get("/api/boards/1/changes"))
+    running = ok(client.get("/api/sprints/12/changes"))
+    assert running["live"] is True and running["until"]["id"] is None
+    assert running["checkpoints"] and {c["sprint_id"] for c in running["checkpoints"]} == {12}
+    assert "CAD-14" in {e["key"] for e in running["new_risks"]}
+
+    # A checkpoint of another sprint is not one of this sprint's.
+    others = [c["id"] for c in board["checkpoints"] if c["sprint_id"] != 12]
+    if others:
+        assert client.get("/api/sprints/12/changes", params={"since": others[0]}).status_code == 404
+
+    # A sprint that is not running has no "now": nothing to compare until it has checkpoints.
+    future = ok(client.get("/api/sprints/13/changes"))
+    assert future["live"] is False and future["checkpoints"] == [] and future["after"]["items"] == 0
+
+    past = ok(client.get("/api/sprints/11/changes"))
+    assert past["live"] is False
+    if past["checkpoints"]:
+        assert past["until"]["id"] == past["checkpoints"][-1]["id"]
+    assert client.get("/api/sprints/99999/changes").status_code == 404
+
+
 def test_the_digest_lists_new_risks_per_space(client):
     digest = ok(client.get("/api/digest"))
     produto = next(s for s in digest["spaces"] if s["space"]["name"] == "Produto Digital")

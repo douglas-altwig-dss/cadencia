@@ -74,7 +74,7 @@ export function ConnectionSection({ view, onDirtyChange }: { view: ConfigView; o
       </ConfigCard>
       <Text size="xs" c="dimmed">
         {old.fromScratchBefore}{' '}
-        <Anchor component={Link} to="/getting-started" size="xs">
+        <Anchor component={Link} to="/setup" size="xs">
           {old.guideLink}
         </Anchor>{' '}
         {old.fromScratchAfter}

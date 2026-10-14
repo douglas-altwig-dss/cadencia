@@ -23,7 +23,6 @@ export const config: Messages['config'] = {
     general: 'Geral',
     boards: 'Boards',
     fields: 'Campos',
-    profile: 'Perfil do board',
     notifications: 'Notificações',
     'epic-plan': 'Plano de épico',
   },
@@ -272,9 +271,7 @@ export const config: Messages['config'] = {
     },
   },
   wizard: {
-    title: 'Assistente de configuração',
     subtitle: 'Conecte ao Jira e defina os padrões em poucos passos. Nada é salvo antes do último.',
-    back: 'Voltar à configuração',
     previous: 'Voltar',
     next: 'Avançar',
     skip: 'Pular',
@@ -325,7 +322,7 @@ export const config: Messages['config'] = {
     done: {
       title: 'Configuração salva',
       body: 'Ela vale a partir de agora, sem reiniciar. Em seguida, descubra os boards no Jira e faça a primeira coleta.',
-      start: 'Descobrir boards e começar',
+      start: 'Continuar: descobrir boards',
       settings: 'Abrir a configuração',
     },
   },

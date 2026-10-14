@@ -2,7 +2,7 @@ import { Badge, Button, Drawer, Group, Paper, SegmentedControl, SimpleGrid, Stac
 import { IconCalendarOff, IconSearch, IconUserCog } from '@tabler/icons-react';
 import { useLocalStorage } from '@mantine/hooks';
 import { useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router';
+import { Navigate, useLocation, useParams, useSearchParams } from 'react-router';
 
 import { usePeople, usePeopleOverview, usePerson, usePersonDetail } from '../api/hooks';
 import { useMembers, useRoles } from '../api/planHooks';
@@ -23,9 +23,10 @@ import { useFilters } from '../lib/filters';
 import { HELP } from '../lib/indicatorHelp';
 import { useT } from '../i18n';
 import { fmtNum } from '../lib/format';
+import { myWeekPath } from '../lib/navigation';
 import { visiblePeople } from '../lib/people';
 
-function PersonCards({ people, indicators, loading }: { people: Person[]; indicators: ReadonlyMap<string, PersonIndicators>; loading: boolean }) {
+export function PersonCards({ people, indicators, loading }: { people: Person[]; indicators: ReadonlyMap<string, PersonIndicators>; loading: boolean }) {
   const { carry } = useFilters();
   const members = useMembers();
   const roles = useRoles();
@@ -76,6 +77,20 @@ function useParamDrawer(key: string) {
 
 /** RF-23: people under the space (team) they work in. Someone who works in two teams is listed
  *  under both — the repetition is what makes a shared person visible as shared. */
+/**
+ * `/me`: your own week, at a link that does not change. Who you are is remembered in this browser
+ * (People → "It's me"); until it is, the People page opens its picker. Filters on the link travel.
+ */
+export function MePage() {
+  const { search } = useLocation();
+  const target = myWeekPath();
+  const extra = new URLSearchParams(search);
+  const [path, query = ''] = target.split('?');
+  const params = new URLSearchParams(query);
+  for (const [key, value] of extra) if (!params.has(key)) params.set(key, value);
+  return <Navigate to={`${path}?${params.toString()}`} replace />;
+}
+
 export function PeoplePage() {
   const t = useT();
   const tl = t.people.list;

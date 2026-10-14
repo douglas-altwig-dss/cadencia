@@ -361,6 +361,7 @@ def epic_view(data: BoardData, epic_key: str, now: datetime, base_url: str | Non
     assessments = data.assess([data.histories[k] for k in keys if k != epic_key], now)
     return {
         "epic": issue_brief(data.issues[epic_key], base_url),
+        "board": {"id": data.board.id, "name": data.board.name},
         "description": data.issues[epic_key].description,
         "tree": node_dict(node, assessments, base_url) if node else None,
         "risk_counts": risk_counts(assessments.values()),

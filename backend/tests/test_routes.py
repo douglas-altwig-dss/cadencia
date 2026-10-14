@@ -144,7 +144,7 @@ def test_search_links_people_and_templates_to_the_english_screens(sessions):
         paths = {i["type"]: i["path"] for i in search(session, "modelo", 10)}
         template_id = session.query(s.TemplateRow.id).scalar()
     assert paths["pessoa"] == "/people/acc-1"
-    assert paths["modelo"] == f"/presentation?template={template_id}"
+    assert paths["modelo"] == f"/presentation/templates/{template_id}"
 
 
 def test_the_deck_notification_links_the_presentation_screen(tmp_path):
@@ -153,7 +153,7 @@ def test_the_deck_notification_links_the_presentation_screen(tmp_path):
         status="ok", validation={}, template_id=3, id="r1", reference_at=datetime(2026, 9, 10, tzinfo=UTC)
     )
     message = notify.deck_message(settings, run, "Sprint")
-    assert message.link == "https://cadencia.example/presentation?template=3&run=r1"
+    assert message.link == "https://cadencia.example/presentation/runs/r1"
 
 
 # ------------------------------------------------------------------ migration 0023

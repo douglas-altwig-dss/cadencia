@@ -1,6 +1,5 @@
 import {
   IconAdjustments,
-  IconAdjustmentsHorizontal,
   IconBell,
   IconCalendarTime,
   IconForms,
@@ -34,7 +33,6 @@ export const SECTIONS = [
     items: [
       { id: 'boards', icon: IconLayoutKanban },
       { id: 'fields', icon: IconForms },
-      { id: 'profile', icon: IconAdjustmentsHorizontal },
     ],
   },
   {

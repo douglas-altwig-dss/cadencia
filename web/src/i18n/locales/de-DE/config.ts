@@ -23,7 +23,6 @@ export const config: Messages['config'] = {
     general: 'Allgemein',
     boards: 'Boards',
     fields: 'Felder',
-    profile: 'Board-Profil',
     notifications: 'Benachrichtigungen',
     'epic-plan': 'Epic-Plan',
   },
@@ -272,9 +271,7 @@ export const config: Messages['config'] = {
     },
   },
   wizard: {
-    title: 'Einrichtungsassistent',
     subtitle: 'Mit Jira verbinden und die Standardwerte in wenigen Schritten festlegen. Gespeichert wird erst im letzten Schritt.',
-    back: 'Zurück zu den Einstellungen',
     previous: 'Zurück',
     next: 'Weiter',
     skip: 'Überspringen',
@@ -325,7 +322,7 @@ export const config: Messages['config'] = {
     done: {
       title: 'Konfiguration gespeichert',
       body: 'Sie gilt ab sofort, ohne Neustart. Als Nächstes die Boards in Jira entdecken und die erste Erfassung starten.',
-      start: 'Boards entdecken und loslegen',
+      start: 'Weiter: Boards entdecken',
       settings: 'Einstellungen öffnen',
     },
   },

@@ -4,12 +4,11 @@ import { IconSearch } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 
-import { useBoardDetail, useBoards, usePeople, useSaveBoardSettings } from '../../api/hooks';
-import type { BoardSettings } from '../../api/types';
-import { currentLocale, useT, type Messages } from '../../i18n';
-import { useFilters } from '../../lib/filters';
-import { TIMEZONES, weekdays } from '../../lib/format';
-import { ErrorState, Loading, useConfirm } from '../common';
+import { useBoardDetail, usePeople, useSaveBoardSettings } from '../api/hooks';
+import type { BoardSettings } from '../api/types';
+import { currentLocale, useT, type Messages } from '../i18n';
+import { TIMEZONES, weekdays } from '../lib/format';
+import { ErrorState, Loading } from './common';
 
 /** The confirmation asked before unsaved profile edits are thrown away; read at use time. */
 export const discardDialog = (m: Messages['tracking']['settings']) => ({
@@ -19,16 +18,12 @@ export const discardDialog = (m: Messages['tracking']['settings']) => ({
 });
 
 /**
- * The board's own profile. It reads and writes its own ``profile`` parameter (not the shared ``board`` filter,
- * which the flow page uses), and it keeps the edits: a board or tab change asks first, and the save
- * bar says how many changes are waiting.
+ * A board's profile — flow columns, checkpoint, capacity, affinity — as the board's own Settings
+ * tab. It keeps the edits: leaving the tab asks first (`onDirtyChange`), and the save bar says how
+ * many changes are waiting.
  */
-export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) {
-  const selected = useBoards('', 1, 500, true);
+export function BoardProfile({ boardId, onDirtyChange }: { boardId: number; onDirtyChange: (dirty: boolean) => void }) {
   const people = usePeople();
-  const { get, set } = useFilters();
-  const { confirm, dialog: confirmDialog } = useConfirm();
-  const boardId = get('profile') ? Number(get('profile')) : selected.data?.items[0]?.id;
   const detail = useBoardDetail(boardId);
   const save = useSaveBoardSettings(boardId);
   const [draft, setDraft] = useState<BoardSettings | null>(null);
@@ -56,13 +51,6 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
   useEffect(() => onDirtyChange(pending > 0), [pending, onDirtyChange]);
   useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
 
-  const switchBoard = async (value: string | null) => {
-    if (!value) return;
-    if (pending && !(await confirm(discardDialog(settings)))) return;
-    set({ profile: value });
-  };
-
-  if (selected.data && !selected.data.items.length) return <Text size="sm">{m.selectBoardsFirst}</Text>;
   if (detail.isLoading || !draft) return <Loading />;
   if (detail.error) return <ErrorState error={detail.error} />;
 
@@ -77,14 +65,6 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
 
   return (
     <Stack gap="md">
-      <Select
-        label={m.board}
-        data={(selected.data?.items ?? []).map((b) => ({ value: String(b.id), label: b.name }))}
-        value={boardId ? String(boardId) : null}
-        onChange={switchBoard}
-        w={300}
-        allowDeselect={false}
-      />
       {detail.data!.overridden.length > 0 && (
         <Text size="xs" c="dimmed">
           {m.overridden(detail.data!.overridden.join(', '))}
@@ -264,7 +244,6 @@ export function ProfileTab({ onDirtyChange }: { onDirtyChange: (dirty: boolean) 
           </Group>
         </Group>
       </Paper>
-      {confirmDialog}
     </Stack>
   );
 }
